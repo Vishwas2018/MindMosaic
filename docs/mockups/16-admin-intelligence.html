@@ -1,0 +1,375 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic - Admin Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],mono:['"DM Mono"','monospace']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118'},
+      good:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      warn:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+      bad:{50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626',700:'#b91c1c'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:10px;--r-btn:6px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f3f4f7;color:#2a3040;font-size:14px}
+
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:500;font-size:13px;line-height:1;border-radius:var(--r-btn);padding:7px 12px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 2px rgba(89,37,168,.3)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}
+  .btn-secondary{background:white;color:#525b6e;border:1px solid #d5d9e2}.btn-secondary:hover{background:#f3f4f7}
+  .btn-ghost{background:transparent;color:#6b7488}.btn-ghost:hover{background:#eef0f4;color:#2a3040}
+  .btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fee2e2}.btn-danger:hover{background:#fee2e2}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#8b94a6}
+  .mono{font-family:'DM Mono',monospace;font-size:13px}
+  .pbar{height:4px;background:#eef0f4;border-radius:100px;overflow:hidden}.pfill{height:100%;border-radius:100px}
+
+  /* Dark sidebar */
+  .aside{background:#0e1118;color:#b0b7c5}
+  .aside .snav{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:6px;font-size:13px;font-weight:500;color:#6b7488;cursor:pointer;transition:all var(--fast);text-decoration:none}
+  .aside .snav:hover{background:rgba(255,255,255,.06);color:#d5d9e2}
+  .aside .snav.snav-on{background:rgba(89,37,168,.15);color:#8B5CF6;font-weight:600}
+  .aside .snav svg{width:16px;height:16px;flex-shrink:0;opacity:.7}
+
+  /* Table */
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{text-align:left;padding:8px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8b94a6;border-bottom:1px solid #eef0f4;white-space:nowrap;cursor:pointer;user-select:none}
+  .tbl th:hover{color:#3d4555}
+  .tbl td{padding:10px 12px;border-bottom:1px solid #f3f4f7;vertical-align:middle}
+  .tbl tr:hover td{background:#fcfcfd}
+
+  /* Metric cell colours */
+  .m-good{color:#16a34a}.m-ok{color:#5925a8}.m-warn{color:#d97706}.m-bad{color:#dc2626}
+  .bg-good{background:#f0fdf4;border:1px solid #dcfce7}.bg-warn{background:#fffbeb;border:1px solid #fef3c7}.bg-bad{background:#fef2f2;border:1px solid #fee2e2}
+
+  /* Heatmap cell */
+  .hcell{width:100%;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;transition:all var(--fast)}
+
+  /* Tab */
+  .tab{font-size:13px;font-weight:500;color:#6b7488;padding:8px 14px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#2a3040}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+
+  /* Slide panel */
+  .slide{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:100vw;background:white;box-shadow:-8px 0 24px rgba(0,0,0,.1);z-index:100;transform:translateX(100%);transition:transform 250ms cubic-bezier(.4,0,.2,1);overflow-y:auto}
+  .slide.open{transform:translateX(0)}
+  .sov{position:fixed;inset:0;background:rgba(14,17,24,.35);z-index:99;opacity:0;pointer-events:none;transition:opacity var(--base)}.sov.open{opacity:1;pointer-events:auto}
+
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}.afi{animation:fadeIn 200ms ease both}
+  ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+<!-- ================================================================== -->
+<!-- SIDEBAR (Dark admin)                                                -->
+<!-- ================================================================== -->
+<aside class="aside hidden lg:flex flex-col w-[220px] flex-shrink-0 h-screen sticky top-0 border-r border-slate-900">
+  <div class="px-4 py-4 border-b border-white/5 flex items-center gap-2">
+    <img src="../brand/logo.svg" alt="MindMosaic" style="height:32px;width:auto;filter:brightness(0) invert(1);">
+    <span class="pill bg-white/10 text-white/60 ml-auto text-[9px]">Admin</span>
+  </div>
+  <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+    <a class="snav snav-on"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Content Intelligence</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Question Bank</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Users</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Platform Health</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.68 15H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a2 2 0 0 1 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06"/></svg>Settings</a>
+  </nav>
+  <div class="px-3 py-3 border-t border-white/5"><div class="flex items-center gap-2.5"><div class="w-7 h-7 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-semibold">AD</div><div class="min-w-0"><p class="text-xs font-medium text-white/80 truncate">Admin</p><p class="text-[10px] text-white/40">Content Team</p></div></div></div>
+</aside>
+
+<!-- ================================================================== -->
+<!-- MAIN                                                                -->
+<!-- ================================================================== -->
+<div class="flex-1 min-w-0 flex flex-col">
+  <header class="sticky top-0 z-50 bg-white border-b border-slate-100">
+    <div class="px-5 h-12 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[14px] font-semibold text-slate-900">Content Intelligence</h1>
+        <span class="pill bg-slate-50 text-slate-500 border border-slate-150">Year 7 Numeracy</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-ghost text-xs gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Last 30d</button>
+        <button class="btn btn-secondary text-xs gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="px-5 border-b border-slate-100 flex gap-0">
+    <button class="tab tab-on" onclick="A.tab(this,'perf')">Question Performance</button>
+    <button class="tab" onclick="A.tab(this,'quality')">Content Quality</button>
+    <button class="tab" onclick="A.tab(this,'coverage')">Topic Coverage</button>
+    <button class="tab" onclick="A.tab(this,'insights')">Insights</button>
+  </div>
+
+  <main class="flex-1 px-5 py-5 overflow-y-auto" id="area"></main>
+</div>
+
+<!-- ================================================================== -->
+<!-- QUESTION DETAIL PANEL                                               -->
+<!-- ================================================================== -->
+<div class="sov" id="pov" onclick="A.closePanel()"></div>
+<div class="slide" id="panel">
+  <div class="sticky top-0 z-10 bg-white border-b border-slate-100 px-5 py-3 flex items-center justify-between">
+    <h3 class="text-sm font-semibold text-slate-900" id="pn-title">Question Detail</h3>
+    <button class="btn btn-ghost p-1" onclick="A.closePanel()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="pn-body" class="p-5"></div>
+</div>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var view="perf";
+
+// Data
+var questions=[
+  {id:"Q-001",text:"What is 3\u00B2 + 4\u00B2?",topic:"Algebra",skill:"Indices",difficulty:.32,accuracy:.88,disc:.45,attempts:842,flagged:false,status:"good"},
+  {id:"Q-002",text:"Simplify 2(3x+4)\u22125x",topic:"Algebra",skill:"Expressions",difficulty:.41,accuracy:.74,disc:.52,attempts:798,flagged:false,status:"good"},
+  {id:"Q-003",text:"Perimeter of rectangle 12\u00D78",topic:"Geometry",skill:"Perimeter",difficulty:.28,accuracy:.91,disc:.31,attempts:856,flagged:true,status:"easy"},
+  {id:"Q-004",text:"What is \u00B3/\u2085 of 45?",topic:"Fractions",skill:"Operations",difficulty:.55,accuracy:.58,disc:.61,attempts:834,flagged:false,status:"ok"},
+  {id:"Q-005",text:"Convert 0.625 to fraction",topic:"Fractions",skill:"Conversion",difficulty:.62,accuracy:.48,disc:.55,attempts:812,flagged:false,status:"hard"},
+  {id:"Q-006",text:"Triangle angles ratio 2:3:4",topic:"Geometry",skill:"Angles",difficulty:.51,accuracy:.65,disc:.49,attempts:828,flagged:false,status:"ok"},
+  {id:"Q-007",text:"Mean of 12,15,18,21,24",topic:"Statistics",skill:"Averages",difficulty:.22,accuracy:.94,disc:.18,attempts:850,flagged:true,status:"easy"},
+  {id:"Q-008",text:"15% discount on $40",topic:"Algebra",skill:"Percentages",difficulty:.38,accuracy:.78,disc:.42,attempts:841,flagged:false,status:"good"},
+  {id:"Q-009",text:"Next: 2,6,18,54,...",topic:"Algebra",skill:"Patterns",difficulty:.44,accuracy:.72,disc:.48,attempts:820,flagged:false,status:"good"},
+  {id:"Q-010",text:"7/20 as percentage",topic:"Algebra",skill:"Percentages",difficulty:.25,accuracy:.92,disc:.22,attempts:848,flagged:true,status:"easy"},
+  {id:"Q-011",text:"Volume of cube side 5cm",topic:"Geometry",skill:"Volume",difficulty:.35,accuracy:.82,disc:.38,attempts:836,flagged:false,status:"good"},
+  {id:"Q-012",text:"Solve 3x\u22127=14",topic:"Algebra",skill:"Equations",difficulty:.30,accuracy:.86,disc:.35,attempts:844,flagged:false,status:"good"},
+  {id:"Q-013",text:"P(even) on standard die",topic:"Statistics",skill:"Probability",difficulty:.29,accuracy:.85,disc:.33,attempts:840,flagged:false,status:"good"},
+  {id:"Q-014",text:"240km in 3hrs speed",topic:"Geometry",skill:"Speed",difficulty:.48,accuracy:.62,disc:.58,attempts:818,flagged:false,status:"ok"},
+  {id:"Q-015",text:"Triangle area b=10 h=6",topic:"Geometry",skill:"Area",difficulty:.33,accuracy:.84,disc:.40,attempts:838,flagged:false,status:"good"},
+  {id:"Q-016",text:"Round 3.4567 to 2dp",topic:"Algebra",skill:"Rounding",difficulty:.52,accuracy:.61,disc:.44,attempts:832,flagged:false,status:"ok"},
+  {id:"Q-017",text:"\u22123 \u00D7 (\u22124)",topic:"Algebra",skill:"Negatives",difficulty:.36,accuracy:.80,disc:.41,attempts:842,flagged:false,status:"good"},
+  {id:"Q-018",text:"P(blue) from 3R,5B,2G",topic:"Statistics",skill:"Probability",difficulty:.31,accuracy:.83,disc:.36,attempts:836,flagged:false,status:"good"},
+  {id:"Q-019",text:"Simplify 4a+3b\u22122a+5b",topic:"Algebra",skill:"Expressions",difficulty:.40,accuracy:.76,disc:.46,attempts:830,flagged:false,status:"good"},
+  {id:"Q-020",text:"Scale 1:50000 distance",topic:"Geometry",skill:"Scale",difficulty:.58,accuracy:.52,disc:.62,attempts:810,flagged:false,status:"hard"},
+  {id:"Q-021",text:"Median of 5,8,3,12,7",topic:"Statistics",skill:"Averages",difficulty:.27,accuracy:.89,disc:.28,attempts:845,flagged:false,status:"good"},
+  {id:"Q-022",text:"2.5 \u00D7 0.4",topic:"Algebra",skill:"Decimals",difficulty:.78,accuracy:.35,disc:.25,attempts:808,flagged:true,status:"hard"},
+  {id:"Q-023",text:"Circumference r=7 \u03C0=22/7",topic:"Geometry",skill:"Circles",difficulty:.45,accuracy:.70,disc:.50,attempts:825,flagged:false,status:"good"},
+  {id:"Q-024",text:"y=2x+3 when x=\u22122",topic:"Algebra",skill:"Substitution",difficulty:.68,accuracy:.42,disc:.20,attempts:805,flagged:true,status:"hard"},
+  {id:"Q-025",text:"30 students 18 girls %boys",topic:"Statistics",skill:"Percentages",difficulty:.34,accuracy:.81,disc:.39,attempts:840,flagged:false,status:"good"},
+];
+
+var topicCoverage=[
+  {topic:"Algebra",subtopics:["Indices","Expressions","Percentages","Patterns","Equations","Rounding","Negatives","Decimals","Substitution"],questions:13,avgAcc:.71,avgDisc:.39},
+  {topic:"Geometry",subtopics:["Perimeter","Angles","Volume","Speed","Area","Scale","Circles"],questions:7,avgAcc:.72,avgDisc:.44},
+  {topic:"Statistics",subtopics:["Averages","Probability","Percentages"],questions:5,avgAcc:.86,avgDisc:.31},
+  {topic:"Fractions",subtopics:["Operations","Conversion"],questions:2,avgAcc:.53,avgDisc:.58},
+];
+
+// Helpers
+function mc(v,thresholds){if(v>=thresholds[0])return"m-good";if(v>=thresholds[1])return"m-ok";if(v>=thresholds[2])return"m-warn";return"m-bad"}
+function stPill(s){if(s==="good")return'<span class="pill bg-good text-good-700">Good</span>';if(s==="ok")return'<span class="pill bg-warn text-warn-700">Review</span>';if(s==="easy")return'<span class="pill bg-good text-good-700">Too Easy</span>';if(s==="hard")return'<span class="pill bg-bad text-bad-700">Too Hard</span>';return'<span class="pill bg-warn text-warn-700">'+s+'</span>'}
+function pct(v){return Math.round(v*100)+"%"}
+function heatCol(v){if(v>=.8)return"background:#dcfce7;color:#15803d";if(v>=.6)return"background:#EDE8F8;color:#4a1d96";if(v>=.4)return"background:#fef3c7;color:#b45309";return"background:#fee2e2;color:#b91c1c"}
+
+function render(){
+  var h="";
+  switch(view){
+    case"perf":h=renderPerf();break;
+    case"quality":h=renderQuality();break;
+    case"coverage":h=renderCoverage();break;
+    case"insights":h=renderInsights();break;
+  }
+  $("area").innerHTML=h;
+}
+
+// ── Performance ───────────────────────────────────────────────────
+function renderPerf(){
+  // KPIs
+  var totalQ=questions.length,avgAcc=questions.reduce(function(s,q){return s+q.accuracy},0)/totalQ;
+  var avgDisc=questions.reduce(function(s,q){return s+q.disc},0)/totalQ;
+  var flagged=questions.filter(function(q){return q.flagged}).length;
+
+  var h='<div class="grid grid-cols-4 gap-3 mb-5">';
+  h+='<div class="card p-4"><p class="sl mb-1">Questions</p><p class="text-xl font-bold text-slate-900 mono">'+totalQ+'</p></div>';
+  h+='<div class="card p-4"><p class="sl mb-1">Avg Accuracy</p><p class="text-xl font-bold '+mc(avgAcc,[.75,.6,.4])+' mono">'+pct(avgAcc)+'</p></div>';
+  h+='<div class="card p-4"><p class="sl mb-1">Avg Discrimination</p><p class="text-xl font-bold '+mc(avgDisc,[.4,.3,.2])+' mono">'+avgDisc.toFixed(2)+'</p></div>';
+  h+='<div class="card p-4"><p class="sl mb-1">Flagged</p><p class="text-xl font-bold '+(flagged>0?"m-warn":"m-good")+' mono">'+flagged+'</p></div>';
+  h+='</div>';
+
+  // Table
+  h+='<div class="card"><div class="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between"><p class="text-[13px] font-semibold text-slate-900">All Questions</p><div class="flex gap-2"><button class="btn btn-ghost text-[11px]">Filter</button><button class="btn btn-ghost text-[11px]">Sort</button></div></div>';
+  h+='<div class="overflow-x-auto"><table class="tbl"><thead><tr><th>ID</th><th>Question</th><th>Topic</th><th>Accuracy</th><th>Difficulty</th><th>Disc.</th><th>Attempts</th><th>Status</th><th></th></tr></thead><tbody>';
+  questions.forEach(function(q,i){
+    h+='<tr>';
+    h+='<td class="mono text-slate-400 text-xs">'+q.id+'</td>';
+    h+='<td class="text-slate-800 font-medium text-xs max-w-[200px] truncate">'+q.text+(q.flagged?' <svg class="w-3 h-3 inline text-warn-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg>':"")+'</td>';
+    h+='<td class="text-xs text-slate-500">'+q.topic+'</td>';
+    h+='<td class="mono font-semibold '+mc(q.accuracy,[.75,.6,.4])+'">'+pct(q.accuracy)+'</td>';
+    h+='<td><div class="flex items-center gap-1.5"><div class="pbar w-12"><div class="pfill" style="width:'+pct(q.difficulty)+';background:'+(q.difficulty>.6?"#dc2626":q.difficulty>.4?"#d97706":"#16a34a")+'"></div></div><span class="mono text-xs text-slate-500">'+q.difficulty.toFixed(2)+'</span></div></td>';
+    h+='<td class="mono text-xs '+mc(q.disc,[.4,.3,.2])+'">'+q.disc.toFixed(2)+'</td>';
+    h+='<td class="mono text-xs text-slate-400">'+q.attempts.toLocaleString()+'</td>';
+    h+='<td>'+stPill(q.status)+'</td>';
+    h+='<td><button class="btn btn-ghost text-[11px] py-1 px-2" onclick="A.openPanel('+i+')"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
+
+// ── Quality ───────────────────────────────────────────────────────
+function renderQuality(){
+  var easy=questions.filter(function(q){return q.status==="easy"});
+  var hard=questions.filter(function(q){return q.status==="hard"});
+  var flagged=questions.filter(function(q){return q.flagged});
+  var lowDisc=questions.filter(function(q){return q.disc<.25});
+
+  var h='<div class="grid lg:grid-cols-2 gap-4 mb-5">';
+
+  // Too easy
+  h+='<div class="card"><div class="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-good-50 text-good-600 flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17l5-5 5 5M7 7l5 5 5-5"/></svg></div><p class="text-[13px] font-semibold text-slate-900">Too Easy</p></div><span class="pill bg-good text-good-700">'+easy.length+'</span></div>';
+  h+='<div class="divide-y divide-slate-75">';
+  easy.forEach(function(q){h+='<div class="px-4 py-2.5 flex items-center gap-3"><span class="mono text-[11px] text-slate-400 w-14">'+q.id+'</span><span class="text-xs text-slate-700 flex-1 truncate">'+q.text+'</span><span class="mono text-[11px] m-good">'+pct(q.accuracy)+'</span><button class="btn btn-ghost text-[10px] py-0.5 px-1.5" onclick="A.openPanel('+questions.indexOf(q)+')">View</button></div>'});
+  if(!easy.length)h+='<div class="p-4 text-xs text-slate-400">No items flagged as too easy.</div>';
+  h+='</div></div>';
+
+  // Too hard
+  h+='<div class="card"><div class="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-bad-50 text-bad-600 flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 7l-5 5-5-5M17 17l-5-5-5 5"/></svg></div><p class="text-[13px] font-semibold text-slate-900">Too Hard</p></div><span class="pill bg-bad text-bad-700">'+hard.length+'</span></div>';
+  h+='<div class="divide-y divide-slate-75">';
+  hard.forEach(function(q){h+='<div class="px-4 py-2.5 flex items-center gap-3"><span class="mono text-[11px] text-slate-400 w-14">'+q.id+'</span><span class="text-xs text-slate-700 flex-1 truncate">'+q.text+'</span><span class="mono text-[11px] m-bad">'+pct(q.accuracy)+'</span><button class="btn btn-ghost text-[10px] py-0.5 px-1.5" onclick="A.openPanel('+questions.indexOf(q)+')">View</button></div>'});
+  if(!hard.length)h+='<div class="p-4 text-xs text-slate-400">No items flagged as too hard.</div>';
+  h+='</div></div>';
+
+  // Low discrimination
+  h+='<div class="card"><div class="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-warn-50 text-warn-600 flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><p class="text-[13px] font-semibold text-slate-900">Low Discrimination</p></div><span class="pill bg-warn text-warn-700">'+lowDisc.length+'</span></div>';
+  h+='<div class="divide-y divide-slate-75">';
+  lowDisc.forEach(function(q){h+='<div class="px-4 py-2.5 flex items-center gap-3"><span class="mono text-[11px] text-slate-400 w-14">'+q.id+'</span><span class="text-xs text-slate-700 flex-1 truncate">'+q.text+'</span><span class="mono text-[11px] m-warn">'+q.disc.toFixed(2)+'</span><button class="btn btn-ghost text-[10px] py-0.5 px-1.5" onclick="A.openPanel('+questions.indexOf(q)+')">View</button></div>'});
+  h+='</div></div>';
+
+  // Flagged
+  h+='<div class="card"><div class="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded bg-warn-50 text-warn-600 flex items-center justify-center"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg></div><p class="text-[13px] font-semibold text-slate-900">Flagged for Review</p></div><span class="pill bg-warn text-warn-700">'+flagged.length+'</span></div>';
+  h+='<div class="divide-y divide-slate-75">';
+  flagged.forEach(function(q){h+='<div class="px-4 py-2.5 flex items-center gap-3"><span class="mono text-[11px] text-slate-400 w-14">'+q.id+'</span><span class="text-xs text-slate-700 flex-1 truncate">'+q.text+'</span><span class="mono text-[11px]">'+pct(q.accuracy)+'</span><button class="btn btn-ghost text-[10px] py-0.5 px-1.5" onclick="A.openPanel('+questions.indexOf(q)+')">View</button></div>'});
+  h+='</div></div>';
+  h+='</div>';
+  return h;
+}
+
+// ── Coverage ──────────────────────────────────────────────────────
+function renderCoverage(){
+  var h='<div class="card mb-5"><div class="px-4 pt-4 pb-3 border-b border-slate-100"><p class="text-[13px] font-semibold text-slate-900">Topic Distribution</p></div><div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Topic</th><th>Questions</th><th>Subtopics</th><th>Avg Accuracy</th><th>Avg Discrimination</th><th>Coverage</th></tr></thead><tbody>';
+  topicCoverage.forEach(function(t){
+    var covPct=t.questions/questions.length;
+    h+='<tr><td class="font-semibold text-slate-800">'+t.topic+'</td>';
+    h+='<td class="mono">'+t.questions+'</td>';
+    h+='<td class="text-xs text-slate-500">'+t.subtopics.join(", ")+'</td>';
+    h+='<td class="mono font-semibold '+mc(t.avgAcc,[.75,.6,.4])+'">'+pct(t.avgAcc)+'</td>';
+    h+='<td class="mono '+mc(t.avgDisc,[.4,.3,.2])+'">'+t.avgDisc.toFixed(2)+'</td>';
+    h+='<td><div class="flex items-center gap-1.5"><div class="pbar w-16"><div class="pfill bg-brand-500" style="width:'+Math.round(covPct*100)+'%"></div></div><span class="mono text-xs text-slate-400">'+Math.round(covPct*100)+'%</span></div></td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';
+
+  // Accuracy heatmap
+  h+='<div class="card"><div class="px-4 pt-4 pb-3 border-b border-slate-100"><p class="text-[13px] font-semibold text-slate-900">Accuracy by Skill</p><p class="text-[11px] text-slate-400 mt-0.5">Colour intensity indicates student accuracy</p></div><div class="p-4">';
+  h+='<div class="grid gap-2" style="grid-template-columns:120px repeat('+questions.length+',1fr)">';
+  // Header row
+  h+='<div></div>';
+  questions.forEach(function(q){h+='<div class="text-[9px] text-slate-400 text-center truncate" title="'+q.id+'">'+q.id.replace("Q-","")+'</div>'});
+  // Topic rows
+  topicCoverage.forEach(function(t){
+    h+='<div class="text-xs font-medium text-slate-700 flex items-center">'+t.topic+'</div>';
+    questions.forEach(function(q){
+      if(q.topic===t.topic){
+        h+='<div class="hcell" style="'+heatCol(q.accuracy)+'" title="'+q.id+': '+pct(q.accuracy)+'">'+Math.round(q.accuracy*100)+'</div>';
+      }else{
+        h+='<div class="hcell" style="background:#f8f9fb;color:#d5d9e2">-</div>';
+      }
+    });
+  });
+  h+='</div></div></div>';
+
+  // Gap analysis
+  h+='<div class="card mt-5 p-4"><p class="text-[13px] font-semibold text-slate-900 mb-3">Coverage Gaps</p><div class="space-y-2">';
+  h+='<div class="flex items-start gap-3 p-3 rounded bg-bad-50 border border-bad-100"><svg class="w-4 h-4 text-bad-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div><p class="text-xs font-semibold text-bad-700">Fractions is critically underrepresented</p><p class="text-[11px] text-slate-600">Only 2 questions (8% coverage) for a topic where student accuracy is 53%. Add 5+ questions at varying difficulty levels.</p></div></div>';
+  h+='<div class="flex items-start gap-3 p-3 rounded bg-warn-50 border border-warn-100"><svg class="w-4 h-4 text-warn-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div><p class="text-xs font-semibold text-warn-700">Data Interpretation has no questions</p><p class="text-[11px] text-slate-600">This is a key NAPLAN strand with zero question coverage. Needs immediate content creation.</p></div></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// ── Insights ──────────────────────────────────────────────────────
+function renderInsights(){
+  var h='<div class="space-y-4">';
+  var insights=[
+    {type:"bad",title:"Fractions questions underperforming",body:"Average accuracy across Fractions is 53% with only 2 questions available. This is both a content quality and coverage issue. Students are struggling, and there is insufficient question variety to assess or remediate effectively.",action:"Add 5+ Fractions questions at difficulty levels 0.3, 0.5, and 0.7"},
+    {type:"warn",title:"3 questions have low discrimination",body:"Q-007 (Mean), Q-010 (7/20 percentage), and Q-022 (2.5\u00D70.4) all have discrimination indices below 0.25. These questions fail to differentiate between strong and weak students, reducing assessment accuracy.",action:"Review and revise wording, distractors, or difficulty level"},
+    {type:"good",title:"Geometry shows strong engagement and quality",body:"7 questions across 7 subtopics with average accuracy of 72% and discrimination of 0.44. This is the best-performing content area in terms of psychometric quality.",action:"Use Geometry as a template for content development in other topics"},
+    {type:"warn",title:"Q-022 is likely miskeyed or ambiguous",body:"2.5\u00D70.4 has 78% difficulty and only 35% accuracy. The discrimination index (0.25) suggests the question may have an issue with the correct answer key or distractor quality.",action:"Review answer key and student response distribution"},
+    {type:"bad",title:"Q-024 may need difficulty recalibration",body:"y=2x+3 when x=\u22122 has 68% difficulty but only 20% discrimination. High-ability students are not reliably answering correctly, suggesting possible ambiguity in the question or answer options.",action:"Review option wording and consider adding worked example support"},
+    {type:"good",title:"Statistics content is clean but limited",body:"5 questions with 86% average accuracy and consistent discrimination. However, the pool is small. Consider adding questions on data interpretation and graph reading.","action":"Expand Statistics bank with 3+ data interpretation questions"},
+  ];
+  insights.forEach(function(ins){
+    var bg=ins.type==="good"?"bg-good":"bg-"+ins.type;var border=ins.type==="good"?"border-good-100":"border-"+ins.type+"-100";var tc=ins.type==="good"?"text-good-700":"text-"+ins.type+"-700";
+    var ico=ins.type==="good"?'<svg class="w-4 h-4 text-good-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>':ins.type==="warn"?'<svg class="w-4 h-4 text-warn-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>':'<svg class="w-4 h-4 text-bad-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+    h+='<div class="card p-5"><div class="flex items-start gap-3"><div class="w-7 h-7 rounded '+bg+'-50 '+tc+' flex items-center justify-center flex-shrink-0 mt-0.5">'+ico+'</div><div class="flex-1"><p class="text-[13px] font-semibold text-slate-900 mb-1">'+ins.title+'</p><p class="text-xs text-slate-500 leading-relaxed mb-2">'+ins.body+'</p><div class="flex items-center gap-2"><span class="pill '+bg+'-50 '+tc+' border '+border+'">Recommended: '+ins.action+'</span></div></div></div></div>';
+  });
+  h+='</div>';
+  return h;
+}
+
+// ── Panel ─────────────────────────────────────────────────────────
+window.A={
+  tab:function(el,v){el.parentElement.querySelectorAll(".tab").forEach(function(t){t.classList.remove("tab-on")});el.classList.add("tab-on");view=v;render()},
+  openPanel:function(i){
+    var q=questions[i];
+    $("pn-title").textContent=q.id+" Detail";
+    var h='';
+    h+='<div class="space-y-5">';
+    // Question
+    h+='<div><p class="sl mb-2">Question</p><p class="text-sm text-slate-800 leading-relaxed">'+q.text+'</p></div>';
+    // Metadata
+    h+='<div class="grid grid-cols-2 gap-3">';
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-3"><p class="sl mb-1">Topic</p><p class="text-sm font-medium text-slate-800">'+q.topic+'</p></div>';
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-3"><p class="sl mb-1">Skill</p><p class="text-sm font-medium text-slate-800">'+q.skill+'</p></div>';
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-3"><p class="sl mb-1">Accuracy</p><p class="text-sm font-semibold mono '+mc(q.accuracy,[.75,.6,.4])+'">'+pct(q.accuracy)+'</p></div>';
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-3"><p class="sl mb-1">Difficulty</p><p class="text-sm font-semibold mono">'+q.difficulty.toFixed(2)+'</p></div>';
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-3"><p class="sl mb-1">Discrimination</p><p class="text-sm font-semibold mono '+mc(q.disc,[.4,.3,.2])+'">'+q.disc.toFixed(2)+'</p></div>';
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-3"><p class="sl mb-1">Attempts</p><p class="text-sm font-semibold mono">'+q.attempts.toLocaleString()+'</p></div>';
+    h+='</div>';
+    // Status
+    h+='<div><p class="sl mb-2">Status</p>'+stPill(q.status)+(q.flagged?' <span class="pill bg-warn text-warn-700 ml-1">Flagged</span>':"")+'</div>';
+    // Interpretation
+    h+='<div class="rounded bg-slate-50 border border-slate-100 p-4"><p class="sl mb-2">Psychometric Interpretation</p><div class="space-y-1 text-xs text-slate-600 leading-relaxed">';
+    if(q.accuracy>.85)h+='<p>Very high accuracy indicates this question may be too easy for the target population.</p>';
+    else if(q.accuracy<.45)h+='<p>Low accuracy suggests this question is too difficult, or may have issues with clarity or answer key.</p>';
+    else h+='<p>Accuracy is within acceptable range for this difficulty level.</p>';
+    if(q.disc<.25)h+='<p class="text-warn-700 font-medium">Low discrimination: this item does not effectively differentiate between strong and weak students. Consider revising distractors.</p>';
+    else if(q.disc>.5)h+='<p class="text-good-700 font-medium">Strong discrimination: this item effectively separates high and low performers.</p>';
+    h+='</div></div>';
+    // Actions
+    h+='<div class="flex flex-col gap-2">';
+    h+='<button class="btn btn-primary w-full text-xs gap-1.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit Question</button>';
+    h+='<button class="btn btn-secondary w-full text-xs gap-1.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Archive Question</button>';
+    if(!q.flagged)h+='<button class="btn btn-danger w-full text-xs gap-1.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg>Flag for Review</button>';
+    h+='</div>';
+    h+='</div>';
+    $("pn-body").innerHTML=h;
+    $("panel").classList.add("open");$("pov").classList.add("open");
+  },
+  closePanel:function(){$("panel").classList.remove("open");$("pov").classList.remove("open")},
+};
+render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic - Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118'},
+      correct:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      incorrect:{50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626'},
+      warn:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)',elevated:'0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:12px;--r-btn:8px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9fb;color:#2a3040}
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,.25)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5E8}.btn-secondary:hover{background:#F5F3FF}
+  .btn-ghost{background:transparent;color:#525b6e}.btn-ghost:hover{background:#f3f4f7;color:#2a3040}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8b94a6}
+  .pbar{height:6px;background:#eef0f4;border-radius:100px;overflow:hidden}.pfill{height:100%;border-radius:100px;transition:width 600ms cubic-bezier(.4,0,.2,1)}
+  .snav{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#6b7488;cursor:pointer;transition:all var(--fast);text-decoration:none}.snav:hover{background:#f3f4f7;color:#2a3040}.snav.snav-on{background:#F5F3FF;color:#5925a8;font-weight:600}.snav svg{width:18px;height:18px;flex-shrink:0}
+  .tab{font-size:13px;font-weight:500;color:#6b7488;padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#2a3040}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b94a6;border-bottom:1px solid #eef0f4;white-space:nowrap}.tbl td{padding:12px 16px;border-bottom:1px solid #f3f4f7;vertical-align:middle}.tbl tr:hover td{background:#fcfcfd}
+
+  /* Chart area */
+  .chart-area{background:#f8f9fb;border:1px solid #eef0f4;border-radius:var(--r-card);overflow:hidden}
+  .chart-area svg{display:block}
+
+  /* Modal */
+  .mbg{position:fixed;inset:0;z-index:200;background:rgba(14,17,24,.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity var(--base)}.mbg.open{opacity:1;pointer-events:auto}
+  .mbox{background:white;border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,.12);max-width:640px;width:100%;max-height:90vh;overflow-y:auto;transform:scale(.95);transition:transform var(--base)}.mbg.open .mbox{transform:scale(1)}
+
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.afs{animation:fadeSlide 300ms cubic-bezier(.4,0,.2,1) both}
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+<!-- ================================================================== -->
+<!-- SIDEBAR                                                             -->
+<!-- ================================================================== -->
+<aside class="hidden lg:flex flex-col w-[260px] flex-shrink-0 bg-white border-r border-slate-100 h-screen sticky top-0">
+  <div class="px-5 py-5 border-b border-slate-100 flex items-center gap-2.5">
+    <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+    <span class="pill bg-brand-50 text-brand-600 border border-brand-200 ml-auto text-[10px]">Teacher</span>
+  </div>
+  <div class="px-4 py-3 border-b border-slate-100"><p class="sl mb-2">Class</p><button class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-150 text-sm font-medium text-slate-800 hover:bg-slate-75 transition-colors"><span>7A &mdash; Numeracy</span><svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div>
+  <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <a href="teacher-dashboard.html" class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Students</a>
+    <a href="assignment-engine.html" class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Assignments</a>
+    <a class="snav snav-on"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Analytics</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Insights</a>
+  </nav>
+  <div class="px-4 py-4 border-t border-slate-100"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">MS</div><div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 truncate">Ms. Sarah Chen</p><p class="text-[11px] text-slate-400">Mathematics</p></div></div></div>
+</aside>
+
+<!-- ================================================================== -->
+<!-- MAIN                                                                -->
+<!-- ================================================================== -->
+<div class="flex-1 min-w-0 flex flex-col">
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="px-6 lg:px-8 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[15px] font-semibold text-slate-900">Analytics &amp; Reports</h1>
+        <span class="pill bg-slate-50 text-slate-500 border border-slate-150">7A &mdash; Numeracy</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-ghost text-xs py-1.5 px-3 gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Last 4 Weeks</button>
+        <button class="btn btn-secondary text-xs py-1.5 px-3 gap-1.5" onclick="openM('export')"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+        <button class="btn btn-primary text-xs py-1.5 px-3 gap-1.5" onclick="openM('report')"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF Report</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Report Tabs -->
+  <div class="px-6 lg:px-8 border-b border-slate-100 flex gap-0">
+    <button class="tab tab-on" onclick="R.switchTab(this,'student')">Student Reports</button>
+    <button class="tab" onclick="R.switchTab(this,'class')">Class Overview</button>
+    <button class="tab" onclick="R.switchTab(this,'topic')">Topic Analysis</button>
+    <button class="tab" onclick="R.switchTab(this,'time')">Time Analysis</button>
+  </div>
+
+  <main class="flex-1 px-6 lg:px-8 py-6 overflow-y-auto" id="report-area"></main>
+</div>
+
+<!-- ================================================================== -->
+<!-- EXPORT MODAL                                                        -->
+<!-- ================================================================== -->
+<div id="modal-export" class="mbg" onclick="if(event.target===this)closeM('export')">
+  <div class="mbox p-8 text-center" onclick="event.stopPropagation()">
+    <div class="w-14 h-14 rounded-2xl bg-brand-50 text-brand-500 flex items-center justify-center mx-auto mb-5"><svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+    <h3 class="text-lg font-semibold text-slate-900 mb-2">Export Data</h3>
+    <p class="text-sm text-slate-500 mb-6">Choose a format to download the current report data.</p>
+    <div class="flex flex-col gap-2 max-w-xs mx-auto">
+      <button class="btn btn-secondary w-full justify-start gap-3 py-3"><svg class="w-5 h-5 text-correct-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Export as CSV</button>
+      <button class="btn btn-secondary w-full justify-start gap-3 py-3"><svg class="w-5 h-5 text-incorrect-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Export as PDF</button>
+    </div>
+    <button class="btn btn-ghost text-sm mt-4" onclick="closeM('export')">Cancel</button>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PDF REPORT PREVIEW MODAL                                            -->
+<!-- ================================================================== -->
+<div id="modal-report" class="mbg" onclick="if(event.target===this)closeM('report')">
+  <div class="mbox" onclick="event.stopPropagation()">
+    <div class="h-1 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div>
+    <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+      <div><h3 class="text-lg font-semibold text-slate-900">Report Preview</h3><p class="text-xs text-slate-400 mt-0.5">Class 7A Numeracy &mdash; 4 Week Summary</p></div>
+      <button class="btn btn-ghost p-1.5" onclick="closeM('report')"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="p-6 space-y-5">
+      <!-- Summary -->
+      <div class="grid grid-cols-4 gap-3">
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800">28</p><p class="text-[10px] text-slate-400">Students</p></div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-correct-600">72%</p><p class="text-[10px] text-slate-400">Avg Score</p></div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-brand-600">68%</p><p class="text-[10px] text-slate-400">Completion</p></div>
+        <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-incorrect-600">3</p><p class="text-[10px] text-slate-400">At Risk</p></div>
+      </div>
+      <div class="text-sm text-slate-600 leading-relaxed space-y-2">
+        <p><span class="font-semibold text-slate-800">Performance Summary:</span> Class 7A showed a 4% improvement in average scores over the past 4 weeks, driven primarily by gains in Geometry (+8%). Fractions remains the weakest area at 48% mastery across the class.</p>
+        <p><span class="font-semibold text-slate-800">Attention Required:</span> 3 students (Liam Carter, Priya Sharma, Jordan Blake) are classified as at-risk with declining performance and low engagement. Olivia Taylor and Ethan Davis have zero sessions in the reporting period.</p>
+        <p><span class="font-semibold text-slate-800">Recommendation:</span> Prioritise Fractions and Data Interpretation in upcoming assignments. Consider targeted practice sessions for at-risk students.</p>
+      </div>
+    </div>
+    <div class="p-6 pt-0 flex gap-3">
+      <button class="btn btn-primary flex-1 gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download PDF</button>
+      <button class="btn btn-secondary flex-1 gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Share Link</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+function openM(n){$("modal-"+n).classList.add("open")}
+function closeM(n){$("modal-"+n).classList.remove("open")}
+window.openM=openM;window.closeM=closeM;
+
+// ── Data ──────────────────────────────────────────────────────────
+var weeks=["W1 Mar","W2 Mar","W3 Mar","W4 Mar","W1 Apr"];
+var classAvg=[62,65,68,70,72];
+var classCompletion=[45,52,58,64,68];
+var studentData=[
+  {name:"Ava Mitchell",init:"AM",avg:88,trend:[78,82,85,86,88],mastery:{Geo:92,Alg:85,Prob:80,Frac:78,Pat:65},time:42,sessions:24},
+  {name:"Noah Williams",init:"NW",avg:82,trend:[72,75,78,80,82],mastery:{Geo:80,Alg:90,Prob:75,Frac:62,Pat:78},time:38,sessions:20},
+  {name:"Chloe Park",init:"CP",avg:79,trend:[70,72,74,77,79],mastery:{Geo:60,Alg:78,Prob:88,Frac:72,Pat:80},time:35,sessions:18},
+  {name:"Lucas Chen",init:"LC",avg:76,trend:[68,70,72,74,76],mastery:{Geo:85,Alg:75,Prob:70,Frac:58,Pat:72},time:34,sessions:20},
+  {name:"Sophie Brown",init:"SB",avg:74,trend:[65,68,70,72,74],mastery:{Geo:72,Alg:82,Prob:55,Frac:70,Pat:75},time:28,sessions:14},
+  {name:"Liam Carter",init:"LC2",avg:54,trend:[60,58,56,55,54],mastery:{Geo:50,Alg:48,Prob:55,Frac:35,Pat:65},time:12,sessions:5},
+  {name:"Priya Sharma",init:"PS",avg:48,trend:[55,52,50,49,48],mastery:{Geo:32,Alg:58,Prob:45,Frac:42,Pat:50},time:8,sessions:4},
+  {name:"Jordan Blake",init:"JB",avg:42,trend:[50,48,45,43,42],mastery:{Geo:40,Alg:38,Prob:55,Frac:28,Pat:42},time:6,sessions:2},
+];
+var topicData=[
+  {name:"Geometry",pct:72,prev:64,students28:28,above70:18},
+  {name:"Algebra",pct:70,prev:65,students28:28,above70:16},
+  {name:"Probability",pct:66,prev:62,students28:28,above70:14},
+  {name:"Patterns",pct:62,prev:58,students28:28,above70:12},
+  {name:"Fractions",pct:48,prev:42,students28:28,above70:6},
+  {name:"Data Interpretation",pct:44,prev:40,students28:28,above70:4},
+];
+var distribution=[2,3,5,8,6,3,1]; // bands: 0-20, 20-40, 40-60, 60-80, 80-100 (adjusted to 7 bands)
+var distLabels=["0-15","15-30","30-45","45-60","60-75","75-90","90-100"];
+var timeVsPerf=[{t:6,p:42},{t:8,p:48},{t:12,p:54},{t:18,p:68},{t:28,p:74},{t:34,p:76},{t:35,p:79},{t:38,p:82},{t:42,p:88}];
+
+// ── Chart Helpers ─────────────────────────────────────────────────
+function sc(p){if(p>=70)return"#16a34a";if(p>=50)return"#5925a8";if(p>=30)return"#d97706";return"#dc2626"}
+function scCls(p){if(p>=70)return"text-correct-600";if(p>=50)return"text-brand-600";if(p>=30)return"text-warn-600";return"text-incorrect-600"}
+
+function lineChart(data,labels,w,h,color,fillColor){
+  var pad={t:20,r:20,b:30,l:40},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  var mn=Math.min.apply(null,data)-5,mx=Math.max.apply(null,data)+5;
+  var pts=data.map(function(v,i){return{x:pad.l+(i/(data.length-1))*cw,y:pad.t+ch-(((v-mn)/(mx-mn))*ch)}});
+  var path=pts.map(function(p,i){return(i===0?"M":"L")+p.x.toFixed(1)+","+p.y.toFixed(1)}).join(" ");
+  var area=path+" L"+pts[pts.length-1].x.toFixed(1)+","+(pad.t+ch)+" L"+pts[0].x.toFixed(1)+","+(pad.t+ch)+" Z";
+  var svg='<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" class="w-full">';
+  // Grid lines
+  for(var g=0;g<5;g++){var gy=pad.t+(ch/4)*g;var gv=Math.round(mx-((mx-mn)/4)*g);svg+='<line x1="'+pad.l+'" y1="'+gy+'" x2="'+(w-pad.r)+'" y2="'+gy+'" stroke="#eef0f4" stroke-width="1"/>';svg+='<text x="'+(pad.l-8)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#8b94a6">'+gv+'</text>'}
+  // Area fill
+  svg+='<path d="'+area+'" fill="'+fillColor+'" opacity="0.15"/>';
+  // Line
+  svg+='<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  // Dots + labels
+  pts.forEach(function(p,i){svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="4" fill="white" stroke="'+color+'" stroke-width="2"/>';svg+='<text x="'+p.x.toFixed(1)+'" y="'+(pad.t+ch+18)+'" text-anchor="middle" font-size="10" fill="#8b94a6">'+labels[i]+'</text>'});
+  svg+='</svg>';
+  return svg;
+}
+
+function barChart(data,labels,w,h,colorFn){
+  var pad={t:10,r:10,b:30,l:40},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  var mx=Math.max.apply(null,data.map(function(d){return d.pct}))+10;
+  var bw=Math.min(40,(cw/data.length)*0.6),gap=(cw-bw*data.length)/(data.length+1);
+  var svg='<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" class="w-full">';
+  for(var g=0;g<5;g++){var gy=pad.t+(ch/4)*g;var gv=Math.round(mx-((mx)/4)*g);svg+='<line x1="'+pad.l+'" y1="'+gy+'" x2="'+(w-pad.r)+'" y2="'+gy+'" stroke="#eef0f4" stroke-width="1"/>';svg+='<text x="'+(pad.l-8)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#8b94a6">'+gv+'%</text>'}
+  data.forEach(function(d,i){var bx=pad.l+gap+(bw+gap)*i;var bh=(d.pct/mx)*ch;var by=pad.t+ch-bh;svg+='<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" rx="4" fill="'+colorFn(d.pct)+'" opacity="0.85"/>';svg+='<text x="'+(bx+bw/2)+'" y="'+(pad.t+ch+16)+'" text-anchor="middle" font-size="9" fill="#8b94a6">'+d.name.substring(0,6)+'</text>';svg+='<text x="'+(bx+bw/2)+'" y="'+(by-6)+'" text-anchor="middle" font-size="10" font-weight="600" fill="'+colorFn(d.pct)+'">'+d.pct+'%</text>'});
+  svg+='</svg>';
+  return svg;
+}
+
+function distChart(data,labels,w,h){
+  var pad={t:10,r:10,b:30,l:30},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  var mx=Math.max.apply(null,data)+2;
+  var bw=(cw/data.length)*0.7,gap=(cw-bw*data.length)/(data.length+1);
+  var svg='<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" class="w-full">';
+  data.forEach(function(v,i){var bx=pad.l+gap+(bw+gap)*i;var bh=(v/mx)*ch;var by=pad.t+ch-bh;svg+='<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" rx="3" fill="#5925a8" opacity="0.7"/>';svg+='<text x="'+(bx+bw/2)+'" y="'+(by-5)+'" text-anchor="middle" font-size="10" font-weight="600" fill="#5925a8">'+v+'</text>';svg+='<text x="'+(bx+bw/2)+'" y="'+(pad.t+ch+16)+'" text-anchor="middle" font-size="9" fill="#8b94a6">'+labels[i]+'</text>'});
+  svg+='</svg>';
+  return svg;
+}
+
+function scatterChart(data,w,h){
+  var pad={t:20,r:20,b:35,l:50},cw=w-pad.l-pad.r,ch=h-pad.t-pad.b;
+  var xMn=0,xMx=50,yMn=20,yMx=100;
+  var svg='<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" class="w-full">';
+  for(var g=0;g<5;g++){var gy=pad.t+(ch/4)*g;svg+='<line x1="'+pad.l+'" y1="'+gy+'" x2="'+(w-pad.r)+'" y2="'+gy+'" stroke="#eef0f4" stroke-width="1"/>'}
+  svg+='<text x="'+(pad.l+cw/2)+'" y="'+(h-4)+'" text-anchor="middle" font-size="10" fill="#8b94a6">Time Spent (min/week)</text>';
+  svg+='<text x="12" y="'+(pad.t+ch/2)+'" text-anchor="middle" font-size="10" fill="#8b94a6" transform="rotate(-90,12,'+(pad.t+ch/2)+')">Avg Score %</text>';
+  // Trend line
+  var x1=pad.l,y1=pad.t+ch-((40-yMn)/(yMx-yMn))*ch;
+  var x2=pad.l+cw,y2=pad.t+ch-((90-yMn)/(yMx-yMn))*ch;
+  svg+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#5925a8" stroke-width="1.5" stroke-dasharray="4" opacity="0.4"/>';
+  data.forEach(function(d){var cx=pad.l+((d.t-xMn)/(xMx-xMn))*cw;var cy=pad.t+ch-((d.p-yMn)/(yMx-yMn))*ch;svg+='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="6" fill="'+sc(d.p)+'" opacity="0.8" stroke="white" stroke-width="1.5"/>'});
+  svg+='</svg>';
+  return svg;
+}
+
+// ── Tab Views ─────────────────────────────────────────────────────
+var currentTab="student";
+
+function renderTab(){
+  var h="";
+  switch(currentTab){
+    case "student":h=renderStudent();break;
+    case "class":h=renderClass();break;
+    case "topic":h=renderTopic();break;
+    case "time":h=renderTime();break;
+  }
+  $("report-area").innerHTML='<div class="afs">'+h+'</div>';
+}
+
+// Student Reports
+function renderStudent(){
+  var h='<div class="grid lg:grid-cols-5 gap-6">';
+  // Left: student list + trends
+  h+='<div class="lg:col-span-3 space-y-6">';
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Student Score Trends</h3><p class="text-xs text-slate-400 mt-0.5">Individual performance over last 5 weeks</p></div>';
+  h+='<div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Student</th><th>Current</th><th>Trend (5 wks)</th><th>Change</th></tr></thead><tbody>';
+  studentData.forEach(function(s){
+    var change=s.trend[4]-s.trend[0];
+    var mini='<svg viewBox="0 0 80 24" class="w-20 h-6"><polyline points="';
+    s.trend.forEach(function(v,i){var x=4+i*18;var y=22-((v-30)/70)*20;mini+=x+","+y+" "});
+    mini+='" fill="none" stroke="'+(change>=0?"#16a34a":"#dc2626")+'" stroke-width="2" stroke-linecap="round"/></svg>';
+    h+='<tr><td><div class="flex items-center gap-3"><div class="w-7 h-7 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-[10px] font-semibold">'+s.init.substring(0,2)+'</div><span class="font-medium text-slate-800 text-sm">'+s.name+'</span></div></td>';
+    h+='<td class="font-semibold tabular-nums '+scCls(s.avg)+'">'+s.avg+'%</td>';
+    h+='<td>'+mini+'</td>';
+    h+='<td class="font-semibold tabular-nums text-sm '+(change>=0?"text-correct-600":"text-incorrect-600")+'">'+(change>=0?"+":"")+change+'%</td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+
+  // Mastery growth chart
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Class Average Score Trend</h3></div><div class="p-4">'+lineChart(classAvg,weeks,560,200,"#5925a8","#5925a8")+'</div></div>';
+  h+='</div>';
+
+  // Right: top insights
+  h+='<div class="lg:col-span-2 space-y-4">';
+  h+='<div class="card p-5"><p class="sl mb-3">Key Findings</p><div class="space-y-3">';
+  h+='<div class="flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-correct-50 text-correct-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 7l5 5-5 5"/></svg></div><p class="text-sm text-slate-600 leading-relaxed"><span class="font-semibold text-correct-700">5 students</span> improved by 10%+ over 4 weeks.</p></div>';
+  h+='<div class="flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-incorrect-50 text-incorrect-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 7l-5 5-5-5"/></svg></div><p class="text-sm text-slate-600 leading-relaxed"><span class="font-semibold text-incorrect-700">3 students</span> show declining scores across consecutive weeks.</p></div>';
+  h+='<div class="flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-warn-50 text-warn-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><p class="text-sm text-slate-600 leading-relaxed"><span class="font-semibold text-warn-700">2 students</span> have zero activity in the reporting period.</p></div>';
+  h+='</div></div>';
+
+  // Mastery snapshot
+  h+='<div class="card p-5"><p class="sl mb-3">Class Mastery Distribution</p>';
+  h+='<div class="space-y-2.5">';
+  var bands=[{label:"Mastered (80%+)",count:6,color:"bg-correct-500"},{label:"Proficient (60-79%)",count:12,color:"bg-brand-500"},{label:"Developing (40-59%)",count:7,color:"bg-warn-500"},{label:"Below (< 40%)",count:3,color:"bg-incorrect-500"}];
+  bands.forEach(function(b){h+='<div><div class="flex items-center justify-between mb-1"><span class="text-xs text-slate-600">'+b.label+'</span><span class="text-xs font-semibold text-slate-800">'+b.count+'</span></div><div class="pbar"><div class="pfill '+b.color+'" style="width:'+Math.round(b.count/28*100)+'%"></div></div></div>'});
+  h+='</div></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// Class Overview
+function renderClass(){
+  var h='<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">';
+  h+='<div class="card p-5"><p class="sl mb-2">Avg Score</p><p class="text-2xl font-bold text-slate-900 tabular-nums">72%</p><p class="text-xs text-correct-600 font-medium mt-0.5">&uarr; 10% over 4 weeks</p></div>';
+  h+='<div class="card p-5"><p class="sl mb-2">Completion Rate</p><p class="text-2xl font-bold text-slate-900 tabular-nums">68%</p><p class="text-xs text-correct-600 font-medium mt-0.5">&uarr; 23% over 4 weeks</p></div>';
+  h+='<div class="card p-5"><p class="sl mb-2">Active Students</p><p class="text-2xl font-bold text-slate-900 tabular-nums">26/28</p><p class="text-xs text-slate-400 mt-0.5">93% engagement</p></div>';
+  h+='<div class="card p-5"><p class="sl mb-2">Total Sessions</p><p class="text-2xl font-bold text-slate-900 tabular-nums">156</p><p class="text-xs text-slate-400 mt-0.5">This period</p></div>';
+  h+='</div>';
+
+  h+='<div class="grid lg:grid-cols-2 gap-6 mb-6">';
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Score Trend</h3></div><div class="p-4">'+lineChart(classAvg,weeks,480,200,"#5925a8","#5925a8")+'</div></div>';
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Score Distribution</h3><p class="text-xs text-slate-400 mt-0.5">Students by score band</p></div><div class="p-4">'+distChart(distribution,distLabels,480,200)+'</div></div>';
+  h+='</div>';
+
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Completion Trend</h3></div><div class="p-4">'+lineChart(classCompletion,weeks,900,180,"#16a34a","#16a34a")+'</div></div>';
+  return h;
+}
+
+// Topic Analysis
+function renderTopic(){
+  var h='<div class="grid lg:grid-cols-5 gap-6">';
+  h+='<div class="lg:col-span-3">';
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Topic Mastery Comparison</h3></div><div class="p-4">'+barChart(topicData.map(function(t){return{name:t.name,pct:t.pct}}),null,580,240,sc)+'</div></div>';
+
+  h+='<div class="card mt-6"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Detailed Breakdown</h3></div><div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Topic</th><th>Mastery</th><th>Change</th><th>Students &ge;70%</th></tr></thead><tbody>';
+  topicData.forEach(function(t){var diff=t.pct-t.prev;h+='<tr><td class="font-medium text-slate-800">'+t.name+'</td><td><div class="flex items-center gap-2"><div class="pbar w-20"><div class="pfill" style="width:'+t.pct+'%;background:'+sc(t.pct)+'"></div></div><span class="font-semibold tabular-nums text-sm '+scCls(t.pct)+'">'+t.pct+'%</span></div></td><td class="font-semibold tabular-nums text-sm '+(diff>=0?"text-correct-600":"text-incorrect-600")+'">'+(diff>=0?"+":"")+diff+'%</td><td class="tabular-nums text-sm text-slate-600">'+t.above70+'/'+t.students28+'</td></tr>'});
+  h+='</tbody></table></div></div>';
+  h+='</div>';
+
+  h+='<div class="lg:col-span-2 space-y-4">';
+  h+='<div class="card p-5"><p class="sl mb-3">Strengths</p><div class="space-y-2">';
+  topicData.filter(function(t){return t.pct>=65}).forEach(function(t){h+='<div class="flex items-center gap-3 p-2.5 rounded-lg bg-correct-50 border border-correct-100"><svg class="w-4 h-4 text-correct-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span class="text-sm font-medium text-correct-700">'+t.name+'</span><span class="text-xs text-correct-600 ml-auto font-semibold tabular-nums">'+t.pct+'%</span></div>'});
+  h+='</div></div>';
+
+  h+='<div class="card p-5"><p class="sl mb-3">Weaknesses</p><div class="space-y-2">';
+  topicData.filter(function(t){return t.pct<65}).forEach(function(t){h+='<div class="flex items-center gap-3 p-2.5 rounded-lg bg-incorrect-50 border border-incorrect-100"><svg class="w-4 h-4 text-incorrect-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span class="text-sm font-medium text-incorrect-700">'+t.name+'</span><span class="text-xs text-incorrect-600 ml-auto font-semibold tabular-nums">'+t.pct+'%</span></div>'});
+  h+='</div></div>';
+
+  h+='<div class="card p-5"><p class="sl mb-3">Insight</p><p class="text-sm text-slate-600 leading-relaxed"><span class="font-semibold text-slate-800">Fractions</span> and <span class="font-semibold text-slate-800">Data Interpretation</span> remain significantly below the class average. Only <span class="font-semibold text-incorrect-600">6 of 28</span> students have reached proficiency in Fractions. Consider assigning targeted practice and revisiting foundational concepts.</p></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// Time Analysis
+function renderTime(){
+  var h='<div class="grid lg:grid-cols-5 gap-6">';
+  h+='<div class="lg:col-span-3 space-y-6">';
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Time Spent vs Performance</h3><p class="text-xs text-slate-400 mt-0.5">Each dot represents a student</p></div><div class="p-4">'+scatterChart(timeVsPerf,560,280)+'</div><div class="px-5 pb-4"><p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Correlation:</span> Students who spend 30+ minutes per week consistently score above 70%. The dashed line shows the positive trend between time investment and performance.</p></div></div>';
+
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Weekly Time Distribution</h3></div><div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Student</th><th>Min/Week</th><th>Sessions</th><th>Score</th><th>Efficiency</th></tr></thead><tbody>';
+  studentData.sort(function(a,b){return b.time-a.time}).forEach(function(s){
+    var eff=s.time>0?Math.round(s.avg/s.time*10):0;
+    h+='<tr><td class="font-medium text-slate-800 text-sm">'+s.name+'</td><td class="tabular-nums text-sm">'+s.time+' min</td><td class="tabular-nums text-sm">'+s.sessions+'</td><td class="font-semibold tabular-nums text-sm '+scCls(s.avg)+'">'+s.avg+'%</td><td><div class="flex items-center gap-2"><div class="pbar w-16"><div class="pfill" style="width:'+Math.min(100,eff*5)+'%;background:'+(eff>=15?"#16a34a":eff>=10?"#5925a8":"#d97706")+'"></div></div><span class="text-xs tabular-nums text-slate-500">'+eff+'</span></div></td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  h+='</div>';
+
+  h+='<div class="lg:col-span-2 space-y-4">';
+  h+='<div class="card p-5"><p class="sl mb-3">Time Insights</p><div class="space-y-3">';
+  h+='<div class="flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-correct-50 text-correct-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 7l5 5-5 5"/></svg></div><p class="text-sm text-slate-600 leading-relaxed">Students averaging <span class="font-semibold text-correct-700">30+ min/week</span> score 25% higher than those below 15 min.</p></div>';
+  h+='<div class="flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><p class="text-sm text-slate-600 leading-relaxed">Average session length is <span class="font-semibold text-brand-600">12 minutes</span>. Top performers average 15-18 min sessions.</p></div>';
+  h+='<div class="flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-warn-50 text-warn-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><p class="text-sm text-slate-600 leading-relaxed">At-risk students average only <span class="font-semibold text-warn-700">8 min/week</span>. Increasing to 20 min could significantly improve outcomes.</p></div>';
+  h+='</div></div>';
+
+  h+='<div class="card p-5"><p class="sl mb-3">Efficiency Rating</p><p class="text-xs text-slate-500 mb-3">Score points gained per minute spent per week</p>';
+  h+='<div class="space-y-2">';
+  var sorted=studentData.slice().sort(function(a,b){return(b.time>0?b.avg/b.time:0)-(a.time>0?a.avg/a.time:0)});
+  sorted.slice(0,5).forEach(function(s,i){var eff=s.time>0?(s.avg/s.time).toFixed(1):0;h+='<div class="flex items-center gap-3"><span class="text-xs text-slate-400 w-4 tabular-nums">'+(i+1)+'</span><span class="text-sm text-slate-700 flex-1">'+s.name+'</span><span class="text-sm font-semibold text-brand-600 tabular-nums">'+eff+'</span></div>'});
+  h+='</div></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// ── Tab switching ─────────────────────────────────────────────────
+window.R={
+  switchTab:function(el,tab){
+    el.parentElement.querySelectorAll(".tab").forEach(function(t){t.classList.remove("tab-on")});
+    el.classList.add("tab-on");
+    currentTab=tab;
+    renderTab();
+  }
+};
+
+// Init
+renderTab();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic - Parent Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27'},
+      good:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      grow:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+      soft:{50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:14px;--r-btn:8px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9fb;color:#2a3040}
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5E8}.btn-secondary:hover{background:#F5F3FF}
+  .btn-ghost{background:transparent;color:#525b6e}.btn-ghost:hover{background:#f3f4f7}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 12px;border-radius:var(--r-pill);line-height:1.4}
+  .nav-link{font-size:14px;font-weight:500;color:#6b7488;padding:6px 12px;border-radius:6px;transition:all var(--fast);text-decoration:none}.nav-link:hover{color:#2a3040;background:#f3f4f7}.nav-link-active{color:#5925a8;background:#F5F3FF}
+
+  .pbar{height:8px;background:#eef0f4;border-radius:100px;overflow:hidden}.pfill{height:100%;border-radius:100px;transition:width 800ms cubic-bezier(.4,0,.2,1)}
+
+  /* Child selector */
+  .child-btn{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:12px;border:1.5px solid #eef0f4;cursor:pointer;transition:all var(--fast);background:white}
+  .child-btn:hover{border-color:#C4B5E8;background:#f8faff}
+  .child-btn.child-on{border-color:#5925a8;background:#F5F3FF;box-shadow:0 0 0 3px rgba(89,37,168,.08)}
+
+  /* Insight card */
+  .insight{display:flex;align-items:flex-start;gap:14px;padding:16px;border-radius:12px;transition:background var(--fast)}
+  .insight:hover{background:#f8f9fb}
+
+  /* Week dots */
+  .wdot{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+  .wdot-on{background:#5925a8;color:white}
+  .wdot-off{background:#f3f4f7;color:#b0b7c5}
+  .wdot-today{background:#EDE8F8;color:#5925a8;border:2px solid #5925a8}
+
+  /* Sring */
+  .sring{position:relative;display:flex;align-items:center;justify-content:center}
+  .sring svg{position:absolute;top:0;left:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .sring circle{fill:none;stroke-linecap:round}
+  .sring .trk{stroke:#eef0f4;stroke-width:6}.sring .fl{stroke-width:6;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.afs{animation:fadeSlide 350ms cubic-bezier(.4,0,.2,1) both}
+  .d1{animation-delay:80ms}.d2{animation-delay:160ms}.d3{animation-delay:240ms}.d4{animation-delay:320ms}
+
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ================================================================== -->
+<!-- HEADER                                                              -->
+<!-- ================================================================== -->
+<header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+  <div class="max-w-[1080px] mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-8">
+      <a href="#" class="flex items-center gap-2.5">
+        <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+      </a>
+      <nav class="hidden md:flex items-center gap-1">
+        <a href="#" class="nav-link nav-link-active">Overview</a>
+        <a href="#" class="nav-link">Progress</a>
+        <a href="billing.html" class="nav-link">Subscription</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="pill bg-brand-50 text-brand-600 border border-brand-200 hidden sm:inline-flex">Parent</span>
+      <button class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors">
+        <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">VK</div>
+        <span class="text-sm font-medium text-slate-800 hidden sm:block">Vish Kumar</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-[1080px] mx-auto px-6 lg:px-8 py-8" id="root"></main>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+
+var children=[
+  {
+    name:"Arjun",init:"A",year:7,plan:"NAPLAN Numeracy",
+    score:76,scorePrev:68,trend:"up",
+    sessionsWeek:5,totalSessions:24,timeWeek:"2h 15m",streak:7,
+    week:[1,1,1,1,1,0,2], // 0=off, 1=done, 2=today
+    skills:[
+      {name:"Geometry",pct:85,label:"Strong"},
+      {name:"Algebra",pct:78,label:"Strong"},
+      {name:"Probability",pct:70,label:"Good"},
+      {name:"Patterns",pct:65,label:"Building"},
+      {name:"Fractions",pct:52,label:"Needs practice"},
+      {name:"Data Interpretation",pct:45,label:"Needs practice"},
+    ],
+    insights:[
+      {type:"good",text:"Arjun improved by 8% in the last two weeks. His Geometry understanding is now strong."},
+      {type:"grow",text:"Fractions is the area that needs the most attention right now. Two extra practice sessions per week would help."},
+      {type:"good",text:"He has been practising consistently every day this week. Consistency is the biggest predictor of improvement."},
+    ],
+    recentSessions:[
+      {name:"Geometry Practice",date:"Today",score:85},
+      {name:"Algebra Diagnostic",date:"Yesterday",score:78},
+      {name:"Fractions Practice",date:"2 days ago",score:52},
+    ],
+  },
+  {
+    name:"Maya",init:"M",year:4,plan:"NAPLAN Numeracy",
+    score:82,scorePrev:80,trend:"up",
+    sessionsWeek:3,totalSessions:16,timeWeek:"1h 30m",streak:3,
+    week:[1,1,0,1,0,0,2],
+    skills:[
+      {name:"Addition & Subtraction",pct:90,label:"Strong"},
+      {name:"Multiplication",pct:82,label:"Strong"},
+      {name:"Shapes",pct:78,label:"Good"},
+      {name:"Fractions",pct:68,label:"Building"},
+      {name:"Measurement",pct:60,label:"Building"},
+    ],
+    insights:[
+      {type:"good",text:"Maya is doing really well overall. Her scores are above average for Year 4."},
+      {type:"grow",text:"Measurement could use a bit more practice. She tends to mix up units sometimes."},
+    ],
+    recentSessions:[
+      {name:"Multiplication Practice",date:"Today",score:88},
+      {name:"Shapes Quiz",date:"3 days ago",score:78},
+    ],
+  },
+];
+
+var activeChild=0;
+
+function scCol(p){if(p>=75)return{bg:"bg-good-500",text:"text-good-600",light:"bg-good-50"};if(p>=55)return{bg:"bg-brand-500",text:"text-brand-600",light:"bg-brand-50"};return{bg:"bg-grow-500",text:"text-grow-600",light:"bg-grow-50"}}
+function skillLabel(l){if(l==="Strong")return'<span class="pill bg-good-50 text-good-700 border border-good-100">Strong</span>';if(l==="Good")return'<span class="pill bg-brand-50 text-brand-600 border border-brand-200">Good</span>';if(l==="Building")return'<span class="pill bg-grow-50 text-grow-700 border border-grow-100">Building</span>';return'<span class="pill bg-soft-50 text-soft-600 border border-soft-100">Needs practice</span>'}
+
+var days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function render(){
+  var c=children[activeChild];
+  var sc=scCol(c.score);
+  var circ=2*Math.PI*44;
+  var offset=circ-(c.score/100)*circ;
+
+  var h='';
+
+  // ── Child selector (if multiple) ────────────────────────────────
+  if(children.length>1){
+    h+='<div class="flex items-center gap-3 mb-6 afs">';
+    children.forEach(function(ch,i){
+      h+='<button class="child-btn'+(i===activeChild?" child-on":"")+'" onclick="P.selectChild('+i+')">';
+      h+='<div class="w-9 h-9 rounded-full '+(i===activeChild?"bg-brand-500 text-white":"bg-brand-100 text-brand-600")+' flex items-center justify-center text-sm font-semibold">'+ch.init+'</div>';
+      h+='<div class="text-left"><p class="text-sm font-semibold text-slate-800">'+ch.name+'</p><p class="text-[11px] text-slate-400">Year '+ch.year+'</p></div>';
+      h+='</button>';
+    });
+    h+='</div>';
+  }
+
+  // ── Welcome ─────────────────────────────────────────────────────
+  h+='<div class="mb-8 afs d1"><h1 class="text-2xl font-semibold text-slate-900 tracking-tight">How <span class="font-serif italic text-brand-600">'+c.name+'</span> is doing</h1><p class="text-sm text-slate-500 mt-1">Year '+c.year+' &middot; '+c.plan+'</p></div>';
+
+  // ── Overview Cards ──────────────────────────────────────────────
+  h+='<div class="grid sm:grid-cols-3 gap-5 mb-8 afs d2">';
+
+  // Score ring
+  h+='<div class="card p-6 flex items-center gap-5">';
+  h+='<div class="sring w-[96px] h-[96px] flex-shrink-0"><svg viewBox="0 0 96 96"><circle class="trk" cx="48" cy="48" r="44"/><circle class="fl" cx="48" cy="48" r="44" stroke="'+({up:"#16a34a",down:"#d97706",steady:"#5925a8"}[c.trend])+'" stroke-dasharray="'+circ+'" id="score-ring" stroke-dashoffset="'+circ+'"/></svg><span class="text-2xl font-bold '+sc.text+' tabular-nums relative z-10">'+c.score+'%</span></div>';
+  h+='<div><p class="text-sm font-semibold text-slate-800">Latest Score</p>';
+  if(c.trend==="up")h+='<p class="text-xs text-good-600 font-medium mt-1">Up from '+c.scorePrev+'% last week</p>';
+  else h+='<p class="text-xs text-slate-400 mt-1">Previous: '+c.scorePrev+'%</p>';
+  h+='</div></div>';
+
+  // Weekly activity
+  h+='<div class="card p-6"><p class="text-sm font-semibold text-slate-800 mb-3">This Week</p>';
+  h+='<div class="flex gap-1.5 mb-3">';
+  c.week.forEach(function(v,i){var cls="wdot ";if(v===2)cls+="wdot-today";else if(v===1)cls+="wdot-on";else cls+="wdot-off";h+='<div class="'+cls+'">'+days[i].charAt(0)+'</div>'});
+  h+='</div>';
+  h+='<p class="text-xs text-slate-500">'+c.sessionsWeek+' sessions &middot; '+c.timeWeek+' total</p>';
+  h+='</div>';
+
+  // Streak
+  h+='<div class="card p-6 flex items-center gap-4">';
+  h+='<div class="w-14 h-14 rounded-2xl bg-grow-50 border border-grow-100 flex items-center justify-center flex-shrink-0"><span class="text-2xl">&#x1F525;</span></div>';
+  h+='<div><p class="text-2xl font-bold text-slate-900 tabular-nums">'+c.streak+' days</p><p class="text-sm text-slate-500">Current streak</p></div>';
+  h+='</div>';
+
+  h+='</div>';
+
+  // ── Main Grid ───────────────────────────────────────────────────
+  h+='<div class="grid lg:grid-cols-5 gap-6">';
+
+  // Left (3/5): Skills + Activity
+  h+='<div class="lg:col-span-3 space-y-6 afs d3">';
+
+  // Skill breakdown
+  h+='<div class="card"><div class="px-6 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Subject Areas</h3><p class="text-xs text-slate-400 mt-0.5">How '+c.name+' is progressing in each area</p></div>';
+  h+='<div class="p-6 space-y-5">';
+  c.skills.forEach(function(s){
+    var scc=scCol(s.pct);
+    h+='<div>';
+    h+='<div class="flex items-center justify-between mb-2"><span class="text-sm font-medium text-slate-800">'+s.name+'</span><div class="flex items-center gap-2">'+skillLabel(s.label)+'<span class="text-sm font-semibold tabular-nums '+scc.text+'">'+s.pct+'%</span></div></div>';
+    h+='<div class="pbar"><div class="pfill '+scc.bg+'" style="width:'+s.pct+'%"></div></div>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+
+  // Recent sessions
+  h+='<div class="card"><div class="px-6 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Recent Sessions</h3></div>';
+  h+='<div class="divide-y divide-slate-75">';
+  c.recentSessions.forEach(function(s){
+    var scc=scCol(s.score);
+    h+='<div class="px-6 py-4 flex items-center gap-4"><div class="w-9 h-9 rounded-lg '+scc.light+' '+scc.text+' flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>';
+    h+='<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800">'+s.name+'</p><p class="text-xs text-slate-400 mt-0.5">'+s.date+'</p></div>';
+    h+='<span class="text-sm font-semibold tabular-nums '+scc.text+'">'+s.score+'%</span>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+  h+='</div>';
+
+  // Right (2/5): Insights + Recommendations
+  h+='<div class="lg:col-span-2 space-y-6 afs d4">';
+
+  // Insights
+  h+='<div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-4">What We Have Noticed</h3>';
+  h+='<div class="space-y-1">';
+  c.insights.forEach(function(ins){
+    var ico,bg;
+    if(ins.type==="good"){ico='<svg class="w-4 h-4 text-good-500" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';bg="bg-good-50"}
+    else{ico='<svg class="w-4 h-4 text-grow-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';bg="bg-grow-50"}
+    h+='<div class="insight"><div class="w-8 h-8 rounded-lg '+bg+' flex items-center justify-center flex-shrink-0 mt-0.5">'+ico+'</div><p class="text-sm text-slate-600 leading-relaxed">'+ins.text+'</p></div>';
+  });
+  h+='</div></div>';
+
+  // Recommendations
+  h+='<div class="card overflow-hidden"><div class="h-1 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div><div class="p-6">';
+  h+='<h3 class="text-[15px] font-semibold text-slate-900 mb-1">What Would Help Next</h3>';
+  h+='<p class="text-sm text-slate-500 mb-5">Based on '+c.name+"'s recent activity and performance.</p>";
+
+  // Find weakest skill
+  var weakest=c.skills.reduce(function(a,b){return a.pct<b.pct?a:b});
+  h+='<div class="space-y-3">';
+  h+='<div class="flex items-start gap-3 p-3 rounded-lg bg-brand-50 border border-brand-100"><div class="w-8 h-8 rounded-lg bg-brand-100 text-brand-500 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><div><p class="text-sm font-semibold text-brand-700">Practice '+weakest.name+'</p><p class="text-xs text-slate-500 mt-0.5">This is '+c.name+"'s weakest area at "+weakest.pct+'%. Regular short practice sessions will make a real difference.</p></div></div>';
+
+  h+='<div class="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"><div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div><div><p class="text-sm font-semibold text-slate-700">Keep the streak going</p><p class="text-xs text-slate-500 mt-0.5">'+c.name+' is on a '+c.streak+'-day streak. Even 10 minutes a day builds lasting understanding.</p></div></div>';
+
+  h+='<div class="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"><div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><div><p class="text-sm font-semibold text-slate-700">Try a diagnostic</p><p class="text-xs text-slate-500 mt-0.5">A short diagnostic test would help MindMosaic fine-tune '+c.name+"'s learning plan.</p></div></div>";
+
+  h+='</div></div></div>';
+
+  // Quick stats
+  h+='<div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-4">At a Glance</h3>';
+  h+='<div class="grid grid-cols-2 gap-4">';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">'+c.totalSessions+'</p><p class="text-[11px] text-slate-400">Total sessions</p></div>';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">'+c.timeWeek+'</p><p class="text-[11px] text-slate-400">This week</p></div>';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">'+c.sessionsWeek+'</p><p class="text-[11px] text-slate-400">Sessions this week</p></div>';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-good-600 tabular-nums">'+c.streak+'</p><p class="text-[11px] text-slate-400">Day streak</p></div>';
+  h+='</div></div>';
+
+  h+='</div>'; // right col
+  h+='</div>'; // grid
+
+  $("root").innerHTML=h;
+
+  // Animate score ring
+  requestAnimationFrame(function(){setTimeout(function(){var r=$("score-ring");if(r)r.style.strokeDashoffset=offset},200)});
+}
+
+window.P={selectChild:function(i){activeChild=i;render()}};
+render();
+})();
+</script>
+</body>
+</html>

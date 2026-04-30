@@ -1,0 +1,736 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MindMosaic — Results Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+
+  <!-- ================================================================== -->
+  <!-- DESIGN SYSTEM — shared tokens across all MindMosaic pages           -->
+  <!-- ================================================================== -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+            serif: ['"DM Serif Display"', 'Georgia', 'serif'],
+          },
+          colors: {
+            brand: {
+              50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',
+              400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#3b1584',
+              800:'#2e0f5c',900:'#1E1B4B',
+            },
+            slate: {
+              25:'#FDFCFE',50:'#FAF8FF',75:'#F0EDF8',100:'#E9E5F5',
+              150:'#D6D0E8',200:'#D6D0E8',300:'#A8A0C0',400:'#A8A0C0',
+              500:'#7C7399',600:'#3B3566',700:'#3B3566',800:'#1E1B4B',
+              900:'#1E1B4B',950:'#0e1118',
+            },
+            correct:{50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+            incorrect:{50:'#fef2f2',100:'#fee2e2',200:'#fecaca',500:'#ef4444',600:'#dc2626',700:'#b91c1c'},
+            warn:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+          },
+          boxShadow: {
+            'card':'0 0 0 1px rgba(30,27,75,.03), 0 1px 2px rgba(89,37,168,.04), 0 4px 12px -4px rgba(89,37,168,.06)',
+            'card-hover':'0 0 0 1px rgba(30,27,75,.03), 0 4px 12px rgba(89,37,168,.08), 0 8px 24px -8px rgba(89,37,168,.12)',
+            'elevated':'0 8px 24px rgba(89,37,168,.1), 0 2px 6px rgba(89,37,168,.06)',
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    :root {
+      --fast: 150ms cubic-bezier(0.4,0,0.2,1);
+      --base: 200ms cubic-bezier(0.4,0,0.2,1);
+      --slow: 400ms cubic-bezier(0.4,0,0.2,1);
+      --r-card: 12px;
+      --r-pill: 9999px;
+      --r-btn: 8px;
+    
+      /* Verbose aliases for cross-file consistency */
+      --radius-card: 12px;
+      --radius-pill: 9999px;
+      --radius-button: 8px;
+      --transition-fast: var(--fast);
+      --transition-base: var(--base);
+      --transition-slow: var(--slow, 400ms cubic-bezier(0.4,0,0.2,1));
+    }
+    *{box-sizing:border-box}
+    body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF8FF;color:#1E1B4B}
+
+    /* ── Card ── */
+    .card{background:white;border:1px solid #E9E5F5;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.02)}
+    .card-interactive{transition:box-shadow var(--base),transform var(--base)}
+    .card-interactive:hover{box-shadow:0 4px 12px rgba(0,0,0,0.06),0 1px 3px rgba(0,0,0,0.04);transform:translateY(-1px)}
+
+    /* ── Button ── */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+    .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,0.25)}
+    .btn-primary{background:#5925a8;color:white}
+    .btn-primary:hover{background:#4a1d96}
+    .btn-secondary{background:white;color:#5925a8;border:1px solid #EDE9FE}
+    .btn-secondary:hover{background:#F5F3FF;border-color:#C4B5FD}
+    .btn-ghost{background:transparent;color:#3B3566}
+    .btn-ghost:hover{background:#F0EDF8;color:#1E1B4B}
+    .btn-lg{padding:14px 28px;font-size:15px;font-weight:600}
+
+    /* ── Pill ── */
+    .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:var(--r-pill);line-height:1.4}
+
+    /* ── Progress ── */
+    .progress-track{height:6px;background:#E9E5F5;border-radius:100px;overflow:hidden}
+    .progress-fill{height:100%;border-radius:100px;transition:width 800ms cubic-bezier(0.4,0,0.2,1)}
+
+    /* ── Nav ── */
+    .nav-link{font-size:14px;font-weight:500;color:#7C7399;padding:6px 12px;border-radius:6px;transition:all var(--fast);text-decoration:none}
+    .nav-link:hover{color:#1E1B4B;background:#F0EDF8}
+    .nav-link-active{color:#5925a8;background:#F5F3FF}
+
+    /* ── Section Label ── */
+    .section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#A8A0C0}
+
+    /* ── Stat Ring ── */
+    .stat-ring{position:relative;display:flex;align-items:center;justify-content:center}
+    .stat-ring svg{position:absolute;top:0;left:0;width:100%;height:100%;transform:rotate(-90deg)}
+    .stat-ring circle{fill:none;stroke-linecap:round}
+    .stat-ring .track{stroke:#E9E5F5;stroke-width:5}
+    .stat-ring .fill-c{stroke-width:5;transition:stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)}
+
+    /* ── Tab ── */
+    .tab-btn{font-size:13px;font-weight:500;color:#7C7399;padding:8px 14px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}
+    .tab-btn:hover{color:#1E1B4B}
+    .tab-btn.tab-active{color:#5925a8;border-bottom-color:#5925a8}
+    .tab-count{font-size:11px;font-weight:600;padding:1px 6px;border-radius:var(--r-pill);background:#F0EDF8;color:#7C7399;margin-left:4px}
+    .tab-active .tab-count{background:#EDE9FE;color:#5925a8}
+
+    /* ── Accordion ── */
+    .acc-trigger{cursor:pointer;display:flex;align-items:center;width:100%;text-align:left;padding:16px 20px;border:none;background:none;gap:12px;transition:background var(--fast)}
+    .acc-trigger:hover{background:#FDFCFE}
+    .acc-content{max-height:0;overflow:hidden;transition:max-height 300ms cubic-bezier(0.4,0,0.2,1),padding 300ms}
+    .acc-content.acc-open{max-height:600px;padding:0 20px 20px 20px}
+    .acc-chevron{transition:transform var(--base);flex-shrink:0}
+    .acc-open-trigger .acc-chevron{transform:rotate(180deg)}
+
+    /* ── Status Dot ── */
+    .status-correct{color:#16a34a}
+    .status-incorrect{color:#dc2626}
+    .status-unanswered{color:#A8A0C0}
+
+    /* ── Animations ── */
+    @keyframes fadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes countUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .anim-fs{animation:fadeSlideIn 400ms cubic-bezier(0.4,0,0.2,1) both}
+    .d1{animation-delay:100ms}.d2{animation-delay:200ms}.d3{animation-delay:300ms}
+    .d4{animation-delay:400ms}.d5{animation-delay:500ms}.d6{animation-delay:600ms}
+    .d7{animation-delay:700ms}
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#D6D0E8;border-radius:100px}
+  
+    /* Link reset for clickable cards */
+    a.card, a.card-interactive { text-decoration: none; color: inherit; display: block; }
+      
+    /* ── Cross-file Shared Classes ── */
+    .table-row { transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .table-row:hover { background: #FAF8FF; }
+  
+    /* ── Premium Interaction Polish ── */
+    .btn { transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .btn:active { transform: scale(0.97); }
+    
+    /* Clickable row cue */
+    tr.table-row { cursor: pointer; }
+    tr.table-row td:last-child svg { transition: transform 150ms ease, color 150ms ease; }
+    tr.table-row:hover td:last-child svg { transform: translateX(2px); color: #7C7399; }
+    
+    /* Card link hover enhancement */
+    a.card:hover, a.card-interactive:hover { text-decoration: none; }
+    
+    /* Focus visible for accessibility */
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid #5925a8;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    
+    /* Smooth page transitions feel */
+    main { animation: fadeIn 300ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+  <!-- ================================================================== -->
+  <!-- HEADER                                                              -->
+  <!-- ================================================================== -->
+    <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="max-w-[1360px] mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-10">
+        <a href="dashboard.html" class="flex items-center gap-2.5 group" aria-label="MindMosaic home">
+          <img src="../brand/logo.svg" alt="MindMosaic" style="height:36px;width:auto;">
+        </a>
+        <nav class="hidden md:flex items-center gap-1" aria-label="Main navigation">
+          <a href="dashboard.html" class="nav-link">Dashboard</a>
+          <a href="learn.html" class="nav-link">Learn</a>
+          <a href="session-selection.html" class="nav-link">Practice</a>
+          <a href="student-assignments.html" class="nav-link">Assignments</a>
+          <a href="results.html" class="nav-link nav-link-active" aria-current="page">Results</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="btn-ghost btn p-2 rounded-lg relative" aria-label="Notifications">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white"></span>
+        </button>
+        <div class="h-5 w-px bg-slate-150"></div>
+        <button class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors" aria-label="Profile menu">
+          <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">V</div>
+          <div class="hidden sm:block text-left">
+            <p class="text-sm font-medium text-slate-800 leading-none">Vish</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Year 7</p>
+          </div>
+          <svg class="w-4 h-4 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================================================================== -->
+  <!-- PAGE CONTENT — all sections rendered by JS from examResult data     -->
+  <!-- ================================================================== -->
+  <main class="max-w-[1360px] mx-auto px-6 lg:px-8 pb-24" id="results-root"></main>
+
+  <!-- ================================================================== -->
+  <!-- DATA + RENDERING ENGINE                                             -->
+  <!-- ================================================================== -->
+  <script>
+    /**
+     * Results Intelligence Page
+     *
+     * All content is derived from a single `examResult` object.
+     * In production this would come from a Supabase edge function response.
+     * The render pipeline: examResult → derived metrics → HTML string → DOM.
+     */
+
+    // ── Exam Result Data ──────────────────────────────────────────────
+    const examResult = {
+      examTitle: 'NAPLAN Practice — Numeracy',
+      examType: 'Mock Exam',
+      date: '7 Apr 2026',
+      timeSpent: '32 min',
+      totalTime: '40 min',
+      previousScore: 64,     // null if first attempt
+      attempt: 2,
+
+      questions: [
+        { id:1,  text:'What is the value of 3² + 4²?',                                         topic:'Number & Algebra',        skill:'Indices',              options:['25','12','7','49'],                          correctIndex:0, userIndex:0,  explanation:'3² = 9 and 4² = 16. Adding gives 9 + 16 = 25.',                                                  tip:'Remember: indices apply to the base number only, not the entire expression.' },
+        { id:2,  text:'Simplify: 2(3x + 4) − 5x',                                              topic:'Number & Algebra',        skill:'Algebraic Expressions', options:['x + 8','11x + 8','x + 4','6x + 8'],          correctIndex:0, userIndex:0,  explanation:'Expand: 6x + 8 − 5x = x + 8.',                                                                    tip:'Always expand brackets first, then collect like terms.' },
+        { id:3,  text:'A rectangle has length 12 cm and width 8 cm. What is its perimeter?',    topic:'Measurement & Geometry',   skill:'Perimeter',            options:['96 cm','20 cm','40 cm','48 cm'],              correctIndex:2, userIndex:2,  explanation:'Perimeter = 2(12 + 8) = 2 × 20 = 40 cm.',                                                         tip:null },
+        { id:4,  text:'What is ³⁄₅ of 45?',                                                    topic:'Number & Algebra',        skill:'Fractions',            options:['15','27','30','9'],                            correctIndex:1, userIndex:3,  explanation:'³⁄₅ × 45 = 3 × 9 = 27.',                                                                          tip:'Break it down: divide by the denominator first, then multiply by the numerator.' },
+        { id:5,  text:'Convert 0.625 to a fraction in simplest form.',                          topic:'Number & Algebra',        skill:'Fractions',            options:['³⁄₁₀','³⁄₈','⁵⁄₁₂','⁷⁄₂₀'],                correctIndex:1, userIndex:0,  explanation:'0.625 = 625/1000 = 5/8 after dividing by 125.',                                                    tip:'For decimals with 3 digits, put them over 1000 and simplify by finding the GCF.' },
+        { id:6,  text:'The angles of a triangle are in the ratio 2:3:4. What is the largest?',  topic:'Measurement & Geometry',   skill:'Angles',               options:['60°','80°','90°','100°'],                     correctIndex:1, userIndex:1,  explanation:'Sum = 180°. Parts = 2+3+4 = 9. Largest = (4/9) × 180 = 80°.',                                     tip:null },
+        { id:7,  text:'What is the mean of 12, 15, 18, 21, and 24?',                            topic:'Statistics & Probability', skill:'Averages',             options:['18','15','21','90'],                           correctIndex:0, userIndex:0,  explanation:'Sum = 90. Mean = 90 ÷ 5 = 18.',                                                                    tip:null },
+        { id:8,  text:'A shirt costs $40 and is discounted by 15%. What is the sale price?',    topic:'Number & Algebra',        skill:'Percentages',          options:['$34','$25','$38','$6'],                        correctIndex:0, userIndex:2,  explanation:'15% of $40 = $6. Sale price = $40 − $6 = $34.',                                                    tip:'Find the percentage amount first, then subtract from the original.' },
+        { id:9,  text:'What is the next in: 2, 6, 18, 54, …?',                                  topic:'Number & Algebra',        skill:'Patterns',             options:['72','108','162','216'],                        correctIndex:2, userIndex:2,  explanation:'Each term is multiplied by 3. 54 × 3 = 162.',                                                      tip:null },
+        { id:10, text:'Express 7/20 as a percentage.',                                          topic:'Number & Algebra',        skill:'Percentages',          options:['35%','70%','3.5%','14%'],                      correctIndex:0, userIndex:0,  explanation:'7/20 = 0.35 = 35%.',                                                                               tip:null },
+        { id:11, text:'A cube has side length 5 cm. What is its volume?',                       topic:'Measurement & Geometry',   skill:'Volume',               options:['25 cm³','125 cm³','150 cm³','75 cm³'],        correctIndex:1, userIndex:1,  explanation:'Volume = 5³ = 125 cm³.',                                                                           tip:null },
+        { id:12, text:'Solve for x: 3x − 7 = 14',                                              topic:'Number & Algebra',        skill:'Equations',            options:['x = 3','x = 7','x = 21','x = 5'],             correctIndex:1, userIndex:1,  explanation:'3x = 21, so x = 7.',                                                                               tip:null },
+        { id:13, text:'Probability of rolling an even number on a standard die?',               topic:'Statistics & Probability', skill:'Probability',          options:['¹⁄₃','¹⁄₂','²⁄₃','¹⁄₆'],                    correctIndex:1, userIndex:1,  explanation:'Even numbers: 2, 4, 6 = 3 out of 6 = ½.',                                                         tip:null },
+        { id:14, text:'A car travels 240 km in 3 hours. Average speed?',                        topic:'Measurement & Geometry',   skill:'Speed & Distance',     options:['60 km/h','80 km/h','720 km/h','120 km/h'],    correctIndex:1, userIndex:0,  explanation:'Speed = distance ÷ time = 240 ÷ 3 = 80 km/h.',                                                    tip:'Use the formula triangle: Speed = Distance ÷ Time.' },
+        { id:15, text:'Area of a triangle with base 10 cm and height 6 cm?',                    topic:'Measurement & Geometry',   skill:'Area',                 options:['60 cm²','30 cm²','16 cm²','36 cm²'],          correctIndex:1, userIndex:1,  explanation:'Area = ½ × 10 × 6 = 30 cm².',                                                                     tip:null },
+        { id:16, text:'Round 3.4567 to two decimal places.',                                    topic:'Number & Algebra',        skill:'Rounding',             options:['3.45','3.46','3.50','3.47'],                   correctIndex:1, userIndex:0,  explanation:'The third decimal is 6 (≥ 5), so round up: 3.46.',                                                 tip:'Look at the digit after the place you are rounding to. If it is 5 or more, round up.' },
+        { id:17, text:'What is −3 × (−4)?',                                                     topic:'Number & Algebra',        skill:'Negative Numbers',     options:['−12','12','−7','7'],                           correctIndex:1, userIndex:1,  explanation:'A negative times a negative gives a positive: 12.',                                                tip:null },
+        { id:18, text:'Bag: 3 red, 5 blue, 2 green marbles. P(blue)?',                          topic:'Statistics & Probability', skill:'Probability',          options:['¹⁄₂','³⁄₁₀','¹⁄₅','⁵⁄₁₀'],                  correctIndex:0, userIndex:0,  explanation:'Total = 10. P(blue) = 5/10 = ½.',                                                                  tip:null },
+        { id:19, text:'Simplify: 4a + 3b − 2a + 5b',                                           topic:'Number & Algebra',        skill:'Algebraic Expressions', options:['2a + 8b','6a + 8b','2a + 2b','10ab'],         correctIndex:0, userIndex:2,  explanation:'(4a − 2a) + (3b + 5b) = 2a + 8b.',                                                                 tip:'Group like terms (same variable) before combining.' },
+        { id:20, text:'Scale 1:50,000. Two towns 6 cm apart on map. Actual distance?',          topic:'Measurement & Geometry',   skill:'Scale & Maps',         options:['30 km','3 km','300 km','0.3 km'],              correctIndex:1, userIndex:1,  explanation:'6 × 50,000 = 300,000 cm = 3 km.',                                                                  tip:null },
+        { id:21, text:'Median of: 5, 8, 3, 12, 7?',                                             topic:'Statistics & Probability', skill:'Averages',             options:['8','5','7','3'],                               correctIndex:2, userIndex:2,  explanation:'Ordered: 3, 5, 7, 8, 12. Middle value = 7.',                                                       tip:null },
+        { id:22, text:'Calculate: 2.5 × 0.4',                                                   topic:'Number & Algebra',        skill:'Decimals',             options:['10','1','0.1','1.0'],                          correctIndex:1, userIndex:null, explanation:'2.5 × 0.4 = 1.0.',                                                                                tip:'Count total decimal places in both numbers, then apply to the product.' },
+        { id:23, text:'Circle radius 7 cm. Circumference? (π ≈ 22/7)',                          topic:'Measurement & Geometry',   skill:'Circles',              options:['44 cm','154 cm','22 cm','14 cm'],              correctIndex:0, userIndex:0,  explanation:'C = 2πr = 2 × 22/7 × 7 = 44 cm.',                                                                 tip:null },
+        { id:24, text:'If y = 2x + 3, what is y when x = −2?',                                  topic:'Number & Algebra',        skill:'Substitution',         options:['−1','1','7','−7'],                             correctIndex:0, userIndex:null, explanation:'y = 2(−2) + 3 = −4 + 3 = −1.',                                                                    tip:'Substitute carefully — remember to apply the sign.' },
+        { id:25, text:'30 students, 18 girls. What % are boys?',                                 topic:'Statistics & Probability', skill:'Percentages',          options:['60%','40%','12%','18%'],                       correctIndex:1, userIndex:1,  explanation:'Boys = 12. Percentage = 12/30 × 100 = 40%.',                                                       tip:null },
+      ],
+    };
+
+    // ── Derived Metrics ───────────────────────────────────────────────
+
+    function deriveMetrics(result) {
+      const qs = result.questions;
+      const total = qs.length;
+
+      const correct = qs.filter(q => q.userIndex === q.correctIndex).length;
+      const incorrect = qs.filter(q => q.userIndex !== null && q.userIndex !== q.correctIndex).length;
+      const unanswered = qs.filter(q => q.userIndex === null).length;
+      const accuracy = Math.round((correct / total) * 100);
+
+      // Per-topic breakdown
+      const topicMap = new Map();
+      qs.forEach(q => {
+        if (!topicMap.has(q.topic)) topicMap.set(q.topic, { total: 0, correct: 0, incorrect: 0, unanswered: 0, skills: new Map() });
+        const t = topicMap.get(q.topic);
+        t.total++;
+        if (q.userIndex === q.correctIndex) t.correct++;
+        else if (q.userIndex === null) t.unanswered++;
+        else t.incorrect++;
+
+        if (!t.skills.has(q.skill)) t.skills.set(q.skill, { total: 0, correct: 0 });
+        const s = t.skills.get(q.skill);
+        s.total++;
+        if (q.userIndex === q.correctIndex) s.correct++;
+      });
+
+      const topics = [...topicMap.entries()].map(([name, data]) => ({
+        name,
+        total: data.total,
+        correct: data.correct,
+        incorrect: data.incorrect,
+        unanswered: data.unanswered,
+        pct: Math.round((data.correct / data.total) * 100),
+        skills: [...data.skills.entries()].map(([sName, sData]) => ({
+          name: sName,
+          total: sData.total,
+          correct: sData.correct,
+          pct: Math.round((sData.correct / sData.total) * 100),
+        })).sort((a, b) => a.pct - b.pct),
+      })).sort((a, b) => a.pct - b.pct);
+
+      const strongest = topics[topics.length - 1];
+      const weakest = topics[0];
+
+      const improvement = result.previousScore !== null ? accuracy - result.previousScore : null;
+
+      // Weakest skills (across all topics, pct < 100)
+      const allSkills = topics.flatMap(t => t.skills.map(s => ({ ...s, topic: t.name })));
+      const weakSkills = allSkills.filter(s => s.pct < 100).sort((a, b) => a.pct - b.pct).slice(0, 4);
+      const strongSkills = allSkills.filter(s => s.pct === 100).slice(0, 4);
+
+      return { total, correct, incorrect, unanswered, accuracy, topics, strongest, weakest, improvement, weakSkills, strongSkills };
+    }
+
+    const m = deriveMetrics(examResult);
+    const LETTERS = ['A', 'B', 'C', 'D'];
+
+    // ── Helper: score colour ──────────────────────────────────────────
+    function scoreColor(pct) {
+      if (pct >= 80) return { text: 'text-correct-600', bg: 'bg-correct-50', border: 'border-correct-200', fill: 'bg-correct-500', stroke: '#16a34a' };
+      if (pct >= 60) return { text: 'text-brand-600', bg: 'bg-brand-50', border: 'border-brand-200', fill: 'bg-brand-500', stroke: '#5925a8' };
+      if (pct >= 40) return { text: 'text-warn-600', bg: 'bg-warn-50', border: 'border-warn-100', fill: 'bg-warn-500', stroke: '#d97706' };
+      return { text: 'text-incorrect-600', bg: 'bg-incorrect-50', border: 'border-incorrect-200', fill: 'bg-incorrect-500', stroke: '#dc2626' };
+    }
+
+    function verdictText(pct) {
+      if (pct >= 85) return { headline: 'Excellent Result', sub: 'You have demonstrated strong understanding across this exam.' };
+      if (pct >= 70) return { headline: 'Solid Performance', sub: 'Good foundations — a few targeted areas to strengthen.' };
+      if (pct >= 55) return { headline: 'Room to Grow', sub: 'You are building understanding. Focused practice will close the gaps.' };
+      return { headline: 'Let\u2019s Build From Here', sub: 'This result shows clear areas to target. Review the breakdown below.' };
+    }
+
+    function statusLabel(q) {
+      if (q.userIndex === null) return { cls: 'status-unanswered', label: 'Unanswered', bg: 'bg-slate-50 border-slate-200', icon: `<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` };
+      if (q.userIndex === q.correctIndex) return { cls: 'status-correct', label: 'Correct', bg: 'bg-correct-50 border-correct-200', icon: `<svg class="w-4 h-4 text-correct-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>` };
+      return { cls: 'status-incorrect', label: 'Incorrect', bg: 'bg-incorrect-50 border-incorrect-200', icon: `<svg class="w-4 h-4 text-incorrect-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>` };
+    }
+
+    // ── Render ─────────────────────────────────────────────────────────
+
+    const sc = scoreColor(m.accuracy);
+    const v = verdictText(m.accuracy);
+    const circ = 2 * Math.PI * 52; // ring radius 52
+
+    document.getElementById('results-root').innerHTML = `
+
+      <!-- ============================================================ -->
+      <!-- HERO RESULT SUMMARY                                           -->
+      <!-- ============================================================ -->
+      <section class="pt-8 pb-2 anim-fs">
+        <div class="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
+          <!-- Score Ring -->
+          <div class="stat-ring w-[120px] h-[120px] flex-shrink-0 mx-auto md:mx-0">
+            <svg viewBox="0 0 120 120">
+              <circle class="track" cx="60" cy="60" r="52" />
+              <circle class="fill-c" cx="60" cy="60" r="52"
+                stroke="${sc.stroke}"
+                stroke-dasharray="${circ}"
+                id="hero-ring"
+                stroke-dashoffset="${circ}" />
+            </svg>
+            <span class="text-3xl font-bold ${sc.text} tabular-nums relative z-10">${m.accuracy}%</span>
+          </div>
+          <!-- Text -->
+          <div class="text-center md:text-left flex-1">
+            <p class="section-label mb-2">${examResult.examType} · ${examResult.date}</p>
+            <h1 class="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mb-1">
+              ${v.headline}
+            </h1>
+            <p class="text-[15px] text-slate-500 leading-relaxed max-w-xl">${v.sub}</p>
+            <div class="flex flex-wrap items-center gap-2 mt-3 justify-center md:justify-start">
+              <span class="pill ${sc.bg} ${sc.text} border ${sc.border}">${examResult.examTitle}</span>
+              <span class="pill bg-slate-50 text-slate-600 border border-slate-150">${examResult.timeSpent} of ${examResult.totalTime}</span>
+              ${examResult.attempt > 1 ? `<span class="pill bg-slate-50 text-slate-600 border border-slate-150">Attempt ${examResult.attempt}</span>` : ''}
+              ${m.improvement !== null ? `<span class="pill ${m.improvement >= 0 ? 'bg-correct-50 text-correct-700 border border-correct-200' : 'bg-incorrect-50 text-incorrect-700 border border-incorrect-200'}">${m.improvement >= 0 ? '↑' : '↓'} ${Math.abs(m.improvement)}% vs last attempt</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- PERFORMANCE SNAPSHOT CARDS                                     -->
+      <!-- ============================================================ -->
+      <section class="py-6 anim-fs d1">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <!-- Correct -->
+          <div class="card p-4">
+            <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Correct</p>
+            <p class="text-2xl font-bold text-correct-600 tabular-nums">${m.correct}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">of ${m.total}</p>
+          </div>
+          <!-- Incorrect -->
+          <div class="card p-4">
+            <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Incorrect</p>
+            <p class="text-2xl font-bold text-incorrect-600 tabular-nums">${m.incorrect}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">of ${m.total}</p>
+          </div>
+          <!-- Unanswered -->
+          <div class="card p-4">
+            <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Unanswered</p>
+            <p class="text-2xl font-bold ${m.unanswered > 0 ? 'text-warn-600' : 'text-slate-300'} tabular-nums">${m.unanswered}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">${m.unanswered > 0 ? 'marks lost' : 'all attempted'}</p>
+          </div>
+          <!-- Accuracy -->
+          <div class="card p-4">
+            <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Accuracy</p>
+            <p class="text-2xl font-bold ${sc.text} tabular-nums">${m.accuracy}%</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">overall</p>
+          </div>
+          <!-- Time -->
+          <div class="card p-4">
+            <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Time Used</p>
+            <p class="text-2xl font-bold text-slate-800 tabular-nums">${examResult.timeSpent}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">of ${examResult.totalTime}</p>
+          </div>
+          <!-- vs Previous -->
+          <div class="card p-4">
+            <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">vs Previous</p>
+            ${m.improvement !== null
+              ? `<p class="text-2xl font-bold ${m.improvement >= 0 ? 'text-correct-600' : 'text-incorrect-600'} tabular-nums">${m.improvement >= 0 ? '+' : ''}${m.improvement}%</p>
+                 <p class="text-[11px] text-slate-400 mt-0.5">${m.improvement >= 0 ? 'improvement' : 'change'}</p>`
+              : `<p class="text-2xl font-bold text-slate-200 tabular-nums">—</p>
+                 <p class="text-[11px] text-slate-300 mt-0.5">first attempt</p>`
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- MAIN GRID — Skill Analysis + Insights + NBA                   -->
+      <!-- ============================================================ -->
+      <section class="py-2 anim-fs d2">
+        <div class="grid lg:grid-cols-5 gap-6">
+
+          <!-- LEFT (3/5): Topic + Skill Analysis ─────────────────────── -->
+          <div class="lg:col-span-3 space-y-6">
+
+            <!-- Topic Breakdown -->
+            <div class="card">
+              <div class="px-6 pt-5 pb-4 border-b border-slate-100">
+                <h3 class="text-[15px] font-semibold text-slate-900">Topic Breakdown</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Performance by curriculum strand</p>
+              </div>
+              <div class="divide-y divide-slate-75">
+                ${m.topics.map(t => {
+                  const tc = scoreColor(t.pct);
+                  return `
+                  <div class="px-6 py-4">
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-slate-800">${t.name}</span>
+                        <span class="pill text-[10px] ${tc.bg} ${tc.text} border ${tc.border}">${t.pct}%</span>
+                      </div>
+                      <span class="text-xs text-slate-400 tabular-nums">${t.correct}/${t.total} correct</span>
+                    </div>
+                    <div class="progress-track mb-3"><div class="progress-fill ${tc.fill}" data-width="${t.pct}" style="width:0%"></div></div>
+                    <!-- Skills within topic -->
+                    <div class="flex flex-wrap gap-2">
+                      ${t.skills.map(s => {
+                        const skc = scoreColor(s.pct);
+                        return `<span class="text-[11px] font-medium px-2 py-0.5 rounded ${skc.bg} ${skc.text}">${s.name} ${s.correct}/${s.total}</span>`;
+                      }).join('')}
+                    </div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Weak & Strong Skills -->
+            <div class="grid sm:grid-cols-2 gap-4">
+              <!-- Weak -->
+              <div class="card p-5">
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="w-7 h-7 rounded-lg bg-incorrect-50 text-incorrect-500 flex items-center justify-center">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 7l-5 5-5-5"/></svg>
+                  </div>
+                  <h4 class="text-sm font-semibold text-slate-900">Skills to Improve</h4>
+                </div>
+                <div class="space-y-3">
+                  ${m.weakSkills.map(s => {
+                    const wc = scoreColor(s.pct);
+                    return `
+                    <div>
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm text-slate-700">${s.name}</span>
+                        <span class="text-sm font-semibold ${wc.text} tabular-nums">${s.pct}%</span>
+                      </div>
+                      <div class="progress-track"><div class="progress-fill ${wc.fill}" data-width="${s.pct}" style="width:0%"></div></div>
+                    </div>`;
+                  }).join('')}
+                </div>
+              </div>
+              <!-- Strong -->
+              <div class="card p-5">
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="w-7 h-7 rounded-lg bg-correct-50 text-correct-500 flex items-center justify-center">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M7 17l5-5 5 5"/></svg>
+                  </div>
+                  <h4 class="text-sm font-semibold text-slate-900">Strengths</h4>
+                </div>
+                <div class="space-y-3">
+                  ${m.strongSkills.length > 0 ? m.strongSkills.map(s => `
+                    <div class="flex items-center gap-3">
+                      <svg class="w-4 h-4 text-correct-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                      <span class="text-sm text-slate-700">${s.name}</span>
+                      <span class="text-xs text-correct-600 font-medium ml-auto">${s.correct}/${s.total}</span>
+                    </div>`).join('') : '<p class="text-sm text-slate-400">No skills at 100% — keep practising.</p>'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT (2/5): Insights + Next Best Action ────────────────── -->
+          <div class="lg:col-span-2 space-y-6">
+
+            <!-- Insight Panel -->
+            <div class="card p-6">
+              <div class="flex items-center gap-2 mb-4">
+                <div class="w-7 h-7 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                </div>
+                <h3 class="text-[15px] font-semibold text-slate-900">Performance Insights</h3>
+              </div>
+              <div class="space-y-4 text-sm text-slate-600 leading-relaxed">
+                <p>You scored <span class="font-semibold ${sc.text}">${m.accuracy}%</span> with ${m.correct} correct out of ${m.total} questions${m.unanswered > 0 ? `, leaving <span class="font-semibold text-warn-600">${m.unanswered} unanswered</span>` : ''}.</p>
+                <p>Your strongest strand was <span class="font-semibold text-correct-700">${m.strongest.name}</span> at ${m.strongest.pct}%, showing solid understanding${m.strongest.skills.filter(s => s.pct === 100).length > 0 ? ` — particularly in ${m.strongest.skills.filter(s => s.pct === 100).map(s => s.name).join(' and ')}` : ''}.</p>
+                <p>The biggest area for improvement is <span class="font-semibold text-incorrect-700">${m.weakest.name}</span> at ${m.weakest.pct}%. Within this strand, <span class="font-medium">${m.weakest.skills[0].name}</span> had the lowest accuracy (${m.weakest.skills[0].pct}%).</p>
+                ${m.improvement !== null ? `<p>Compared to your previous attempt, you ${m.improvement >= 0 ? `improved by <span class="font-semibold text-correct-600">${m.improvement}%</span>` : `dropped by <span class="font-semibold text-incorrect-600">${Math.abs(m.improvement)}%</span>`}.</p>` : ''}
+                ${m.unanswered > 0 ? `<p class="text-warn-700 font-medium">You left ${m.unanswered} question${m.unanswered > 1 ? 's' : ''} unanswered — that's ${m.unanswered} mark${m.unanswered > 1 ? 's' : ''} lost with no attempt. In timed exams, always attempt every question.</p>` : ''}
+              </div>
+            </div>
+
+            <!-- Next Best Action -->
+            <div class="card bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 border-0 p-6 text-white relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+              <div class="relative z-10">
+                <p class="section-label text-white/60 mb-2">Recommended Next Step</p>
+                <h3 class="text-lg font-semibold tracking-tight mb-2">Practice ${m.weakest.skills[0].name}</h3>
+                <p class="text-white/70 text-sm leading-relaxed mb-5">${m.weakest.skills[0].name} was your weakest skill at ${m.weakest.skills[0].pct}%. A focused practice session can target exactly this gap.</p>
+                <button class="btn bg-white text-brand-700 font-semibold hover:bg-brand-50 px-5 py-3 text-[15px]" onclick="location.href='practice.html'">
+                  Start Practice
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card p-5 space-y-2">
+              <h4 class="text-sm font-semibold text-slate-900 mb-3">More Actions</h4>
+              <a href="exam engine.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                </div>
+                <div class="flex-1"><p class="text-sm font-medium text-slate-800">Retake Full Exam</p><p class="text-[11px] text-slate-400">Try all ${m.total} questions again</p></div>
+                <svg class="w-4 h-4 text-slate-300 group-hover:text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+              </a>
+              <a href="exam engine.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">
+                <div class="w-8 h-8 rounded-lg bg-incorrect-50 text-incorrect-500 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </div>
+                <div class="flex-1"><p class="text-sm font-medium text-slate-800">Retry Incorrect Only</p><p class="text-[11px] text-slate-400">${m.incorrect + m.unanswered} question${m.incorrect + m.unanswered !== 1 ? 's' : ''} to redo</p></div>
+                <svg class="w-4 h-4 text-slate-300 group-hover:text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+              </a>
+              <a href="learn.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">
+                <div class="w-8 h-8 rounded-lg bg-slate-75 text-slate-500 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <div class="flex-1"><p class="text-sm font-medium text-slate-800">Back to Learning Hub</p><p class="text-[11px] text-slate-400">View your updated plan</p></div>
+                <svg class="w-4 h-4 text-slate-300 group-hover:text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- QUESTION REVIEW                                                -->
+      <!-- ============================================================ -->
+      <section class="py-8 anim-fs d4">
+        <div class="card">
+          <div class="px-6 pt-5 pb-0 border-b border-slate-100">
+            <div class="flex items-center justify-between mb-0">
+              <h3 class="text-[15px] font-semibold text-slate-900">Question Review</h3>
+              <span class="text-xs text-slate-400">${m.total} questions</span>
+            </div>
+            <!-- Filter Tabs -->
+            <div class="flex gap-0 mt-3 -mb-px overflow-x-auto" id="review-tabs">
+              <button class="tab-btn tab-active" data-filter="all">All<span class="tab-count">${m.total}</span></button>
+              <button class="tab-btn" data-filter="incorrect">Incorrect<span class="tab-count">${m.incorrect}</span></button>
+              <button class="tab-btn" data-filter="unanswered">Unanswered<span class="tab-count">${m.unanswered}</span></button>
+              <button class="tab-btn" data-filter="correct">Correct<span class="tab-count">${m.correct}</span></button>
+            </div>
+          </div>
+          <div id="review-list" class="divide-y divide-slate-75"></div>
+        </div>
+      </section>
+    `;
+
+    // ── Animate progress bars after render ────────────────────────────
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        document.querySelectorAll('[data-width]').forEach(el => {
+          el.style.width = el.dataset.width + '%';
+        });
+        // Hero ring
+        const ring = document.getElementById('hero-ring');
+        if (ring) {
+          const offset = circ - (m.accuracy / 100) * circ;
+          ring.style.strokeDashoffset = offset;
+        }
+      }, 200);
+    });
+
+    // ── Question Review: Tab Filtering + Accordion ────────────────────
+
+    let activeFilter = 'all';
+    let openAccordion = -1;
+
+    function getStatus(q) {
+      if (q.userIndex === null) return 'unanswered';
+      return q.userIndex === q.correctIndex ? 'correct' : 'incorrect';
+    }
+
+    function renderReviewList() {
+      const filtered = examResult.questions.filter(q =>
+        activeFilter === 'all' || getStatus(q) === activeFilter
+      );
+
+      const listEl = document.getElementById('review-list');
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="px-6 py-10 text-center"><p class="text-sm text-slate-400">No questions match this filter.</p></div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(q => {
+        const st = statusLabel(q);
+        const isOpen = openAccordion === q.id;
+        const userAnswer = q.userIndex !== null ? q.options[q.userIndex] : '—';
+        const correctAnswer = q.options[q.correctIndex];
+
+        return `
+          <div class="question-review-item" data-qid="${q.id}">
+            <button class="acc-trigger ${isOpen ? 'acc-open-trigger' : ''}" onclick="toggleAccordion(${q.id})" aria-expanded="${isOpen}">
+              <!-- Status icon -->
+              <div class="w-7 h-7 rounded-lg ${st.bg} border flex items-center justify-center flex-shrink-0">${st.icon}</div>
+              <!-- Question info -->
+              <div class="flex-1 min-w-0 text-left">
+                <div class="flex items-center gap-2">
+                  <span class="text-[11px] font-semibold text-slate-400">Q${q.id}</span>
+                  <span class="text-[11px] text-slate-300">·</span>
+                  <span class="text-[11px] text-slate-400">${q.topic}</span>
+                  <span class="text-[11px] text-slate-300">·</span>
+                  <span class="text-[11px] text-slate-400">${q.skill}</span>
+                </div>
+                <p class="text-sm text-slate-800 mt-0.5 truncate">${q.text}</p>
+              </div>
+              <!-- Status pill -->
+              <span class="pill text-[10px] ${st.bg} border ${st.cls} hidden sm:inline-flex">${st.label}</span>
+              <!-- Chevron -->
+              <svg class="acc-chevron w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="acc-content ${isOpen ? 'acc-open' : ''}">
+              <div class="pl-11 space-y-4">
+                <!-- Full question -->
+                <p class="text-sm text-slate-700 leading-relaxed">${q.text}</p>
+                <!-- Options display -->
+                <div class="space-y-2">
+                  ${q.options.map((opt, i) => {
+                    let optCls = 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm border';
+                    if (i === q.correctIndex) {
+                      optCls += ' bg-correct-50 border-correct-200 text-correct-700';
+                    } else if (q.userIndex === i && i !== q.correctIndex) {
+                      optCls += ' bg-incorrect-50 border-incorrect-200 text-incorrect-700 line-through';
+                    } else {
+                      optCls += ' bg-white border-slate-100 text-slate-500';
+                    }
+                    const letter = LETTERS[i];
+                    let indicator = '';
+                    if (i === q.correctIndex) indicator = `<svg class="w-3.5 h-3.5 text-correct-500 ml-auto flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>`;
+                    else if (q.userIndex === i) indicator = `<svg class="w-3.5 h-3.5 text-incorrect-500 ml-auto flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+                    return `<div class="${optCls}">
+                      <span class="text-xs font-semibold w-5">${letter}</span>
+                      <span class="flex-1">${opt}</span>
+                      ${indicator}
+                    </div>`;
+                  }).join('')}
+                </div>
+                <!-- Answer summary -->
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <span>Your answer: <span class="font-medium ${getStatus(q) === 'correct' ? 'text-correct-600' : getStatus(q) === 'incorrect' ? 'text-incorrect-600' : 'text-slate-400'}">${userAnswer}</span></span>
+                  ${getStatus(q) !== 'correct' ? `<span>Correct answer: <span class="font-medium text-correct-600">${correctAnswer}</span></span>` : ''}
+                </div>
+                <!-- Explanation -->
+                <div class="rounded-lg bg-slate-50 border border-slate-100 px-4 py-3">
+                  <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Explanation</p>
+                  <p class="text-sm text-slate-600 leading-relaxed">${q.explanation}</p>
+                </div>
+                ${q.tip ? `
+                <div class="rounded-lg bg-brand-50 border border-brand-100 px-4 py-3">
+                  <p class="text-[11px] font-semibold text-brand-400 uppercase tracking-wider mb-1">Learning Tip</p>
+                  <p class="text-sm text-brand-700 leading-relaxed">${q.tip}</p>
+                </div>` : ''}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function toggleAccordion(qid) {
+      openAccordion = openAccordion === qid ? -1 : qid;
+      renderReviewList();
+    }
+
+    // Tab switching
+    document.getElementById('review-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('.tab-btn');
+      if (!btn) return;
+      activeFilter = btn.dataset.filter;
+      openAccordion = -1;
+      document.querySelectorAll('#review-tabs .tab-btn').forEach(t => t.classList.remove('tab-active'));
+      btn.classList.add('tab-active');
+      renderReviewList();
+    });
+
+    // Initial render
+    renderReviewList();
+  </script>
+
+</body>
+</html>

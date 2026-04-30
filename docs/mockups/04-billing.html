@@ -1,0 +1,389 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic - Plans & Billing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118'},
+      correct:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)',elevated:'0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:12px;--r-btn:8px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9fb;color:#2a3040}
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,.25)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5E8}.btn-secondary:hover{background:#F5F3FF}
+  .btn-ghost{background:transparent;color:#525b6e}.btn-ghost:hover{background:#f3f4f7;color:#2a3040}
+  .btn-submit{background:linear-gradient(135deg,#2e0f5c,#5b21b6);color:white;font-weight:600}.btn-submit:hover{opacity:.92}
+  .btn-lg{padding:14px 28px;font-size:15px;font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8b94a6}
+  .nav-link{font-size:14px;font-weight:500;color:#6b7488;padding:6px 12px;border-radius:6px;transition:all var(--fast);text-decoration:none}.nav-link:hover{color:#2a3040;background:#f3f4f7}.nav-link-active{color:#5925a8;background:#F5F3FF}
+  .tab{font-size:14px;font-weight:500;color:#6b7488;padding:10px 18px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#2a3040}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+
+  /* Toggle */
+  .toggle-track{width:44px;height:24px;border-radius:12px;background:#d5d9e2;padding:2px;cursor:pointer;transition:background var(--fast);display:flex;align-items:center}
+  .toggle-track.on{background:#5925a8}
+  .toggle-dot{width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:transform var(--fast)}
+  .toggle-track.on .toggle-dot{transform:translateX(20px)}
+
+  /* Pricing card */
+  .plan-card{position:relative;padding:32px;border-radius:16px;background:white;border:1.5px solid #eef0f4;transition:all var(--base)}
+  .plan-card:hover{box-shadow:0 8px 24px rgba(0,0,0,.08)}
+  .plan-card.plan-pop{border-color:#5925a8;box-shadow:0 0 0 1px #5925a8,0 8px 24px rgba(89,37,168,.12)}
+
+  /* Comparison table */
+  .cmp-tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .cmp-tbl th{text-align:center;padding:12px 16px;font-size:12px;font-weight:600;color:#6b7488;border-bottom:2px solid #eef0f4;background:#f8f9fb}
+  .cmp-tbl th:first-child{text-align:left;background:white;color:#2a3040;font-size:14px}
+  .cmp-tbl td{padding:12px 16px;border-bottom:1px solid #f3f4f7;text-align:center;font-size:13px;color:#525b6e}
+  .cmp-tbl td:first-child{text-align:left;font-weight:500;color:#2a3040}
+  .cmp-tbl tr:hover td{background:#fcfcfd}
+  .cmp-tbl .pop-col{background:#F5F3FF}
+
+  /* Input */
+  .inp{width:100%;padding:11px 14px;border:1.5px solid #e4e7ed;border-radius:var(--r-btn);font-size:14px;font-family:inherit;color:#2a3040;background:white;transition:all var(--fast);outline:none}
+  .inp:focus{border-color:#5925a8;box-shadow:0 0 0 3px rgba(89,37,168,.1)}
+  .inp::placeholder{color:#b0b7c5}
+
+  /* Card field (Stripe-like) */
+  .card-field{background:#f8f9fb;border:1.5px solid #e4e7ed;border-radius:var(--r-btn);padding:14px 16px;font-size:15px;font-family:'DM Sans',monospace;color:#2a3040;letter-spacing:.5px;transition:all var(--fast)}
+  .card-field:focus{border-color:#5925a8;box-shadow:0 0 0 3px rgba(89,37,168,.1);outline:none;background:white}
+
+  /* Invoice row */
+  .inv-row{transition:background var(--fast)}.inv-row:hover{background:#fcfcfd}
+
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.afs{animation:fadeSlide 350ms cubic-bezier(.4,0,.2,1) both}
+  .d1{animation-delay:80ms}.d2{animation-delay:160ms}.d3{animation-delay:240ms}
+
+  /* Success */
+  @keyframes scaleUp{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}.asc{animation:scaleUp 400ms cubic-bezier(.4,0,.2,1) both}
+
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ================================================================== -->
+<!-- HEADER                                                              -->
+<!-- ================================================================== -->
+<header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+  <div class="max-w-[1200px] mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-10">
+      <a href="dashboard.html" class="flex items-center gap-2.5">
+        <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+      </a>
+      <nav class="hidden md:flex items-center gap-1">
+        <a href="dashboard.html" class="nav-link">Dashboard</a>
+        <a href="learn.html" class="nav-link">Learn</a>
+        <a href="#" class="nav-link nav-link-active">Plans</a>
+      </nav>
+    </div>
+    <button class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors">
+      <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">V</div>
+      <div class="hidden sm:block text-left"><p class="text-sm font-medium text-slate-800 leading-none">Vish</p><p class="text-[11px] text-slate-400 mt-0.5">Student Plan</p></div>
+    </button>
+  </div>
+</header>
+
+<!-- Tab bar -->
+<div class="max-w-[1200px] mx-auto px-6 lg:px-8 border-b border-slate-100 flex gap-0">
+  <button class="tab tab-on" onclick="V.tab(this,'pricing')">Plans</button>
+  <button class="tab" onclick="V.tab(this,'compare')">Compare</button>
+  <button class="tab" onclick="V.tab(this,'billing')">Billing</button>
+</div>
+
+<!-- ================================================================== -->
+<!-- CONTENT                                                             -->
+<!-- ================================================================== -->
+<main class="max-w-[1200px] mx-auto px-6 lg:px-8 py-10" id="main"></main>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var currentView="pricing";
+var annual=true;
+
+var plans=[
+  {id:"student",name:"Student",desc:"Everything one student needs to practise, improve, and prepare.",priceM:12,priceA:9,features:["Unlimited practice sessions","Personalised weekly plan","Mastery tracking","All diagnostic types","Basic results & explanations","Email support"],limit:"1 student",color:"brand",pop:false},
+  {id:"family",name:"Family",desc:"Cover the whole family with shared billing and individual progress.",priceM:29,priceA:22,features:["Everything in Student","Up to 4 students","Individual dashboards per child","Parent overview panel","Priority email support","Exam-style mock tests"],limit:"Up to 4 students",color:"brand",pop:true},
+  {id:"school",name:"School",desc:"Full platform access with teacher tools, analytics, and admin controls.",priceM:null,priceA:null,features:["Everything in Family","Unlimited students","Teacher dashboard","Assignment engine","Class analytics & reports","Admin & billing controls","Dedicated account manager","Custom onboarding"],limit:"Unlimited",color:"brand",pop:false},
+];
+
+var features=[
+  {name:"Practice sessions",vals:["Unlimited","Unlimited","Unlimited"]},
+  {name:"Weekly learning plan",vals:["Yes","Yes","Yes"]},
+  {name:"Mastery tracking",vals:["Yes","Yes","Yes"]},
+  {name:"Diagnostic assessments",vals:["All types","All types","All types"]},
+  {name:"Mock exams",vals:["3/month","Unlimited","Unlimited"]},
+  {name:"Results & explanations",vals:["Basic","Detailed","Detailed + analytics"]},
+  {name:"Students included",vals:["1","Up to 4","Unlimited"]},
+  {name:"Parent overview",vals:["\u2014","Yes","Yes"]},
+  {name:"Teacher dashboard",vals:["\u2014","\u2014","Yes"]},
+  {name:"Assignment engine",vals:["\u2014","\u2014","Yes"]},
+  {name:"Class analytics",vals:["\u2014","\u2014","Yes"]},
+  {name:"Admin controls",vals:["\u2014","\u2014","Yes"]},
+  {name:"Support",vals:["Email","Priority email","Dedicated manager"]},
+  {name:"API access",vals:["\u2014","\u2014","On request"]},
+];
+
+var invoices=[
+  {id:"INV-2026-004",date:"1 Apr 2026",amount:"$9.00",status:"Paid",plan:"Student (Annual)"},
+  {id:"INV-2026-003",date:"1 Mar 2026",amount:"$9.00",status:"Paid",plan:"Student (Annual)"},
+  {id:"INV-2026-002",date:"1 Feb 2026",amount:"$9.00",status:"Paid",plan:"Student (Annual)"},
+  {id:"INV-2026-001",date:"1 Jan 2026",amount:"$12.00",status:"Paid",plan:"Student (Monthly)"},
+];
+
+// ── Check/X icons ─────────────────────────────────────────────────
+var checkIco='<svg class="w-4 h-4 text-correct-500 mx-auto" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';
+var dashIco='<span class="text-slate-300">\u2014</span>';
+
+function featureVal(v){
+  if(v==="Yes")return checkIco;
+  if(v==="\u2014")return dashIco;
+  return'<span class="text-sm text-slate-700">'+v+'</span>';
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function render(){
+  var h="";
+  switch(currentView){
+    case "pricing":h=renderPricing();break;
+    case "compare":h=renderCompare();break;
+    case "billing":h=renderBilling();break;
+    case "checkout":h=renderCheckout();break;
+    case "success":h=renderSuccess();break;
+  }
+  $("main").innerHTML='<div class="afs">'+h+'</div>';
+  // Wire toggle
+  var tog=document.getElementById("billing-toggle");
+  if(tog)tog.addEventListener("click",function(){annual=!annual;this.classList.toggle("on",annual);render()});
+}
+
+// ── Pricing ───────────────────────────────────────────────────────
+function renderPricing(){
+  var h='<div class="text-center mb-10"><h1 class="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight mb-3">Simple, transparent pricing</h1><p class="text-[15px] text-slate-500 max-w-lg mx-auto leading-relaxed">Choose the plan that fits your learning journey. All plans include full access to practice, diagnostics, and personalised learning.</p>';
+  // Toggle
+  h+='<div class="flex items-center justify-center gap-3 mt-6"><span class="text-sm '+(annual?"text-slate-400":"text-slate-800 font-medium")+'">Monthly</span><div class="toggle-track'+(annual?" on":"")+'" id="billing-toggle"><div class="toggle-dot"></div></div><span class="text-sm '+(annual?"text-slate-800 font-medium":"text-slate-400")+'">Annual</span>';
+  if(annual)h+='<span class="pill bg-correct-50 text-correct-700 border border-correct-200">Save 25%</span>';
+  h+='</div></div>';
+
+  // Cards
+  h+='<div class="grid md:grid-cols-3 gap-5 max-w-4xl mx-auto mb-12">';
+  plans.forEach(function(p){
+    var price=annual?p.priceA:p.priceM;
+    var isPop=p.pop;
+    h+='<div class="plan-card'+(isPop?" plan-pop":"")+'">';
+    if(isPop)h+='<div class="absolute -top-3 left-1/2 -translate-x-1/2"><span class="pill bg-brand-500 text-white text-[10px] px-3 py-1 shadow-sm">Most Popular</span></div>';
+    h+='<div class="mb-6"><h3 class="text-lg font-semibold text-slate-900 mb-1">'+p.name+'</h3><p class="text-sm text-slate-500 leading-relaxed">'+p.desc+'</p></div>';
+    if(price!==null){
+      h+='<div class="flex items-baseline gap-1 mb-1"><span class="text-4xl font-bold text-slate-900 tracking-tight">$'+price+'</span><span class="text-sm text-slate-400">/month</span></div>';
+      if(annual)h+='<p class="text-xs text-slate-400 mb-6">Billed annually ($'+(price*12)+'/year)</p>';
+      else h+='<p class="text-xs text-slate-400 mb-6">Billed monthly</p>';
+    }else{
+      h+='<div class="mb-1"><span class="text-2xl font-bold text-slate-900">Custom</span></div><p class="text-xs text-slate-400 mb-6">Contact us for school pricing</p>';
+    }
+    h+='<button class="btn '+(isPop?"btn-submit":"btn-secondary")+' w-full mb-6" onclick="'+(price!==null?"V.startCheckout(\'"+p.id+"\')":"")+'">'+
+      (price!==null?(p.id==="student"?"Get Started":"Upgrade"):"Contact Sales")+'</button>';
+    h+='<div class="space-y-3">';
+    p.features.forEach(function(f){
+      h+='<div class="flex items-start gap-2.5"><svg class="w-4 h-4 text-correct-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span class="text-sm text-slate-600">'+f+'</span></div>';
+    });
+    h+='</div></div>';
+  });
+  h+='</div>';
+
+  // Trust signals
+  h+='<div class="text-center mb-6"><div class="flex items-center justify-center gap-6 text-xs text-slate-400">';
+  h+='<div class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Secure checkout</div>';
+  h+='<div class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Cancel anytime</div>';
+  h+='<div class="flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Australian data residency</div>';
+  h+='</div></div>';
+
+  // FAQ
+  h+='<div class="max-w-2xl mx-auto"><h3 class="text-lg font-semibold text-slate-900 text-center mb-6">Frequently Asked Questions</h3><div class="space-y-3">';
+  var faqs=[
+    {q:"Can I switch plans later?",a:"Yes. You can upgrade or downgrade at any time. Changes take effect at your next billing cycle."},
+    {q:"Is there a free trial?",a:"All plans include a 14-day free trial with full access. No credit card required to start."},
+    {q:"What payment methods are accepted?",a:"We accept Visa, Mastercard, and American Express. School plans can also pay via invoice."},
+    {q:"Can I cancel anytime?",a:"Absolutely. Cancel from your billing settings and your access continues until the end of the current period."},
+  ];
+  faqs.forEach(function(f){
+    h+='<div class="card p-5"><p class="text-sm font-semibold text-slate-800 mb-1">'+f.q+'</p><p class="text-sm text-slate-500 leading-relaxed">'+f.a+'</p></div>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
+// ── Compare ───────────────────────────────────────────────────────
+function renderCompare(){
+  var h='<div class="text-center mb-8"><h2 class="text-2xl font-semibold text-slate-900 tracking-tight mb-2">Plan Comparison</h2><p class="text-sm text-slate-500">See exactly what each plan includes.</p></div>';
+  h+='<div class="card overflow-hidden max-w-4xl mx-auto"><div class="overflow-x-auto"><table class="cmp-tbl">';
+  h+='<thead><tr><th>Feature</th><th>Student</th><th class="pop-col">Family</th><th>School</th></tr></thead><tbody>';
+  // Price row
+  var sp=annual?9:12,fp=annual?22:29;
+  h+='<tr><td class="font-semibold">Price</td><td class="font-bold text-slate-900">$'+sp+'/mo</td><td class="pop-col font-bold text-slate-900">$'+fp+'/mo</td><td class="font-bold text-slate-900">Custom</td></tr>';
+  features.forEach(function(f){
+    h+='<tr><td>'+f.name+'</td><td>'+featureVal(f.vals[0])+'</td><td class="pop-col">'+featureVal(f.vals[1])+'</td><td>'+featureVal(f.vals[2])+'</td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  // CTAs
+  h+='<div class="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto mt-6">';
+  h+='<button class="btn btn-secondary w-full" onclick="V.startCheckout(\'student\')">Get Student</button>';
+  h+='<button class="btn btn-submit w-full" onclick="V.startCheckout(\'family\')">Get Family</button>';
+  h+='<button class="btn btn-secondary w-full">Contact Sales</button>';
+  h+='</div>';
+  return h;
+}
+
+// ── Billing ───────────────────────────────────────────────────────
+function renderBilling(){
+  var h='<div class="max-w-3xl mx-auto">';
+  h+='<h2 class="text-2xl font-semibold text-slate-900 tracking-tight mb-6">Billing & Subscription</h2>';
+
+  // Current plan
+  h+='<div class="card overflow-hidden mb-6"><div class="h-1 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div><div class="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">';
+  h+='<div><p class="sl mb-1">Current Plan</p><h3 class="text-lg font-semibold text-slate-900">Student <span class="text-sm font-normal text-slate-400">(Annual)</span></h3><p class="text-sm text-slate-500 mt-1">$9/month &middot; Billed annually &middot; Renews 1 Jan 2027</p></div>';
+  h+='<div class="flex items-center gap-2"><button class="btn btn-primary text-sm" onclick="V.show(\'pricing\')">Upgrade Plan</button><button class="btn btn-ghost text-sm text-incorrect-500 hover:text-incorrect-600 hover:bg-incorrect-50">Cancel</button></div>';
+  h+='</div></div>';
+
+  // Payment method
+  h+='<div class="card p-6 mb-6"><div class="flex items-center justify-between mb-4"><p class="text-[15px] font-semibold text-slate-900">Payment Method</p><button class="btn btn-ghost text-xs">Update</button></div>';
+  h+='<div class="flex items-center gap-4 p-4 rounded-lg bg-slate-50 border border-slate-100">';
+  h+='<div class="w-12 h-8 rounded bg-slate-800 flex items-center justify-center"><svg class="w-8 h-5" viewBox="0 0 32 20" fill="none"><rect width="32" height="20" rx="3" fill="#1a1f36"/><circle cx="12" cy="10" r="6" fill="#eb001b" opacity=".8"/><circle cx="20" cy="10" r="6" fill="#f79e1b" opacity=".8"/></svg></div>';
+  h+='<div><p class="text-sm font-medium text-slate-800">Mastercard ending in 4242</p><p class="text-xs text-slate-400">Expires 12/28</p></div>';
+  h+='<span class="pill bg-correct-50 text-correct-700 border border-correct-200 ml-auto">Default</span>';
+  h+='</div></div>';
+
+  // Billing details
+  h+='<div class="card p-6 mb-6"><p class="text-[15px] font-semibold text-slate-900 mb-4">Billing Details</p>';
+  h+='<div class="grid sm:grid-cols-2 gap-4 text-sm">';
+  h+='<div><p class="text-slate-400 text-xs mb-0.5">Name</p><p class="text-slate-800 font-medium">Vishwas Kumar</p></div>';
+  h+='<div><p class="text-slate-400 text-xs mb-0.5">Email</p><p class="text-slate-800 font-medium">vish@example.com</p></div>';
+  h+='<div><p class="text-slate-400 text-xs mb-0.5">Country</p><p class="text-slate-800 font-medium">Australia</p></div>';
+  h+='<div><p class="text-slate-400 text-xs mb-0.5">Currency</p><p class="text-slate-800 font-medium">AUD ($)</p></div>';
+  h+='</div></div>';
+
+  // Invoices
+  h+='<div class="card"><div class="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between"><p class="text-[15px] font-semibold text-slate-900">Invoice History</p><button class="btn btn-ghost text-xs gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download All</button></div>';
+  h+='<div class="divide-y divide-slate-75">';
+  invoices.forEach(function(inv){
+    h+='<div class="px-6 py-3.5 flex items-center gap-4 inv-row">';
+    h+='<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800">'+inv.id+'</p><p class="text-xs text-slate-400 mt-0.5">'+inv.plan+' &middot; '+inv.date+'</p></div>';
+    h+='<span class="text-sm font-semibold text-slate-800 tabular-nums">'+inv.amount+'</span>';
+    h+='<span class="pill bg-correct-50 text-correct-700 border border-correct-200">'+inv.status+'</span>';
+    h+='<button class="btn btn-ghost text-xs py-1 px-2"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+
+  h+='</div>';
+  return h;
+}
+
+// ── Checkout ──────────────────────────────────────────────────────
+var checkoutPlan="family";
+
+function renderCheckout(){
+  var p=plans.find(function(x){return x.id===checkoutPlan});
+  if(!p)return"";
+  var price=annual?p.priceA:p.priceM;
+
+  var h='<div class="max-w-2xl mx-auto">';
+  h+='<button class="btn btn-ghost text-sm gap-1 mb-6" onclick="V.show(\'pricing\')"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Back to Plans</button>';
+
+  h+='<div class="grid sm:grid-cols-5 gap-6">';
+
+  // Left: form (3/5)
+  h+='<div class="sm:col-span-3"><div class="card p-6">';
+  h+='<h3 class="text-lg font-semibold text-slate-900 mb-5">Payment Details</h3>';
+  h+='<div class="space-y-4">';
+  h+='<div><label class="sl block mb-2">Email</label><input type="email" class="inp" value="vish@example.com" placeholder="you@example.com"/></div>';
+  h+='<div><label class="sl block mb-2">Card Number</label><input type="text" class="card-field w-full" placeholder="1234 5678 9012 3456" maxlength="19"/></div>';
+  h+='<div class="grid grid-cols-2 gap-3"><div><label class="sl block mb-2">Expiry</label><input type="text" class="card-field w-full" placeholder="MM / YY" maxlength="7"/></div><div><label class="sl block mb-2">CVC</label><input type="text" class="card-field w-full" placeholder="123" maxlength="4"/></div></div>';
+  h+='<div><label class="sl block mb-2">Name on Card</label><input type="text" class="inp" placeholder="Vishwas Kumar"/></div>';
+  h+='<div><label class="sl block mb-2">Country</label><input type="text" class="inp" value="Australia"/></div>';
+  h+='</div>';
+
+  h+='<button class="btn btn-submit btn-lg w-full mt-6" onclick="V.confirmPayment()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Pay $'+(annual?price*12:price)+'.00 '+(annual?"AUD/year":"AUD/month")+'</button>';
+
+  h+='<div class="flex items-center justify-center gap-4 mt-4 text-[11px] text-slate-400">';
+  h+='<div class="flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>SSL encrypted</div>';
+  h+='<div class="flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Powered by Stripe</div>';
+  h+='</div>';
+  h+='</div></div>';
+
+  // Right: summary (2/5)
+  h+='<div class="sm:col-span-2"><div class="card overflow-hidden"><div class="h-1 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div><div class="p-5">';
+  h+='<p class="sl mb-3">Order Summary</p>';
+  h+='<h4 class="text-lg font-semibold text-slate-900 mb-1">'+p.name+' Plan</h4>';
+  h+='<p class="text-xs text-slate-400 mb-4">'+(annual?"Annual billing":"Monthly billing")+'</p>';
+  h+='<div class="space-y-2 mb-4 pb-4 border-b border-slate-100">';
+  h+='<div class="flex justify-between text-sm"><span class="text-slate-500">'+p.name+' '+(annual?"(annual)":"(monthly)")+'</span><span class="font-medium text-slate-800">$'+price+'/mo</span></div>';
+  if(annual)h+='<div class="flex justify-between text-sm"><span class="text-slate-500">Billed annually</span><span class="font-medium text-slate-800">$'+(price*12)+'/yr</span></div>';
+  h+='</div>';
+  h+='<div class="flex justify-between text-sm font-semibold"><span class="text-slate-900">Total today</span><span class="text-slate-900">$'+(annual?price*12:price)+'.00 AUD</span></div>';
+  h+='<p class="text-[11px] text-slate-400 mt-3">14-day free trial included. Cancel anytime before the trial ends and you will not be charged.</p>';
+  h+='</div></div>';
+
+  // What you get
+  h+='<div class="card p-5 mt-4"><p class="sl mb-3">Included</p><div class="space-y-2">';
+  p.features.slice(0,5).forEach(function(f){
+    h+='<div class="flex items-center gap-2"><svg class="w-3.5 h-3.5 text-correct-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span class="text-xs text-slate-600">'+f+'</span></div>';
+  });
+  h+='</div></div>';
+  h+='</div>';
+
+  h+='</div></div>';
+  return h;
+}
+
+// ── Success ───────────────────────────────────────────────────────
+function renderSuccess(){
+  var p=plans.find(function(x){return x.id===checkoutPlan});
+  var h='<div class="flex items-center justify-center py-16"><div class="text-center max-w-md asc">';
+  h+='<div class="w-16 h-16 rounded-2xl bg-correct-50 border border-correct-200 text-correct-500 flex items-center justify-center mx-auto mb-6"><svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>';
+  h+='<h2 class="text-xl font-semibold text-slate-900 mb-2">Welcome to '+p.name+'!</h2>';
+  h+='<p class="text-sm text-slate-500 leading-relaxed mb-6">Your subscription is active and your 14-day free trial has started. Full access to all '+p.name+' features is now available.</p>';
+  h+='<div class="flex items-center justify-center gap-3"><a href="dashboard.html" class="btn btn-primary btn-lg">Go to Dashboard</a><button class="btn btn-secondary" onclick="V.show(\'billing\')">View Billing</button></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// ── Exports ───────────────────────────────────────────────────────
+window.V={
+  tab:function(el,view){
+    el.parentElement.querySelectorAll(".tab").forEach(function(t){t.classList.remove("tab-on")});
+    el.classList.add("tab-on");
+    currentView=view;
+    render();
+  },
+  show:function(view){currentView=view;render()},
+  startCheckout:function(planId){checkoutPlan=planId;currentView="checkout";render()},
+  confirmPayment:function(){currentView="success";render()},
+};
+
+render();
+})();
+</script>
+</body>
+</html>

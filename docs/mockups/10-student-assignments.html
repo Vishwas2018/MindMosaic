@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MindMosaic — My Assignments</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+            serif: ['"DM Serif Display"', 'Georgia', 'serif'],
+          },
+          colors: {
+            brand: { 50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c' },
+            slate: { 25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118' },
+            correct: { 50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d' },
+            incorrect: { 50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626' },
+            warn: { 50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309' },
+          },
+          boxShadow: {
+            'card':'0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+            'card-hover':'0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
+            'elevated':'0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)',
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    :root { --fast:150ms cubic-bezier(.4,0,.2,1); --base:200ms cubic-bezier(.4,0,.2,1); --r-card:12px; --r-btn:8px; --r-pill:9999px; }
+    * { box-sizing: border-box; }
+    body { font-family:'DM Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; background:#f8f9fb; color:#2a3040; }
+
+    /* Nav */
+    .nav-link { font-size:14px; font-weight:500; color:#6b7488; padding:6px 12px; border-radius:6px; transition:all var(--fast); text-decoration:none; }
+    .nav-link:hover { color:#2a3040; background:#f3f4f7; }
+    .nav-link-active { color:#5925a8; background:#F5F3FF; }
+
+    /* Buttons */
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:500; font-size:14px; line-height:1; border-radius:var(--r-btn); padding:10px 18px; transition:all var(--fast); cursor:pointer; border:none; outline:none; }
+    .btn:focus-visible { box-shadow:0 0 0 3px rgba(89,37,168,.25); }
+    .btn:active { transform:scale(.97); }
+    .btn-primary { background:#5925a8; color:white; }
+    .btn-primary:hover { background:#4a1d96; }
+    .btn-secondary { background:white; color:#5925a8; border:1px solid #EDE8F8; }
+    .btn-secondary:hover { background:#F5F3FF; border-color:#C4B5E8; }
+    .btn-ghost { background:transparent; color:#525b6e; }
+    .btn-ghost:hover { background:#f3f4f7; color:#2a3040; }
+    .btn-sm { padding:7px 14px; font-size:13px; }
+    .btn-continue { background:#d97706; color:white; }
+    .btn-continue:hover { background:#b45309; }
+    .btn-review { background:#f3f4f7; color:#3d4555; }
+    .btn-review:hover { background:#e4e7ed; }
+
+    /* Card */
+    .card { background:white; border:1px solid #eef0f4; border-radius:var(--r-card); box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02); }
+    .card-interactive { transition:box-shadow var(--base),transform var(--base); }
+    .card-interactive:hover { box-shadow:0 4px 12px rgba(0,0,0,.06); transform:translateY(-1px); }
+
+    /* Pill */
+    .pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 10px; border-radius:var(--r-pill); line-height:1.4; }
+
+    /* Section label */
+    .sl { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#8b94a6; }
+
+    /* Assignment card */
+    .asgn-card {
+      background:white; border:1px solid #eef0f4; border-radius:14px;
+      padding:20px 24px; display:flex; align-items:center; gap:16px;
+      transition:box-shadow var(--base), transform var(--base), border-color var(--base);
+    }
+    .asgn-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.07); transform:translateY(-1px); }
+    .asgn-card.overdue { border-left:4px solid #ef4444; }
+    .asgn-card.due-soon { border-left:4px solid #f59e0b; }
+    .asgn-card.normal { border-left:4px solid #eef0f4; }
+    .asgn-card.in-progress { border-left:4px solid #5925a8; }
+    .asgn-card.completed { border-left:4px solid #22c55e; opacity:.85; }
+
+    /* Subject icon */
+    .subj-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+    /* Progress bar */
+    .pbar { height:5px; background:#eef0f4; border-radius:100px; overflow:hidden; }
+    .pfill { height:100%; border-radius:100px; transition:width 800ms cubic-bezier(.4,0,.2,1); }
+
+    /* Skeleton */
+    @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+    .sk { background:linear-gradient(90deg,#eef0f4 25%,#f3f4f7 50%,#eef0f4 75%); background-size:200% 100%; animation:shimmer 1.5s ease-in-out infinite; border-radius:6px; }
+
+    /* Empty state */
+    .empty-state { text-align:center; padding:64px 24px; }
+    .empty-icon { width:64px; height:64px; border-radius:16px; background:#f3f4f7; display:flex; align-items:center; justify-content:center; margin:0 auto 20px; color:#b0b7c5; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width:6px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:#d5d9e2; border-radius:100px; }
+
+    /* Fade in */
+    main { animation:fadeIn 300ms ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Tab */
+    .tab-btn { font-size:14px; font-weight:500; color:#6b7488; padding:8px 16px; border:none; background:none; border-bottom:2px solid transparent; cursor:pointer; transition:all var(--fast); white-space:nowrap; }
+    .tab-btn:hover { color:#2a3040; }
+    .tab-btn.active { color:#5925a8; border-bottom-color:#5925a8; }
+    .tab-count { font-size:11px; font-weight:600; padding:1px 6px; border-radius:var(--r-pill); background:#f3f4f7; color:#6b7488; margin-left:5px; }
+    .tab-btn.active .tab-count { background:#EDE8F8; color:#5925a8; }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+  <!-- ================================================================ -->
+  <!-- HEADER                                                            -->
+  <!-- ================================================================ -->
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="max-w-[1360px] mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-10">
+        <a href="dashboard.html" class="flex items-center gap-2.5">
+          <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+        </a>
+        <nav class="hidden md:flex items-center gap-1">
+          <a href="dashboard.html" class="nav-link">Dashboard</a>
+          <a href="learn.html" class="nav-link">Learn</a>
+          <a href="session-selection.html" class="nav-link">Practice</a>
+          <a href="student-assignments.html" class="nav-link nav-link-active" aria-current="page">Assignments</a>
+          <a href="results.html" class="nav-link">Results</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="btn btn-ghost p-2 rounded-lg relative">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white"></span>
+        </button>
+        <div class="h-5 w-px bg-slate-150"></div>
+        <button class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors">
+          <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">V</div>
+          <div class="hidden sm:block text-left">
+            <p class="text-sm font-medium text-slate-800 leading-none">Vish</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Year 7</p>
+          </div>
+          <svg class="w-4 h-4 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================================================================ -->
+  <!-- MAIN                                                              -->
+  <!-- ================================================================ -->
+  <main class="max-w-[1100px] mx-auto px-6 lg:px-8 pb-24">
+
+    <!-- ── Page header ── -->
+    <div class="pt-10 pb-6 flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-[26px] font-bold tracking-tight text-slate-900 mb-1">My Assignments</h1>
+        <p class="text-[14px] text-slate-500">Assigned by your teacher. Complete them before the due date.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button class="btn btn-ghost btn-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="10" y2="18"/></svg>
+          Filter
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Overdue alert ── -->
+    <div class="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6">
+      <svg class="w-4 h-4 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p class="text-[13px] font-500 text-red-700"><span class="font-700 font-bold">1 assignment</span> is overdue. Complete it as soon as possible.</p>
+    </div>
+
+    <!-- ── Tabs ── -->
+    <div class="border-b border-slate-150 mb-8 flex items-center gap-0 overflow-x-auto">
+      <button class="tab-btn active" onclick="switchTab(this,'assigned')">
+        Assigned <span class="tab-count">3</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab(this,'inprogress')">
+        In Progress <span class="tab-count">2</span>
+      </button>
+      <button class="tab-btn" onclick="switchTab(this,'completed')">
+        Completed <span class="tab-count">7</span>
+      </button>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         TAB: ASSIGNED
+    ════════════════════════════════════════════ -->
+    <div id="tab-assigned" class="tab-panel space-y-4">
+
+      <!-- Overdue item -->
+      <div class="asgn-card overdue">
+        <div class="subj-icon bg-red-50">
+          <svg class="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-900 truncate">Reading — Informational Texts</h3>
+            <span class="pill bg-red-50 text-red-700 border border-red-200">Overdue</span>
+          </div>
+          <p class="text-[13px] text-slate-500 mb-2">Assigned by Ms. Chen · 20 questions · Approx. 25 min</p>
+          <div class="flex items-center gap-2 text-[12px] text-red-600 font-medium">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Was due Mon 7 Apr — 3 days overdue
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm flex-shrink-0">Start Now</button>
+      </div>
+
+      <!-- Due soon item -->
+      <div class="asgn-card due-soon">
+        <div class="subj-icon bg-amber-50">
+          <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-900 truncate">NAPLAN Numeracy — Week 14</h3>
+            <span class="pill bg-amber-50 text-amber-700 border border-amber-200">Due Soon</span>
+          </div>
+          <p class="text-[13px] text-slate-500 mb-2">Assigned by Ms. Chen · 32 questions · Approx. 40 min</p>
+          <div class="flex items-center gap-2 text-[12px] text-amber-700 font-medium">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Due Thu 11 Apr — 1 day left
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm flex-shrink-0">Start</button>
+      </div>
+
+      <!-- Normal item -->
+      <div class="asgn-card normal">
+        <div class="subj-icon bg-brand-50">
+          <svg class="w-5 h-5 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-900 truncate">Language Conventions — Grammar Focus</h3>
+            <span class="pill bg-brand-50 text-brand-600 border border-brand-200">Assigned</span>
+          </div>
+          <p class="text-[13px] text-slate-500 mb-2">Assigned by Ms. Chen · 15 questions · Approx. 20 min</p>
+          <div class="flex items-center gap-2 text-[12px] text-slate-400">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Due Sat 14 Apr — 4 days left
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm flex-shrink-0">Start</button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         TAB: IN PROGRESS
+    ════════════════════════════════════════════ -->
+    <div id="tab-inprogress" class="tab-panel space-y-4 hidden">
+
+      <div class="asgn-card in-progress">
+        <div class="subj-icon bg-brand-50">
+          <svg class="w-5 h-5 text-brand-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-900 truncate">ICAS Writing — Persuasive Text</h3>
+            <span class="pill bg-brand-50 text-brand-600 border border-brand-200">In Progress</span>
+          </div>
+          <p class="text-[13px] text-slate-500 mb-3">Ms. Chen · 10 questions · Started 2 days ago</p>
+          <div class="flex items-center gap-3">
+            <div class="pbar flex-1 max-w-[180px]"><div class="pfill bg-brand-500" style="width:60%"></div></div>
+            <span class="text-[12px] font-600 font-semibold text-slate-600">6 / 10 done</span>
+            <span class="text-[12px] text-slate-400">Due Fri 12 Apr</span>
+          </div>
+        </div>
+        <button class="btn btn-continue btn-sm flex-shrink-0">Continue</button>
+      </div>
+
+      <div class="asgn-card in-progress">
+        <div class="subj-icon bg-violet-50">
+          <svg class="w-5 h-5 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-900 truncate">Selective Entry — Thinking Skills</h3>
+            <span class="pill bg-brand-50 text-brand-600 border border-brand-200">In Progress</span>
+          </div>
+          <p class="text-[13px] text-slate-500 mb-3">Ms. Chen · 25 questions · Started today</p>
+          <div class="flex items-center gap-3">
+            <div class="pbar flex-1 max-w-[180px]"><div class="pfill bg-violet-500" style="width:20%"></div></div>
+            <span class="text-[12px] font-600 font-semibold text-slate-600">5 / 25 done</span>
+            <span class="text-[12px] text-slate-400">Due Sun 15 Apr</span>
+          </div>
+        </div>
+        <button class="btn btn-continue btn-sm flex-shrink-0">Continue</button>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════
+         TAB: COMPLETED
+    ════════════════════════════════════════════ -->
+    <div id="tab-completed" class="tab-panel space-y-4 hidden">
+
+      <!-- Completed items -->
+      <div class="asgn-card completed">
+        <div class="subj-icon bg-green-50">
+          <svg class="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-700 truncate">NAPLAN Numeracy — Week 13</h3>
+            <span class="pill bg-green-50 text-green-700 border border-green-200">Completed</span>
+          </div>
+          <p class="text-[13px] text-slate-400">Completed 6 Apr · 32 questions</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <p class="font-bold text-[18px] text-green-600">84%</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">29 / 32 correct</p>
+        </div>
+        <button class="btn btn-review btn-sm flex-shrink-0 ml-2">Review</button>
+      </div>
+
+      <div class="asgn-card completed">
+        <div class="subj-icon bg-green-50">
+          <svg class="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-700 truncate">Reading — Narrative Texts</h3>
+            <span class="pill bg-green-50 text-green-700 border border-green-200">Completed</span>
+          </div>
+          <p class="text-[13px] text-slate-400">Completed 4 Apr · 20 questions</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <p class="font-bold text-[18px] text-green-600">75%</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">15 / 20 correct</p>
+        </div>
+        <button class="btn btn-review btn-sm flex-shrink-0 ml-2">Review</button>
+      </div>
+
+      <div class="asgn-card completed">
+        <div class="subj-icon bg-green-50">
+          <svg class="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <h3 class="font-semibold text-[15px] text-slate-700 truncate">Language Conventions — Spelling</h3>
+            <span class="pill bg-green-50 text-green-700 border border-green-200">Completed</span>
+          </div>
+          <p class="text-[13px] text-slate-400">Completed 1 Apr · 15 questions</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <p class="font-bold text-[18px] text-amber-600">60%</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">9 / 15 correct</p>
+        </div>
+        <button class="btn btn-review btn-sm flex-shrink-0 ml-2">Review</button>
+      </div>
+
+      <!-- Empty state (hidden when there are items) -->
+      <!-- Shown when completed list is empty: -->
+      <!--
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3 class="font-semibold text-slate-800 mb-2">No completed assignments yet</h3>
+        <p class="text-[14px] text-slate-400 max-w-xs mx-auto">When you finish an assignment it will appear here, along with your score.</p>
+      </div>
+      -->
+    </div>
+
+  </main>
+
+  <script>
+    function switchTab(btn, tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.remove('hidden');
+    }
+  </script>
+
+</body>
+</html>

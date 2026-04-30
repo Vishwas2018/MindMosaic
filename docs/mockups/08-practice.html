@@ -1,0 +1,891 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MindMosaic — Practice Mode</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+
+  <!-- ================================================================== -->
+  <!-- SHARED DESIGN TOKENS — consistent with dashboard + learn pages      -->
+  <!-- ================================================================== -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+            serif: ['"DM Serif Display"', 'Georgia', 'serif'],
+          },
+          colors: {
+            brand: {
+              50:  '#F5F3FF',
+              100: '#EDE9FE',
+              200: '#DDD6FE',
+              300: '#C4B5FD',
+              400: '#8B5CF6',
+              500: '#5925a8',
+              600: '#4a1d96',
+              700: '#3b1584',
+              800: '#2e0f5c',
+              900: '#1E1B4B',
+            },
+            slate: {
+              25:  '#FDFCFE',
+              50:  '#FAF8FF',
+              75:  '#F0EDF8',
+              100: '#E9E5F5',
+              150: '#D6D0E8',
+              200: '#D6D0E8',
+              300: '#A8A0C0',
+              400: '#A8A0C0',
+              500: '#7C7399',
+              600: '#3B3566',
+              700: '#3B3566',
+              800: '#1E1B4B',
+              900: '#1E1B4B',
+              950: '#0e1118',
+            },
+            correct: {
+              50:  '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            incorrect: {
+              50:  '#fef2f2',
+              100: '#fee2e2',
+              200: '#fecaca',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+            },
+          },
+          boxShadow: {
+            'card': '0 0 0 1px rgba(30,27,75,.03), 0 1px 2px rgba(89,37,168,.04), 0 4px 12px -4px rgba(89,37,168,.06)',
+            'card-hover': '0 0 0 1px rgba(30,27,75,.03), 0 4px 12px rgba(89,37,168,.08), 0 8px 24px -8px rgba(89,37,168,.12)',
+            'elevated': '0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)',
+            'ring': '0 0 0 3px rgba(89,37,168,0.15)',
+            'ring-correct': '0 0 0 3px rgba(34,197,94,0.2)',
+            'ring-incorrect': '0 0 0 3px rgba(239,68,68,0.2)',
+          },
+          borderRadius: {
+            'xl': '12px',
+            '2xl': '16px',
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    /* ── Core Tokens ── */
+    :root {
+      --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+      --radius-card: 12px;
+      --radius-pill: 9999px;
+      --radius-button: 8px;
+      --radius-option: 10px;
+    
+      /* Shorthand aliases for cross-file consistency */
+      --r-card: 12px;
+      --r-pill: 9999px;
+      --r-btn: 8px;
+      --base: var(--transition-base);
+      --fast: var(--transition-fast);
+      --slow: var(--transition-slow, 400ms cubic-bezier(0.4, 0, 0.2, 1));
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background: #FAF8FF;
+      color: #1E1B4B;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: white;
+      border: 1px solid #E9E5F5;
+      border-radius: var(--radius-card);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    /* ── Button ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      font-weight: 500; font-size: 14px; line-height: 1;
+      border-radius: var(--radius-button); padding: 10px 18px;
+      transition: all var(--transition-fast); cursor: pointer; border: none; outline: none;
+    }
+    .btn:focus-visible { box-shadow: 0 0 0 3px rgba(89,37,168,0.25); }
+    .btn-primary { background: #5925a8; color: white; }
+    .btn-primary:hover { background: #4a1d96; }
+    .btn-primary:active { background: #1e3f9e; }
+    .btn-primary:disabled { background: #C4B5FD; cursor: not-allowed; }
+    .btn-secondary { background: white; color: #5925a8; border: 1px solid #EDE9FE; }
+    .btn-secondary:hover { background: #F5F3FF; border-color: #C4B5FD; }
+    .btn-ghost { background: transparent; color: #3B3566; }
+    .btn-ghost:hover { background: #F0EDF8; color: #1E1B4B; }
+    .btn-lg { padding: 14px 28px; font-size: 15px; font-weight: 600; }
+
+    /* ── Pill ── */
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 500; padding: 4px 12px;
+      border-radius: var(--radius-pill); line-height: 1.4;
+    }
+
+    /* ── Progress Track ── */
+    .progress-track { height: 4px; background: #E9E5F5; border-radius: 100px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 100px; transition: width 500ms cubic-bezier(0.4, 0, 0.2, 1); }
+
+    /* ── Option Button ── */
+    .option-btn {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      text-align: left;
+      padding: 16px 20px;
+      border: 1.5px solid #E9E5F5;
+      border-radius: var(--radius-option);
+      background: white;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #1E1B4B;
+      cursor: pointer;
+      transition: all var(--transition-base);
+      outline: none;
+      position: relative;
+    }
+    .option-btn:hover:not(.option-disabled) {
+      border-color: #C4B5FD;
+      background: #FAF9FE;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .option-btn:focus-visible:not(.option-disabled) {
+      border-color: #5925a8;
+      box-shadow: 0 0 0 3px rgba(89,37,168,0.15);
+    }
+    .option-btn.option-selected {
+      border-color: #5925a8;
+      background: #F5F3FF;
+      box-shadow: 0 0 0 3px rgba(89,37,168,0.1);
+    }
+    .option-btn.option-disabled {
+      cursor: default;
+      pointer-events: none;
+    }
+    .option-btn.option-correct {
+      border-color: #22c55e;
+      background: #f0fdf4;
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.12);
+    }
+    .option-btn.option-incorrect {
+      border-color: #ef4444;
+      background: #fef2f2;
+      box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+    }
+    .option-btn.option-dimmed {
+      opacity: 0.5;
+    }
+
+    /* ── Option Letter ── */
+    .option-letter {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600;
+      flex-shrink: 0;
+      transition: all var(--transition-base);
+      background: #F0EDF8; color: #7C7399;
+    }
+    .option-selected .option-letter {
+      background: #5925a8; color: white;
+    }
+    .option-correct .option-letter {
+      background: #22c55e; color: white;
+    }
+    .option-incorrect .option-letter {
+      background: #ef4444; color: white;
+    }
+
+    /* ── Feedback Card ── */
+    .feedback-card {
+      border-radius: var(--radius-card);
+      padding: 20px 24px;
+      transition: all var(--transition-base);
+    }
+    .feedback-correct {
+      background: #f0fdf4;
+      border: 1px solid #dcfce7;
+    }
+    .feedback-incorrect {
+      background: #fef2f2;
+      border: 1px solid #fee2e2;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-slide {
+      animation: fadeSlideIn 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    .animate-fade {
+      animation: fadeIn 250ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    .animate-scale {
+      animation: scaleIn 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* ── Stagger delays ── */
+    .delay-1 { animation-delay: 50ms; opacity: 0; }
+    .delay-2 { animation-delay: 100ms; opacity: 0; }
+    .delay-3 { animation-delay: 150ms; opacity: 0; }
+    .delay-4 { animation-delay: 200ms; opacity: 0; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #D6D0E8; border-radius: 100px; }
+
+    /* ── Summary Stats ── */
+    .stat-ring {
+      width: 88px; height: 88px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .stat-ring svg {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+    }
+    .stat-ring circle {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+    .stat-ring .track { stroke: #E9E5F5; }
+    .stat-ring .fill-circle {
+      transition: stroke-dashoffset 800ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  
+    /* Link reset for clickable cards */
+    a.card, a.card-interactive { text-decoration: none; color: inherit; display: block; }
+      
+    /* ── Cross-file Shared Classes ── */
+    .section-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #A8A0C0;
+    }
+    .nav-link {
+      position: relative; font-size: 14px; font-weight: 500; color: #7C7399;
+      padding: 6px 12px; border-radius: 6px;
+      transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); text-decoration: none;
+    }
+    .nav-link:hover { color: #1E1B4B; background: #F0EDF8; }
+    .nav-link-active { color: #5925a8; background: #F5F3FF; }
+    .table-row { transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .table-row:hover { background: #FAF8FF; }
+  
+    /* ── Premium Interaction Polish ── */
+    .btn { transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .btn:active { transform: scale(0.97); }
+    
+    /* Clickable row cue */
+    tr.table-row { cursor: pointer; }
+    tr.table-row td:last-child svg { transition: transform 150ms ease, color 150ms ease; }
+    tr.table-row:hover td:last-child svg { transform: translateX(2px); color: #7C7399; }
+    
+    /* Card link hover enhancement */
+    a.card:hover, a.card-interactive:hover { text-decoration: none; }
+    
+    /* Focus visible for accessibility */
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid #5925a8;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    
+    /* Smooth page transitions feel */
+    main { animation: fadeIn 300ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body class="min-h-screen">
+
+  <!-- ================================================================== -->
+  <!-- PRACTICE HEADER — minimal, distraction-free                         -->
+  <!-- ================================================================== -->
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="max-w-[680px] mx-auto px-6 h-14 flex items-center justify-between">
+      <!-- Exit -->
+      <a href="learn.html" class="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors group" id="exit-link">
+        <svg class="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        Exit Practice
+      </a>
+
+      <!-- Centre — skill name + progress -->
+      <div class="text-center flex-1 mx-4">
+        <p class="text-[13px] font-semibold text-slate-800 truncate" id="header-skill">Number &amp; Algebra — Fractions</p>
+        <div class="flex items-center justify-center gap-2 mt-1">
+          <div class="progress-track w-20 sm:w-32">
+            <div class="progress-fill bg-brand-500" id="header-progress" style="width: 0%"></div>
+          </div>
+          <span class="text-[11px] text-slate-400 font-medium tabular-nums" id="header-counter">0 / 8</span>
+        </div>
+      </div>
+
+      <!-- Streak indicator -->
+      <div class="flex items-center gap-1.5 text-sm" id="streak-display">
+        <span class="text-amber-500 text-base">●</span>
+        <span class="text-xs font-medium text-slate-500 tabular-nums" id="streak-count">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================================================================== -->
+  <!-- MAIN CONTENT — centred narrow column                                -->
+  <!-- ================================================================== -->
+  <main class="max-w-[680px] mx-auto px-6 pt-8 pb-24">
+
+    <!-- ============================================================== -->
+    <!-- QUESTION VIEW (shown during practice)                           -->
+    <!-- ============================================================== -->
+    <div id="view-practice">
+
+      <!-- Question Context (optional — shown for some questions) -->
+      <div id="question-context" class="mb-4 hidden">
+        <div class="rounded-lg bg-slate-50 border border-slate-100 px-5 py-4">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Context</p>
+          <p class="text-sm text-slate-600 leading-relaxed" id="context-text"></p>
+        </div>
+      </div>
+
+      <!-- Question Number + Text -->
+      <div id="question-area" class="mb-8">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3" id="question-label">Question 1 of 8</p>
+        <h2 class="text-xl sm:text-[22px] font-semibold text-slate-900 leading-snug tracking-tight" id="question-text"></h2>
+      </div>
+
+      <!-- Answer Options -->
+      <div id="options-area" class="space-y-3 mb-8" role="radiogroup" aria-label="Answer options"></div>
+
+      <!-- Feedback Card (appears after submit) -->
+      <div id="feedback-area" class="mb-8 hidden"></div>
+
+      <!-- Action Bar -->
+      <div class="flex items-center justify-between" id="action-bar">
+        <div></div>
+        <div class="flex items-center gap-3">
+          <button class="btn btn-primary btn-lg" id="btn-submit" disabled>
+            Check Answer
+          </button>
+          <a href="results.html" class="btn btn-primary btn-lg hidden" id="btn-next">
+            Next Question
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SUMMARY VIEW (shown after all questions)                        -->
+    <!-- ============================================================== -->
+    <div id="view-summary" class="hidden">
+
+      <div class="text-center pt-8 pb-6 animate-fade-slide">
+        <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Session Complete</p>
+        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight mb-1">
+          Nice work, <span class="font-serif italic text-brand-600">Vish</span>
+        </h1>
+        <p class="text-sm text-slate-500">Here's how you did on Fractions practice.</p>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="card p-8 mb-6 animate-fade-slide delay-1">
+        <div class="grid grid-cols-3 gap-6 text-center">
+          <!-- Accuracy Ring -->
+          <div class="flex flex-col items-center">
+            <div class="stat-ring mb-3">
+              <svg viewBox="0 0 88 88">
+                <circle class="track" cx="44" cy="44" r="40" />
+                <circle class="fill-circle" cx="44" cy="44" r="40"
+                  stroke="#22c55e"
+                  stroke-dasharray="251.2"
+                  id="accuracy-ring"
+                  stroke-dashoffset="251.2" />
+              </svg>
+              <span class="text-xl font-bold text-slate-900 tabular-nums relative z-10" id="accuracy-value">—</span>
+            </div>
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Accuracy</p>
+          </div>
+          <!-- Correct -->
+          <div class="flex flex-col items-center justify-center">
+            <p class="text-3xl font-bold text-correct-600 tabular-nums mb-1" id="correct-count">—</p>
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Correct</p>
+          </div>
+          <!-- Total -->
+          <div class="flex flex-col items-center justify-center">
+            <p class="text-3xl font-bold text-slate-900 tabular-nums mb-1" id="total-count">—</p>
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Questions</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Streak + Insight -->
+      <div class="card p-5 mb-6 animate-fade-slide delay-2">
+        <div class="flex items-start gap-4">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-slate-800 mb-0.5" id="insight-title">—</p>
+            <p class="text-sm text-slate-500 leading-relaxed" id="insight-text">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Question Review List -->
+      <div class="card mb-8 animate-fade-slide delay-3">
+        <div class="px-5 pt-4 pb-3 border-b border-slate-100">
+          <h3 class="text-[14px] font-semibold text-slate-900">Question Review</h3>
+        </div>
+        <div id="review-list" class="divide-y divide-slate-75"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-slide delay-4">
+        <button class="btn btn-primary btn-lg" onclick="restartPractice()">
+          Practice Again
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+        <a href="learn.html" class="btn btn-secondary btn-lg">
+          Back to Learning Hub
+        </a>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ================================================================== -->
+  <!-- PRACTICE ENGINE — state machine + rendering                         -->
+  <!-- ================================================================== -->
+  <script>
+    /**
+     * Practice Mode State Machine
+     *
+     * States: ANSWERING → SUBMITTED → (auto) → ANSWERING | SUMMARY
+     *
+     * The engine is data-driven: swap the `questions` array for any skill
+     * and the UI renders identically. No DOM IDs are hardcoded in the
+     * question data — rendering is purely functional.
+     */
+
+    // ── Question Bank (realistic Year 7 fractions content) ────────────
+    const questions = [
+      {
+        text: 'What is ³⁄₄ + ¹⁄₈?',
+        context: null,
+        options: ['⁵⁄₈', '⁷⁄₈', '⁴⁄₈', '¹⁄₂'],
+        correctIndex: 1,
+        explanation: 'Convert ³⁄₄ to ⁶⁄₈, then add ¹⁄₈ to get ⁷⁄₈. When adding fractions, find a common denominator first.',
+      },
+      {
+        text: 'Simplify the fraction ¹²⁄₁₈.',
+        context: null,
+        options: ['²⁄₃', '³⁄₄', '⁴⁄₆', '⁶⁄₉'],
+        correctIndex: 0,
+        explanation: 'The greatest common factor of 12 and 18 is 6. Dividing both by 6 gives ²⁄₃.',
+      },
+      {
+        text: 'A recipe requires ²⁄₃ cup of flour. If Maya wants to make 1½ times the recipe, how much flour does she need?',
+        context: 'Maya is baking cupcakes for a school fundraiser and needs to scale up her recipe.',
+        options: ['1 cup', '²⁄₃ cup', '1¹⁄₆ cups', '¹⁄₃ cup'],
+        correctIndex: 0,
+        explanation: 'Multiply ²⁄₃ by ³⁄₂ (which is 1½ as an improper fraction): ²⁄₃ × ³⁄₂ = ⁶⁄₆ = 1 cup.',
+      },
+      {
+        text: 'Which fraction is equivalent to 0.375?',
+        context: null,
+        options: ['³⁄₁₀', '³⁄₈', '⁵⁄₁₂', '⁷⁄₂₀'],
+        correctIndex: 1,
+        explanation: '0.375 = 375/1000. Simplify by dividing numerator and denominator by 125 to get ³⁄₈.',
+      },
+      {
+        text: 'What is ⁵⁄₆ − ¹⁄₃?',
+        context: null,
+        options: ['⁴⁄₃', '¹⁄₂', '²⁄₆', '¹⁄₆'],
+        correctIndex: 1,
+        explanation: 'Convert ¹⁄₃ to ²⁄₆, then subtract: ⁵⁄₆ − ²⁄₆ = ³⁄₆ = ¹⁄₂.',
+      },
+      {
+        text: 'Arrange these fractions from smallest to largest: ²⁄₅, ¹⁄₃, ³⁄₁₀',
+        context: null,
+        options: [
+          '³⁄₁₀, ¹⁄₃, ²⁄₅',
+          '¹⁄₃, ³⁄₁₀, ²⁄₅',
+          '²⁄₅, ¹⁄₃, ³⁄₁₀',
+          '³⁄₁₀, ²⁄₅, ¹⁄₃',
+        ],
+        correctIndex: 0,
+        explanation: 'Converting to common denominator 30: ³⁄₁₀ = 9/30, ¹⁄₃ = 10/30, ²⁄₅ = 12/30. So the order is ³⁄₁₀, ¹⁄₃, ²⁄₅.',
+      },
+      {
+        text: 'A tank is ³⁄₅ full. After using ¹⁄₄ of the water in the tank, what fraction of the full tank remains?',
+        context: null,
+        options: ['⁹⁄₂₀', '⁷⁄₂₀', '²⁄₅', '¹⁄₂'],
+        correctIndex: 0,
+        explanation: 'Used water: ¹⁄₄ × ³⁄₅ = ³⁄₂₀. Remaining: ³⁄₅ − ³⁄₂₀ = ¹²⁄₂₀ − ³⁄₂₀ = ⁹⁄₂₀.',
+      },
+      {
+        text: 'What is ²⁄₃ ÷ ⁴⁄₅?',
+        context: null,
+        options: ['⁸⁄₁₅', '⁵⁄₆', '¹⁰⁄₁₂', '⁶⁄₂₀'],
+        correctIndex: 1,
+        explanation: 'To divide fractions, multiply by the reciprocal: ²⁄₃ × ⁵⁄₄ = ¹⁰⁄₁₂ = ⁵⁄₆.',
+      },
+    ];
+
+    // ── State ─────────────────────────────────────────────────────────
+    const state = {
+      currentIndex: 0,
+      selectedOption: -1,
+      phase: 'answering',     // 'answering' | 'submitted'
+      results: [],             // { correct: boolean, selectedIndex: number }[]
+      streak: 0,
+      bestStreak: 0,
+    };
+
+    const LETTERS = ['A', 'B', 'C', 'D'];
+
+    // ── DOM Refs ──────────────────────────────────────────────────────
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      headerProgress: $('header-progress'),
+      headerCounter: $('header-counter'),
+      streakCount: $('streak-count'),
+      questionContext: $('question-context'),
+      contextText: $('context-text'),
+      questionLabel: $('question-label'),
+      questionText: $('question-text'),
+      optionsArea: $('options-area'),
+      feedbackArea: $('feedback-area'),
+      btnSubmit: $('btn-submit'),
+      btnNext: $('btn-next'),
+      viewPractice: $('view-practice'),
+      viewSummary: $('view-summary'),
+      accuracyRing: $('accuracy-ring'),
+      accuracyValue: $('accuracy-value'),
+      correctCount: $('correct-count'),
+      totalCount: $('total-count'),
+      insightTitle: $('insight-title'),
+      insightText: $('insight-text'),
+      reviewList: $('review-list'),
+    };
+
+    // ── Render Helpers ────────────────────────────────────────────────
+
+    function updateHeader() {
+      const progress = ((state.currentIndex) / questions.length) * 100;
+      els.headerProgress.style.width = progress + '%';
+      els.headerCounter.textContent = `${state.currentIndex} / ${questions.length}`;
+      els.streakCount.textContent = state.streak;
+    }
+
+    function renderQuestion() {
+      const q = questions[state.currentIndex];
+
+      // Context
+      if (q.context) {
+        els.questionContext.classList.remove('hidden');
+        els.contextText.textContent = q.context;
+      } else {
+        els.questionContext.classList.add('hidden');
+      }
+
+      // Question
+      els.questionLabel.textContent = `Question ${state.currentIndex + 1} of ${questions.length}`;
+      els.questionText.textContent = q.text;
+
+      // Options
+      els.optionsArea.innerHTML = q.options.map((opt, i) => `
+        <button
+          class="option-btn animate-fade-slide delay-${i + 1}"
+          data-index="${i}"
+          role="radio"
+          aria-checked="false"
+          tabindex="0"
+          onclick="selectOption(${i})"
+          onkeydown="handleOptionKey(event, ${i})"
+        >
+          <span class="option-letter">${LETTERS[i]}</span>
+          <span class="option-text">${opt}</span>
+        </button>
+      `).join('');
+
+      // Feedback hidden
+      els.feedbackArea.classList.add('hidden');
+      els.feedbackArea.innerHTML = '';
+
+      // Buttons
+      els.btnSubmit.classList.remove('hidden');
+      els.btnSubmit.disabled = true;
+      els.btnNext.classList.add('hidden');
+
+      // Reset state
+      state.selectedOption = -1;
+      state.phase = 'answering';
+
+      updateHeader();
+    }
+
+    function selectOption(index) {
+      if (state.phase !== 'answering') return;
+
+      state.selectedOption = index;
+      els.btnSubmit.disabled = false;
+
+      // Update visual selection
+      els.optionsArea.querySelectorAll('.option-btn').forEach((btn, i) => {
+        const isSelected = i === index;
+        btn.classList.toggle('option-selected', isSelected);
+        btn.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+      });
+    }
+
+    function handleOptionKey(event, index) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (state.phase === 'answering') {
+          selectOption(index);
+        }
+      }
+    }
+
+    function submitAnswer() {
+      if (state.selectedOption === -1 || state.phase !== 'answering') return;
+      state.phase = 'submitted';
+
+      const q = questions[state.currentIndex];
+      const isCorrect = state.selectedOption === q.correctIndex;
+
+      // Track results
+      state.results.push({
+        correct: isCorrect,
+        selectedIndex: state.selectedOption,
+      });
+
+      // Streak
+      if (isCorrect) {
+        state.streak++;
+        if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+      } else {
+        state.streak = 0;
+      }
+
+      // Update option styles
+      els.optionsArea.querySelectorAll('.option-btn').forEach((btn, i) => {
+        btn.classList.add('option-disabled');
+
+        if (i === q.correctIndex) {
+          btn.classList.remove('option-selected');
+          btn.classList.add('option-correct');
+        } else if (i === state.selectedOption && !isCorrect) {
+          btn.classList.remove('option-selected');
+          btn.classList.add('option-incorrect');
+        } else {
+          btn.classList.add('option-dimmed');
+        }
+      });
+
+      // Render feedback
+      const feedbackClass = isCorrect ? 'feedback-correct' : 'feedback-incorrect';
+      const feedbackIcon = isCorrect
+        ? `<svg class="w-5 h-5 text-correct-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>`
+        : `<svg class="w-5 h-5 text-incorrect-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+      const feedbackLabel = isCorrect ? 'Correct' : 'Not quite';
+      const labelColor = isCorrect ? 'text-correct-700' : 'text-incorrect-700';
+
+      els.feedbackArea.innerHTML = `
+        <div class="feedback-card ${feedbackClass} animate-scale">
+          <div class="flex items-start gap-3">
+            ${feedbackIcon}
+            <div>
+              <p class="text-sm font-semibold ${labelColor} mb-1">${feedbackLabel}</p>
+              <p class="text-sm text-slate-600 leading-relaxed">${q.explanation}</p>
+            </div>
+          </div>
+        </div>
+      `;
+      els.feedbackArea.classList.remove('hidden');
+
+      // Swap buttons
+      els.btnSubmit.classList.add('hidden');
+      els.btnNext.classList.remove('hidden');
+      els.btnNext.textContent = state.currentIndex < questions.length - 1
+        ? 'Next Question'
+        : 'View Results';
+      // Re-add arrow icon for next
+      els.btnNext.innerHTML = state.currentIndex < questions.length - 1
+        ? `Next Question <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`
+        : `View Results <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+
+      updateHeader();
+    }
+
+    function nextQuestion() {
+      state.currentIndex++;
+      if (state.currentIndex >= questions.length) {
+        showSummary();
+      } else {
+        renderQuestion();
+      }
+    }
+
+    // ── Summary ───────────────────────────────────────────────────────
+
+    function showSummary() {
+      els.viewPractice.classList.add('hidden');
+      els.viewSummary.classList.remove('hidden');
+
+      const correctTotal = state.results.filter(r => r.correct).length;
+      const total = state.results.length;
+      const accuracy = Math.round((correctTotal / total) * 100);
+
+      // Stats
+      els.accuracyValue.textContent = accuracy + '%';
+      els.correctCount.textContent = correctTotal;
+      els.totalCount.textContent = total;
+
+      // Animate accuracy ring (circumference = 2π × 40 ≈ 251.2)
+      const circumference = 251.2;
+      const offset = circumference - (accuracy / 100) * circumference;
+      setTimeout(() => {
+        els.accuracyRing.style.strokeDashoffset = offset;
+        // Color based on accuracy
+        if (accuracy >= 75) {
+          els.accuracyRing.setAttribute('stroke', '#22c55e');
+        } else if (accuracy >= 50) {
+          els.accuracyRing.setAttribute('stroke', '#f59e0b');
+        } else {
+          els.accuracyRing.setAttribute('stroke', '#ef4444');
+        }
+      }, 100);
+
+      // Insight
+      if (accuracy >= 85) {
+        els.insightTitle.textContent = 'Outstanding session';
+        els.insightText.textContent = `You got ${correctTotal} out of ${total} correct with a best streak of ${state.bestStreak}. Fractions mastery is looking strong — consider moving to a harder difficulty.`;
+      } else if (accuracy >= 60) {
+        els.insightTitle.textContent = 'Solid progress';
+        els.insightText.textContent = `You scored ${accuracy}% with a best streak of ${state.bestStreak}. One more session at this level should lock in the patterns before moving forward.`;
+      } else {
+        els.insightTitle.textContent = 'Keep practising';
+        els.insightText.textContent = `You scored ${accuracy}%. Review the explanations below — the common denominator and reciprocal rules need more attention.`;
+      }
+
+      // Update header to full
+      els.headerProgress.style.width = '100%';
+      els.headerCounter.textContent = `${total} / ${total}`;
+
+      // Review list
+      els.reviewList.innerHTML = questions.map((q, i) => {
+        const result = state.results[i];
+        const isCorrect = result.correct;
+        const iconClass = isCorrect ? 'bg-correct-50 text-correct-600' : 'bg-incorrect-50 text-incorrect-600';
+        const icon = isCorrect
+          ? `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>`
+          : `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+        const yourAnswer = q.options[result.selectedIndex];
+        const correctAnswer = q.options[q.correctIndex];
+        const answerDetail = isCorrect
+          ? `<span class="text-correct-600 font-medium">${correctAnswer}</span>`
+          : `<span class="text-incorrect-600 line-through">${yourAnswer}</span> → <span class="text-correct-600 font-medium">${correctAnswer}</span>`;
+
+        return `
+          <div class="px-5 py-3.5 flex items-start gap-3">
+            <div class="w-6 h-6 rounded-md ${iconClass} flex items-center justify-center flex-shrink-0 mt-0.5">${icon}</div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-slate-800 leading-snug">${q.text}</p>
+              <p class="text-xs text-slate-400 mt-1">${answerDetail}</p>
+            </div>
+            <span class="text-xs font-medium text-slate-300 flex-shrink-0 mt-0.5">Q${i + 1}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── Restart ───────────────────────────────────────────────────────
+
+    function restartPractice() {
+      state.currentIndex = 0;
+      state.selectedOption = -1;
+      state.phase = 'answering';
+      state.results = [];
+      state.streak = 0;
+      state.bestStreak = 0;
+
+      els.viewSummary.classList.add('hidden');
+      els.viewPractice.classList.remove('hidden');
+
+      // Reset accuracy ring
+      els.accuracyRing.style.strokeDashoffset = 251.2;
+
+      renderQuestion();
+    }
+
+    // ── Event Listeners ───────────────────────────────────────────────
+
+    els.btnSubmit.addEventListener('click', submitAnswer);
+    els.btnNext.addEventListener('click', nextQuestion);
+
+    // Keyboard shortcut: Enter to submit/next
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.repeat) {
+        if (state.phase === 'answering' && state.selectedOption !== -1) {
+          submitAnswer();
+        } else if (state.phase === 'submitted') {
+          nextQuestion();
+        }
+      }
+      // Number keys 1-4 to select options
+      if (state.phase === 'answering') {
+        const num = parseInt(e.key);
+        if (num >= 1 && num <= 4 && num <= questions[state.currentIndex].options.length) {
+          selectOption(num - 1);
+        }
+      }
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────
+    renderQuestion();
+  </script>
+
+</body>
+</html>

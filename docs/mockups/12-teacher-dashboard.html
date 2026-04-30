@@ -1,0 +1,417 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic - Teacher Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118'},
+      correct:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      incorrect:{50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626'},
+      warn:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)',elevated:'0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:12px;--r-btn:8px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9fb;color:#2a3040}
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,.25)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5E8}.btn-secondary:hover{background:#F5F3FF}
+  .btn-ghost{background:transparent;color:#525b6e}.btn-ghost:hover{background:#f3f4f7;color:#2a3040}
+  .btn-lg{padding:12px 24px;font-size:15px;font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8b94a6}
+  .pbar{height:6px;background:#eef0f4;border-radius:100px;overflow:hidden}.pfill{height:100%;border-radius:100px;transition:width 600ms cubic-bezier(.4,0,.2,1)}
+
+  /* Sidebar nav */
+  .snav{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#6b7488;cursor:pointer;transition:all var(--fast);text-decoration:none}
+  .snav:hover{background:#f3f4f7;color:#2a3040}
+  .snav.snav-on{background:#F5F3FF;color:#5925a8;font-weight:600}
+  .snav svg{width:18px;height:18px;flex-shrink:0}
+
+  /* Table */
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b94a6;border-bottom:1px solid #eef0f4;cursor:pointer;user-select:none;white-space:nowrap}
+  .tbl th:hover{color:#3d4555}
+  .tbl td{padding:12px 16px;border-bottom:1px solid #f3f4f7;vertical-align:middle}
+  .tbl tr:hover td{background:#fcfcfd}
+  .tbl tr{cursor:pointer;transition:background var(--fast)}
+
+  /* Status pills */
+  .st-track{background:#f0fdf4;color:#15803d;border:1px solid #dcfce7}
+  .st-attn{background:#fffbeb;color:#b45309;border:1px solid #fef3c7}
+  .st-risk{background:#fef2f2;color:#b91c1c;border:1px solid #fee2e2}
+
+  /* Slide panel */
+  .slide-panel{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:100vw;background:white;box-shadow:-8px 0 24px rgba(0,0,0,.08);z-index:100;transform:translateX(100%);transition:transform 300ms cubic-bezier(.4,0,.2,1);overflow-y:auto}
+  .slide-panel.open{transform:translateX(0)}
+  .slide-overlay{position:fixed;inset:0;background:rgba(14,17,24,.3);z-index:99;opacity:0;pointer-events:none;transition:opacity var(--base)}
+  .slide-overlay.open{opacity:1;pointer-events:auto}
+
+  /* Tab */
+  .tab{font-size:13px;font-weight:500;color:#6b7488;padding:8px 14px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#2a3040}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .afs{animation:fadeSlide 350ms cubic-bezier(.4,0,.2,1) both}
+  .d1{animation-delay:60ms}.d2{animation-delay:120ms}.d3{animation-delay:180ms}.d4{animation-delay:240ms}.d5{animation-delay:300ms}
+
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+<!-- ================================================================== -->
+<!-- SIDEBAR                                                             -->
+<!-- ================================================================== -->
+<aside class="hidden lg:flex flex-col w-[260px] flex-shrink-0 bg-white border-r border-slate-100 h-screen sticky top-0">
+  <!-- Logo -->
+  <div class="px-5 py-5 border-b border-slate-100 flex items-center gap-2.5">
+    <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+    <span class="pill bg-brand-50 text-brand-600 border border-brand-200 ml-auto text-[10px]">Teacher</span>
+  </div>
+
+  <!-- Class selector -->
+  <div class="px-4 py-3 border-b border-slate-100">
+    <p class="sl mb-2">Class</p>
+    <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-150 text-sm font-medium text-slate-800 hover:bg-slate-75 transition-colors">
+      <span>7A &mdash; Numeracy</span>
+      <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <a class="snav snav-on"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Students</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Analytics</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Assignments</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Insights</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+  </nav>
+
+  <!-- Teacher profile -->
+  <div class="px-4 py-4 border-t border-slate-100">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">MS</div>
+      <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 truncate">Ms. Sarah Chen</p><p class="text-[11px] text-slate-400">Mathematics</p></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ================================================================== -->
+<!-- MAIN CONTENT                                                        -->
+<!-- ================================================================== -->
+<div class="flex-1 min-w-0 flex flex-col">
+
+  <!-- Top bar -->
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="px-6 lg:px-8 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[15px] font-semibold text-slate-900">Class Overview</h1>
+        <span class="pill bg-slate-50 text-slate-500 border border-slate-150">7A &mdash; Numeracy</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="btn btn-ghost text-xs gap-1.5 py-2 px-3"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>This Week</button>
+        <button class="btn btn-ghost p-2 rounded-lg relative"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="absolute top-1 right-1 w-2 h-2 bg-incorrect-500 rounded-full ring-2 ring-white"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 px-6 lg:px-8 py-6 overflow-y-auto">
+
+    <!-- ============================================================ -->
+    <!-- KPI CARDS                                                     -->
+    <!-- ============================================================ -->
+    <section class="mb-6 afs">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-2"><p class="sl">Students</p><div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center"><svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div></div>
+          <p class="text-2xl font-bold text-slate-900 tabular-nums">28</p>
+          <p class="text-xs text-slate-400 mt-0.5"><span class="text-correct-600 font-medium">26 active</span> this week</p>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-2"><p class="sl">Avg Score</p><div class="w-8 h-8 rounded-lg bg-correct-50 flex items-center justify-center"><svg class="w-4 h-4 text-correct-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div></div>
+          <p class="text-2xl font-bold text-slate-900 tabular-nums">72%</p>
+          <p class="text-xs text-slate-400 mt-0.5"><span class="text-correct-600 font-medium">&uarr; 4%</span> vs last week</p>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-2"><p class="sl">Completion</p><div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center"><svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div></div>
+          <p class="text-2xl font-bold text-slate-900 tabular-nums">68%</p>
+          <p class="text-xs text-slate-400 mt-0.5">Weekly plan tasks done</p>
+        </div>
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-2"><p class="sl">At Risk</p><div class="w-8 h-8 rounded-lg bg-incorrect-50 flex items-center justify-center"><svg class="w-4 h-4 text-incorrect-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div></div>
+          <p class="text-2xl font-bold text-incorrect-600 tabular-nums">3</p>
+          <p class="text-xs text-slate-400 mt-0.5">Students need attention</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- ALERTS + INSIGHTS ROW                                         -->
+    <!-- ============================================================ -->
+    <section class="mb-6 grid lg:grid-cols-5 gap-4 afs d1">
+      <!-- Alerts (3/5) -->
+      <div class="lg:col-span-3 space-y-3">
+        <p class="sl">Priority Alerts</p>
+        <div class="card border-incorrect-100 bg-incorrect-50/30 p-4 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-incorrect-100 text-incorrect-600 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-slate-800">3 students are at risk of falling behind</p>
+            <p class="text-xs text-slate-500 mt-0.5">Liam, Priya, and Jordan have declining scores and low activity this week.</p>
+          </div>
+          <button class="btn btn-secondary text-xs py-1.5 px-3 flex-shrink-0">Review</button>
+        </div>
+        <div class="card border-warn-100 bg-warn-50/30 p-4 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-warn-100 text-warn-600 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-slate-800">2 students have not attempted any tasks</p>
+            <p class="text-xs text-slate-500 mt-0.5">Olivia and Ethan have zero sessions this week.</p>
+          </div>
+          <button class="btn btn-secondary text-xs py-1.5 px-3 flex-shrink-0">Assign Work</button>
+        </div>
+      </div>
+
+      <!-- Insights (2/5) -->
+      <div class="lg:col-span-2">
+        <p class="sl mb-3">Insights</p>
+        <div class="card p-5 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-md bg-correct-50 text-correct-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 7l5 5-5 5M6 7l5 5-5 5"/></svg></div>
+            <p class="text-sm text-slate-600 leading-relaxed">Class accuracy <span class="font-semibold text-correct-600">improved 4%</span> this week. Geometry drove most gains.</p>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-md bg-warn-50 text-warn-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <p class="text-sm text-slate-600 leading-relaxed"><span class="font-semibold text-slate-800">Fractions</span> remains weak across <span class="font-semibold text-warn-600">60%</span> of students.</p>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-md bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+            <p class="text-sm text-slate-600 leading-relaxed">Top performers practise <span class="font-semibold text-brand-600">3+ times per week</span> consistently.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- STUDENT TABLE                                                 -->
+    <!-- ============================================================ -->
+    <section class="mb-6 afs d2">
+      <div class="card">
+        <div class="px-5 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+          <div><h3 class="text-[15px] font-semibold text-slate-900">Student Performance</h3><p class="text-xs text-slate-400 mt-0.5">28 students &middot; Click a row for details</p></div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-ghost text-xs py-1.5 px-3 gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filter</button>
+            <button class="btn btn-ghost text-xs py-1.5 px-3 gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Last Active</th>
+                <th>Avg Score</th>
+                <th>Strongest</th>
+                <th>Weakest</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="student-tbody">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SKILL ANALYSIS + ASSIGNMENTS                                  -->
+    <!-- ============================================================ -->
+    <section class="grid lg:grid-cols-5 gap-6 mb-6 afs d3">
+      <!-- Skill Analysis (3/5) -->
+      <div class="lg:col-span-3 card">
+        <div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Topic Mastery (Class)</h3><p class="text-xs text-slate-400 mt-0.5">Average mastery across all students</p></div>
+        <div class="p-5 space-y-4" id="topic-bars">
+          <!-- Rendered by JS -->
+        </div>
+        <div class="px-5 pb-4"><p class="text-xs text-slate-500"><span class="font-semibold text-slate-700">Insight:</span> Fractions and Data Interpretation are the weakest across the class and should be prioritised in upcoming assignments.</p></div>
+      </div>
+
+      <!-- Assignments (2/5) -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="card">
+          <div class="px-5 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-[15px] font-semibold text-slate-900">Assignments</h3>
+            <button class="btn btn-primary text-xs py-1.5 px-3 gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create</button>
+          </div>
+          <div class="divide-y divide-slate-75">
+            <div class="px-5 py-3.5 flex items-center gap-3">
+              <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800">Fractions Practice</p><p class="text-[11px] text-slate-400 mt-0.5">Due 11 Apr &middot; All students</p></div>
+              <div class="text-right"><p class="text-sm font-semibold text-warn-600 tabular-nums">42%</p><p class="text-[11px] text-slate-400">completed</p></div>
+            </div>
+            <div class="px-5 py-3.5 flex items-center gap-3">
+              <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800">Geometry Diagnostic</p><p class="text-[11px] text-slate-400 mt-0.5">Due 14 Apr &middot; All students</p></div>
+              <div class="text-right"><p class="text-sm font-semibold text-brand-600 tabular-nums">18%</p><p class="text-[11px] text-slate-400">completed</p></div>
+            </div>
+            <div class="px-5 py-3.5 flex items-center gap-3">
+              <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800">NAPLAN Mock Exam</p><p class="text-[11px] text-slate-400 mt-0.5">Due 18 Apr &middot; Selected students</p></div>
+              <div class="text-right"><p class="text-sm font-semibold text-slate-300 tabular-nums">0%</p><p class="text-[11px] text-slate-400">not started</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card p-5">
+          <p class="sl mb-3">Quick Actions</p>
+          <div class="space-y-2">
+            <button class="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors text-left group">
+              <div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+              <span class="text-sm font-medium text-slate-800">Assign by weak topic</span>
+              <svg class="w-4 h-4 text-slate-300 ml-auto group-hover:text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button class="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors text-left group">
+              <div class="w-8 h-8 rounded-lg bg-incorrect-50 text-incorrect-500 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+              <span class="text-sm font-medium text-slate-800">Review at-risk students</span>
+              <svg class="w-4 h-4 text-slate-300 ml-auto group-hover:text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+            <button class="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors text-left group">
+              <div class="w-8 h-8 rounded-lg bg-correct-50 text-correct-500 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+              <span class="text-sm font-medium text-slate-800">Generate class report</span>
+              <svg class="w-4 h-4 text-slate-300 ml-auto group-hover:text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ================================================================== -->
+<!-- STUDENT SLIDE PANEL                                                 -->
+<!-- ================================================================== -->
+<div class="slide-overlay" id="panel-overlay" onclick="closePanel()"></div>
+<div class="slide-panel" id="panel">
+  <div class="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+    <h3 class="text-[15px] font-semibold text-slate-900" id="panel-name">Student</h3>
+    <button class="btn btn-ghost p-1.5" onclick="closePanel()"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="panel-body" class="p-6"></div>
+</div>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+
+var students=[
+  {name:"Ava Mitchell",init:"AM",last:"Today",avg:88,strong:"Geometry",weak:"Patterns",status:"track",sessions:6,mastery:{Geometry:92,Algebra:85,Probability:80,Fractions:78,Patterns:65}},
+  {name:"Noah Williams",init:"NW",last:"Today",avg:82,strong:"Algebra",weak:"Fractions",status:"track",sessions:5,mastery:{Geometry:80,Algebra:90,Probability:75,Fractions:62,Patterns:78}},
+  {name:"Chloe Park",init:"CP",last:"Yesterday",avg:79,strong:"Probability",weak:"Geometry",status:"track",sessions:4,mastery:{Geometry:60,Algebra:78,Probability:88,Fractions:72,Patterns:80}},
+  {name:"Lucas Chen",init:"LC",last:"Today",avg:76,strong:"Geometry",weak:"Fractions",status:"track",sessions:5,mastery:{Geometry:85,Algebra:75,Probability:70,Fractions:58,Patterns:72}},
+  {name:"Sophie Brown",init:"SB",last:"2 days ago",avg:74,strong:"Algebra",weak:"Probability",status:"track",sessions:3,mastery:{Geometry:72,Algebra:82,Probability:55,Fractions:70,Patterns:75}},
+  {name:"James Lee",init:"JL",last:"Today",avg:71,strong:"Patterns",weak:"Fractions",status:"track",sessions:4,mastery:{Geometry:68,Algebra:72,Probability:70,Fractions:52,Patterns:85}},
+  {name:"Isabella Nguyen",init:"IN",last:"Yesterday",avg:70,strong:"Geometry",weak:"Algebra",status:"attn",sessions:3,mastery:{Geometry:82,Algebra:55,Probability:68,Fractions:65,Patterns:72}},
+  {name:"Liam Carter",init:"LC2",last:"3 days ago",avg:54,strong:"Patterns",weak:"Fractions",status:"risk",sessions:1,mastery:{Geometry:50,Algebra:48,Probability:55,Fractions:35,Patterns:65}},
+  {name:"Priya Sharma",init:"PS",last:"4 days ago",avg:48,strong:"Algebra",weak:"Geometry",status:"risk",sessions:1,mastery:{Geometry:32,Algebra:58,Probability:45,Fractions:42,Patterns:50}},
+  {name:"Jordan Blake",init:"JB",last:"5 days ago",avg:42,strong:"Probability",weak:"Fractions",status:"risk",sessions:0,mastery:{Geometry:40,Algebra:38,Probability:55,Fractions:28,Patterns:42}},
+  {name:"Olivia Taylor",init:"OT",last:"No activity",avg:0,strong:"-",weak:"-",status:"risk",sessions:0,mastery:{Geometry:0,Algebra:0,Probability:0,Fractions:0,Patterns:0}},
+  {name:"Ethan Davis",init:"ED",last:"No activity",avg:0,strong:"-",weak:"-",status:"risk",sessions:0,mastery:{Geometry:0,Algebra:0,Probability:0,Fractions:0,Patterns:0}},
+];
+
+var topics=[
+  {name:"Geometry",pct:72,prev:68},
+  {name:"Algebra",pct:70,prev:67},
+  {name:"Probability",pct:66,prev:64},
+  {name:"Patterns",pct:62,prev:60},
+  {name:"Fractions",pct:48,prev:45},
+  {name:"Data Interpretation",pct:44,prev:42},
+];
+
+function sc(p){if(p>=70)return{bg:"bg-correct-500",text:"text-correct-600"};if(p>=50)return{bg:"bg-brand-500",text:"text-brand-600"};if(p>=30)return{bg:"bg-warn-500",text:"text-warn-600"};return{bg:"bg-incorrect-500",text:"text-incorrect-600"}}
+function stPill(s){if(s==="track")return'<span class="pill st-track">On Track</span>';if(s==="attn")return'<span class="pill st-attn">Needs Attention</span>';return'<span class="pill st-risk">At Risk</span>'}
+
+// Render student table
+function renderTable(){
+  $("student-tbody").innerHTML=students.map(function(s,i){
+    return'<tr onclick="openStudent('+i+')"><td><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">'+s.init.substring(0,2)+'</div><span class="font-medium text-slate-800">'+s.name+'</span></div></td><td class="text-slate-500 text-sm">'+s.last+'</td><td><span class="font-semibold tabular-nums '+sc(s.avg).text+'">'+s.avg+'%</span></td><td class="text-sm text-slate-600">'+s.strong+'</td><td class="text-sm text-slate-600">'+s.weak+'</td><td>'+stPill(s.status)+'</td></tr>';
+  }).join("");
+}
+
+// Render topic bars
+function renderTopics(){
+  $("topic-bars").innerHTML=topics.map(function(t){
+    var c=sc(t.pct);var diff=t.pct-t.prev;
+    return'<div><div class="flex items-center justify-between mb-1.5"><span class="text-sm font-medium text-slate-700">'+t.name+'</span><div class="flex items-center gap-2"><span class="text-sm font-semibold tabular-nums '+c.text+'">'+t.pct+'%</span><span class="text-[11px] '+(diff>=0?'text-correct-600':'text-incorrect-600')+' font-medium">'+(diff>=0?"+":"")+diff+'%</span></div></div><div class="pbar"><div class="pfill '+c.bg+'" style="width:'+t.pct+'%"></div></div></div>';
+  }).join("");
+}
+
+// Student panel
+window.openStudent=function(i){
+  var s=students[i];
+  $("panel-name").textContent=s.name;
+  var h='';
+  // Profile header
+  h+='<div class="flex items-center gap-4 mb-6"><div class="w-14 h-14 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-lg font-bold">'+s.init.substring(0,2)+'</div><div><p class="text-lg font-semibold text-slate-900">'+s.name+'</p><div class="flex items-center gap-2 mt-1">'+stPill(s.status)+'<span class="text-xs text-slate-400">Last active: '+s.last+'</span></div></div></div>';
+
+  // KPIs
+  h+='<div class="grid grid-cols-3 gap-3 mb-6">';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold tabular-nums '+sc(s.avg).text+'">'+s.avg+'%</p><p class="text-[11px] text-slate-400">Avg Score</p></div>';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">'+s.sessions+'</p><p class="text-[11px] text-slate-400">Sessions</p></div>';
+  h+='<div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-brand-600 tabular-nums">'+Object.values(s.mastery).filter(function(v){return v>=70}).length+'/'+Object.keys(s.mastery).length+'</p><p class="text-[11px] text-slate-400">Mastered</p></div></div>';
+
+  // Mastery map
+  h+='<div class="mb-6"><p class="sl mb-3">Skill Mastery</p><div class="space-y-3">';
+  Object.keys(s.mastery).forEach(function(k){
+    var v=s.mastery[k],c=sc(v);
+    h+='<div><div class="flex items-center justify-between mb-1"><span class="text-sm text-slate-700">'+k+'</span><span class="text-sm font-semibold tabular-nums '+c.text+'">'+v+'%</span></div><div class="pbar"><div class="pfill '+c.bg+'" style="width:'+v+'%"></div></div></div>';
+  });
+  h+='</div></div>';
+
+  // Strengths / weaknesses
+  h+='<div class="grid grid-cols-2 gap-3 mb-6">';
+  h+='<div class="rounded-lg bg-correct-50 border border-correct-100 p-3"><p class="text-[11px] font-semibold text-correct-600 uppercase tracking-wider mb-1">Strongest</p><p class="text-sm font-medium text-correct-700">'+s.strong+'</p></div>';
+  h+='<div class="rounded-lg bg-incorrect-50 border border-incorrect-100 p-3"><p class="text-[11px] font-semibold text-incorrect-600 uppercase tracking-wider mb-1">Weakest</p><p class="text-sm font-medium text-incorrect-700">'+s.weak+'</p></div></div>';
+
+  // Actions
+  h+='<p class="sl mb-3">Recommended Actions</p><div class="space-y-2">';
+  if(s.status==="risk"||s.status==="attn"){
+    h+='<button class="w-full btn btn-primary text-sm py-2.5 gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Assign '+s.weak+' Practice</button>';
+  }
+  h+='<button class="w-full btn btn-secondary text-sm py-2.5 gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Assign Diagnostic</button>';
+  h+='<a href="teacher-student-detail.html" class="w-full btn btn-ghost text-sm py-2.5 gap-2" style="text-decoration:none"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>View Full Profile</a></div>';
+
+  $("panel-body").innerHTML=h;
+  $("panel").classList.add("open");
+  $("panel-overlay").classList.add("open");
+};
+
+window.closePanel=function(){
+  $("panel").classList.remove("open");
+  $("panel-overlay").classList.remove("open");
+};
+
+// Init
+renderTable();
+renderTopics();
+
+})();
+</script>
+</body>
+</html>

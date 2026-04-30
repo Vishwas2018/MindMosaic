@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic — Student Detail</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118'},
+      correct:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      incorrect:{50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626'},
+      warn:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)',elevated:'0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:12px;--r-btn:8px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9fb;color:#2a3040}
+
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,.25)}
+  .btn:active{transform:scale(.97)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5E8}.btn-secondary:hover{background:#F5F3FF}
+  .btn-ghost{background:transparent;color:#525b6e}.btn-ghost:hover{background:#f3f4f7;color:#2a3040}
+  .btn-sm{padding:7px 14px;font-size:13px}
+  .btn-danger-soft{background:#fef2f2;color:#dc2626;border:1px solid #fee2e2}.btn-danger-soft:hover{background:#fee2e2}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8b94a6}
+
+  .pbar{height:6px;background:#eef0f4;border-radius:100px;overflow:hidden}.pfill{height:100%;border-radius:100px;transition:width 800ms cubic-bezier(.4,0,.2,1)}
+  .pbar-sm{height:4px}
+
+  /* Sidebar nav */
+  .snav{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#6b7488;cursor:pointer;transition:all var(--fast);text-decoration:none}
+  .snav:hover{background:#f3f4f7;color:#2a3040}.snav.snav-on{background:#F5F3FF;color:#5925a8;font-weight:600}
+  .snav svg{width:18px;height:18px;flex-shrink:0}
+
+  /* Tab */
+  .tab{font-size:13px;font-weight:500;color:#6b7488;padding:8px 14px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#2a3040}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+
+  /* Stat card */
+  .stat-tile{background:white;border:1px solid #eef0f4;border-radius:12px;padding:20px 24px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+
+  /* Activity entry */
+  .act-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f3f4f7}
+  .act-row:last-child{border-bottom:none}
+  .act-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+
+  /* Table */
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b94a6;border-bottom:1px solid #eef0f4;white-space:nowrap}
+  .tbl td{padding:12px 16px;border-bottom:1px solid #f3f4f7;vertical-align:middle}
+  .tbl tr:hover td{background:#fcfcfd}
+  .tbl tr{transition:background var(--fast)}
+
+  /* Skill bar row */
+  .skill-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .skill-label{font-size:13px;color:#525b6e;width:180px;flex-shrink:0}
+  .skill-bar{flex:1;height:8px;background:#eef0f4;border-radius:100px;overflow:hidden}
+  .skill-fill{height:100%;border-radius:100px}
+  .skill-pct{font-size:12px;font-weight:600;color:#3d4555;width:36px;text-align:right;flex-shrink:0}
+
+  /* Breadcrumb */
+  .crumb{font-size:13px;color:#8b94a6;display:flex;align-items:center;gap:6px}
+  .crumb a{color:#8b94a6;text-decoration:none;transition:color var(--fast)}.crumb a:hover{color:#5925a8}
+  .crumb-sep{color:#d5d9e2}
+
+  /* Mini chart bars (pure CSS) */
+  .bar-chart{display:flex;align-items:flex-end;gap:4px;height:64px}
+  .bar-chart .b{border-radius:4px 4px 0 0;transition:height var(--base);min-width:12px}
+
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.afs{animation:fadeSlide 350ms cubic-bezier(.4,0,.2,1) both}
+  .d1{animation-delay:60ms}.d2{animation-delay:120ms}.d3{animation-delay:180ms}.d4{animation-delay:240ms}.d5{animation-delay:300ms}
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+<!-- ================================================================== -->
+<!-- SIDEBAR                                                             -->
+<!-- ================================================================== -->
+<aside class="hidden lg:flex flex-col w-[260px] flex-shrink-0 bg-white border-r border-slate-100 h-screen sticky top-0">
+  <div class="px-5 py-5 border-b border-slate-100 flex items-center gap-2.5">
+    <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+    <span class="pill bg-brand-50 text-brand-600 border border-brand-200 ml-auto text-[10px]">Teacher</span>
+  </div>
+  <div class="px-4 py-3 border-b border-slate-100">
+    <p class="sl mb-2">Class</p>
+    <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-150 text-sm font-medium text-slate-800 hover:bg-slate-75 transition-colors">
+      <span>7A &mdash; Numeracy</span>
+      <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </div>
+  <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <a href="teacher-dashboard.html" class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+    <a href="teacher-dashboard.html" class="snav snav-on"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Students</a>
+    <a href="assignment-engine.html" class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Assignments</a>
+    <a href="analytics.html" class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Analytics</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Insights</a>
+  </nav>
+  <div class="px-4 py-4 border-t border-slate-100">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">MS</div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-slate-800 truncate">Ms. Sarah Chen</p>
+        <p class="text-[11px] text-slate-400">Mathematics</p>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ================================================================== -->
+<!-- MAIN                                                                -->
+<!-- ================================================================== -->
+<div class="flex-1 min-w-0 flex flex-col">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="px-6 lg:px-8 h-14 flex items-center justify-between">
+      <!-- Breadcrumb -->
+      <div class="crumb">
+        <a href="teacher-dashboard.html">Students</a>
+        <span class="crumb-sep">/</span>
+        <span class="text-slate-700 font-medium">Priya Sharma</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-ghost btn-sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export
+        </button>
+        <button class="btn btn-primary btn-sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Assign Work
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <main class="flex-1 px-6 lg:px-8 py-8 pb-24 overflow-y-auto">
+
+    <!-- ── Student hero ── -->
+    <div class="flex items-start gap-5 mb-8 afs">
+      <!-- Avatar -->
+      <div class="w-16 h-16 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center text-2xl font-bold flex-shrink-0">P</div>
+      <!-- Info -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 flex-wrap mb-1">
+          <h1 class="text-[22px] font-bold tracking-tight text-slate-900">Priya Sharma</h1>
+          <span class="pill bg-brand-50 text-brand-600 border border-brand-200">Year 7</span>
+          <span class="pill bg-amber-50 text-amber-700 border border-amber-200">Needs Attention</span>
+        </div>
+        <p class="text-[13px] text-slate-400 mb-3">priya.sharma@school.edu.au · Class 7A · Enrolled Mar 2024</p>
+        <div class="flex items-center gap-5 text-[13px] text-slate-500">
+          <span><span class="font-semibold text-slate-800">42</span> sessions completed</span>
+          <span><span class="font-semibold text-slate-800">7</span> day streak</span>
+          <span>Last active <span class="font-semibold text-slate-800">Today, 8:52 am</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Stat tiles ── -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+      <div class="stat-tile afs d1">
+        <p class="sl mb-3">Overall Score</p>
+        <p class="text-[28px] font-bold text-slate-900 leading-none mb-1">74%</p>
+        <p class="text-[12px] text-amber-600 font-medium flex items-center gap-1">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          +4% this month
+        </p>
+      </div>
+
+      <div class="stat-tile afs d2">
+        <p class="sl mb-3">Assignments</p>
+        <p class="text-[28px] font-bold text-slate-900 leading-none mb-1">11/14</p>
+        <p class="text-[12px] text-slate-400">3 pending · 1 overdue</p>
+      </div>
+
+      <div class="stat-tile afs d3">
+        <p class="sl mb-3">Time Spent</p>
+        <p class="text-[28px] font-bold text-slate-900 leading-none mb-1">6.2 h</p>
+        <p class="text-[12px] text-slate-400">This week · avg 52 min/day</p>
+      </div>
+
+      <div class="stat-tile afs d4">
+        <p class="sl mb-3">Questions Done</p>
+        <p class="text-[28px] font-bold text-slate-900 leading-none mb-1">847</p>
+        <p class="text-[12px] text-green-600 font-medium flex items-center gap-1">
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          Top 20% of class
+        </p>
+      </div>
+    </div>
+
+    <!-- ── Two-col layout ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- LEFT: Skills + Activity -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- Performance by strand -->
+        <div class="card p-6 afs d2">
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="font-semibold text-[15px] text-slate-800">Performance by Strand</h2>
+            <div class="flex items-center gap-1 border-b border-slate-150">
+              <button class="tab tab-on">NAPLAN</button>
+              <button class="tab">ICAS</button>
+              <button class="tab">Selective</button>
+            </div>
+          </div>
+
+          <!-- Skill bars -->
+          <div>
+            <div class="skill-row">
+              <span class="skill-label">Reading</span>
+              <div class="skill-bar"><div class="skill-fill bg-brand-500" style="width:82%"></div></div>
+              <span class="skill-pct">82%</span>
+            </div>
+            <div class="skill-row">
+              <span class="skill-label">Numeracy</span>
+              <div class="skill-bar"><div class="skill-fill bg-brand-500" style="width:68%"></div></div>
+              <span class="skill-pct">68%</span>
+            </div>
+            <div class="skill-row">
+              <span class="skill-label">Language Conventions</span>
+              <div class="skill-bar"><div class="skill-fill bg-amber-500" style="width:55%"></div></div>
+              <span class="skill-pct text-amber-700">55%</span>
+            </div>
+            <div class="skill-row">
+              <span class="skill-label">Writing</span>
+              <div class="skill-bar"><div class="skill-fill bg-red-400" style="width:48%"></div></div>
+              <span class="skill-pct text-red-600">48%</span>
+            </div>
+            <div class="skill-row" style="margin-bottom:0">
+              <span class="skill-label">Thinking Skills</span>
+              <div class="skill-bar"><div class="skill-fill bg-brand-500" style="width:71%"></div></div>
+              <span class="skill-pct">71%</span>
+            </div>
+          </div>
+
+          <!-- Insight callout -->
+          <div class="mt-5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+            <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+              <p class="text-[13px] font-semibold text-amber-800 mb-0.5">Writing needs focus</p>
+              <p class="text-[12px] text-amber-700">Priya is 18 points below class average in Writing. Consider assigning structured writing practice this week.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assignment History -->
+        <div class="card afs d3">
+          <div class="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+            <h2 class="font-semibold text-[15px] text-slate-800">Assignment History</h2>
+            <a href="assignment-engine.html" class="text-[13px] font-medium text-brand-500 hover:text-brand-600 transition-colors">Assign work →</a>
+          </div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Assignment</th>
+                <th>Type</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-medium text-slate-800">NAPLAN Numeracy W14</td>
+                <td><span class="pill bg-amber-50 text-amber-700 border border-amber-200">Exam Sim</span></td>
+                <td>—</td>
+                <td><span class="pill bg-red-50 text-red-700 border border-red-200">Overdue</span></td>
+                <td class="text-slate-400">7 Apr</td>
+              </tr>
+              <tr>
+                <td class="font-medium text-slate-800">ICAS Writing — Persuasive</td>
+                <td><span class="pill bg-brand-50 text-brand-600 border border-brand-200">Practice</span></td>
+                <td class="text-slate-500">In progress</td>
+                <td><span class="pill bg-brand-50 text-brand-600 border border-brand-200">In Progress</span></td>
+                <td class="text-slate-400">12 Apr</td>
+              </tr>
+              <tr>
+                <td class="font-medium text-slate-800">Reading — Informational</td>
+                <td><span class="pill bg-brand-50 text-brand-600 border border-brand-200">Practice</span></td>
+                <td class="font-semibold text-green-600">82%</td>
+                <td><span class="pill bg-green-50 text-green-700 border border-green-200">Complete</span></td>
+                <td class="text-slate-400">4 Apr</td>
+              </tr>
+              <tr>
+                <td class="font-medium text-slate-800">NAPLAN Numeracy W13</td>
+                <td><span class="pill bg-amber-50 text-amber-700 border border-amber-200">Exam Sim</span></td>
+                <td class="font-semibold text-green-600">78%</td>
+                <td><span class="pill bg-green-50 text-green-700 border border-green-200">Complete</span></td>
+                <td class="text-slate-400">31 Mar</td>
+              </tr>
+              <tr>
+                <td class="font-medium text-slate-800">Language Conv. — Spelling</td>
+                <td><span class="pill bg-brand-50 text-brand-600 border border-brand-200">Practice</span></td>
+                <td class="font-semibold text-amber-600">60%</td>
+                <td><span class="pill bg-green-50 text-green-700 border border-green-200">Complete</span></td>
+                <td class="text-slate-400">28 Mar</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: Summary + Activity -->
+      <div class="space-y-6">
+
+        <!-- Score trend (mini bar chart) -->
+        <div class="card p-5 afs d1">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-[14px] text-slate-800">Score Trend</h2>
+            <span class="text-[11px] text-slate-400">Last 8 sessions</span>
+          </div>
+          <div class="bar-chart mb-3">
+            <div class="b bg-brand-200" style="height:38px;flex:1" title="62%"></div>
+            <div class="b bg-brand-300" style="height:44px;flex:1" title="68%"></div>
+            <div class="b bg-brand-300" style="height:42px;flex:1" title="66%"></div>
+            <div class="b bg-brand-400" style="height:48px;flex:1" title="74%"></div>
+            <div class="b bg-brand-400" style="height:46px;flex:1" title="72%"></div>
+            <div class="b bg-brand-500" style="height:52px;flex:1" title="80%"></div>
+            <div class="b bg-brand-400" style="height:47px;flex:1" title="73%"></div>
+            <div class="b bg-brand-500" style="height:54px;flex:1" title="82%"></div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-400">
+            <span>Mar 10</span>
+            <span class="font-semibold text-green-600">↑ +20pts trend</span>
+            <span>Apr 9</span>
+          </div>
+        </div>
+
+        <!-- Attendance / session activity -->
+        <div class="card p-5 afs d2">
+          <h2 class="font-semibold text-[14px] text-slate-800 mb-4">Recent Activity</h2>
+          <div>
+            <div class="act-row">
+              <div class="act-dot bg-brand-500 mt-1"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium text-slate-800">ICAS Writing — 6/10 questions</p>
+                <p class="text-[12px] text-slate-400">Practice · Today 8:52 am</p>
+              </div>
+            </div>
+            <div class="act-row">
+              <div class="act-dot bg-green-500 mt-1"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium text-slate-800">Reading Informational — 82%</p>
+                <p class="text-[12px] text-slate-400">Complete · Yesterday 4:10 pm</p>
+              </div>
+            </div>
+            <div class="act-row">
+              <div class="act-dot bg-amber-400 mt-1"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium text-slate-800">Self-practice — Numeracy</p>
+                <p class="text-[12px] text-slate-400">12 questions · Yesterday 3:30 pm</p>
+              </div>
+            </div>
+            <div class="act-row">
+              <div class="act-dot bg-green-500 mt-1"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium text-slate-800">NAPLAN Numeracy W13 — 78%</p>
+                <p class="text-[12px] text-slate-400">Complete · 2 days ago</p>
+              </div>
+            </div>
+            <div class="act-row">
+              <div class="act-dot bg-red-400 mt-1"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium text-slate-800">Language Conventions — 55%</p>
+                <p class="text-[12px] text-slate-400">Practice · 3 days ago</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Teacher notes -->
+        <div class="card p-5 afs d3">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold text-[14px] text-slate-800">Teacher Notes</h2>
+            <button class="btn btn-ghost btn-sm text-[12px] p-1.5">+ Add</button>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-3 text-[13px] text-slate-600 leading-relaxed border border-slate-100">
+            Priya is making good progress in Reading but continues to struggle with Writing structure. Has been reluctant to attempt timed writing tasks. Recommend scaffolded practice before next exam.
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Last edited by Ms. Chen · 5 Apr 2025</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="space-y-2 afs d4">
+          <button class="btn btn-primary w-full">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Assign Work to Priya
+          </button>
+          <button class="btn btn-secondary w-full">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Message Parent
+          </button>
+          <button class="btn btn-danger-soft w-full">Flag for Review</button>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>

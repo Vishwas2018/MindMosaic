@@ -1,0 +1,437 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic - Assignment Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE8F8',200:'#C4B5E8',300:'#A78BFA',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#5b21b6',800:'#3b1a6e',900:'#2e0f5c'},
+      slate:{25:'#fcfcfd',50:'#f8f9fb',75:'#f3f4f7',100:'#eef0f4',150:'#e4e7ed',200:'#d5d9e2',300:'#b0b7c5',400:'#8b94a6',500:'#6b7488',600:'#525b6e',700:'#3d4555',800:'#2a3040',900:'#181c27',950:'#0e1118'},
+      correct:{50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      incorrect:{50:'#fef2f2',100:'#fee2e2',500:'#ef4444',600:'#dc2626'},
+      warn:{50:'#fffbeb',100:'#fef3c7',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+    },
+    boxShadow:{card:'0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)',elevated:'0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04)'},
+  }}}
+  </script>
+  <style>
+  :root{--fast:150ms cubic-bezier(.4,0,.2,1);--base:200ms cubic-bezier(.4,0,.2,1);--r-card:12px;--r-btn:8px;--r-pill:9999px}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#f8f9fb;color:#2a3040}
+  .card{background:white;border:1px solid #eef0f4;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,.25)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}.btn-primary:disabled{background:#C4B5E8;cursor:not-allowed}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5E8}.btn-secondary:hover{background:#F5F3FF}
+  .btn-ghost{background:transparent;color:#525b6e}.btn-ghost:hover{background:#f3f4f7;color:#2a3040}
+  .btn-submit{background:linear-gradient(135deg,#2e0f5c,#5b21b6);color:white;font-weight:600}.btn-submit:hover{opacity:.92}
+  .btn-lg{padding:14px 28px;font-size:15px;font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#8b94a6}
+  .pbar{height:6px;background:#eef0f4;border-radius:100px;overflow:hidden}.pfill{height:100%;border-radius:100px;transition:width 600ms cubic-bezier(.4,0,.2,1)}
+  .snav{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#6b7488;cursor:pointer;transition:all var(--fast);text-decoration:none}
+  .snav:hover{background:#f3f4f7;color:#2a3040}.snav.snav-on{background:#F5F3FF;color:#5925a8;font-weight:600}
+  .snav svg{width:18px;height:18px;flex-shrink:0}
+
+  /* Tabs */
+  .tab{font-size:13px;font-weight:500;color:#6b7488;padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#2a3040}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+  .tab-ct{font-size:11px;font-weight:600;padding:1px 6px;border-radius:var(--r-pill);background:#f3f4f7;color:#6b7488;margin-left:4px}.tab-on .tab-ct{background:#EDE8F8;color:#5925a8}
+
+  /* Wizard step indicator */
+  .step-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:2px solid #d5d9e2;color:#8b94a6;background:white;transition:all var(--base);flex-shrink:0}
+  .step-dot.step-active{border-color:#5925a8;background:#5925a8;color:white}
+  .step-dot.step-done{border-color:#22c55e;background:#22c55e;color:white}
+  .step-line{flex:1;height:2px;background:#e4e7ed;margin:0 4px;transition:background var(--base)}
+  .step-line.step-line-done{background:#22c55e}
+  .step-label{font-size:11px;font-weight:500;color:#8b94a6;transition:color var(--base);text-align:center;margin-top:4px}
+  .step-label.step-label-active{color:#5925a8;font-weight:600}
+  .step-label.step-label-done{color:#16a34a}
+
+  /* Type card */
+  .type-card{padding:20px;border:1.5px solid #eef0f4;border-radius:var(--r-card);cursor:pointer;transition:all var(--base);background:white}
+  .type-card:hover{border-color:#C4B5E8;background:#f8faff;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .type-card.type-sel{border-color:#5925a8;background:#F5F3FF;box-shadow:0 0 0 3px rgba(89,37,168,.1)}
+
+  /* Target chip */
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r-pill);font-size:13px;font-weight:500;border:1.5px solid #e4e7ed;color:#525b6e;cursor:pointer;transition:all var(--fast);background:white}
+  .chip:hover{border-color:#C4B5E8;background:#f8faff}
+  .chip.chip-sel{border-color:#5925a8;background:#F5F3FF;color:#5925a8}
+
+  /* Input */
+  .inp{width:100%;padding:10px 14px;border:1.5px solid #e4e7ed;border-radius:var(--r-btn);font-size:14px;font-family:inherit;color:#2a3040;background:white;transition:border-color var(--fast);outline:none}
+  .inp:focus{border-color:#5925a8;box-shadow:0 0 0 3px rgba(89,37,168,.1)}
+  .inp::placeholder{color:#b0b7c5}
+  select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b94a6' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+
+  /* Table */
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b94a6;border-bottom:1px solid #eef0f4;white-space:nowrap}
+  .tbl td{padding:12px 16px;border-bottom:1px solid #f3f4f7;vertical-align:middle}
+  .tbl tr:hover td{background:#fcfcfd}
+
+  /* Status pills */
+  .st-active{background:#F5F3FF;color:#4a1d96;border:1px solid #EDE8F8}
+  .st-upcoming{background:#fffbeb;color:#b45309;border:1px solid #fef3c7}
+  .st-complete{background:#f0fdf4;color:#15803d;border:1px solid #dcfce7}
+  .st-late{background:#fef2f2;color:#b91c1c;border:1px solid #fee2e2}
+  .st-done{background:#f0fdf4;color:#15803d;border:1px solid #dcfce7}
+  .st-progress{background:#F5F3FF;color:#4a1d96;border:1px solid #EDE8F8}
+  .st-notstarted{background:#f3f4f7;color:#6b7488;border:1px solid #e4e7ed}
+
+  /* Animation */
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .afs{animation:fadeSlide 300ms cubic-bezier(.4,0,.2,1) both}
+
+  /* Success animation */
+  @keyframes scaleUp{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+  .asc{animation:scaleUp 400ms cubic-bezier(.4,0,.2,1) both}
+
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d5d9e2;border-radius:100px}
+  </style>
+</head>
+<body class="min-h-screen flex">
+
+<!-- ================================================================== -->
+<!-- SIDEBAR (consistent with teacher dashboard)                         -->
+<!-- ================================================================== -->
+<aside class="hidden lg:flex flex-col w-[260px] flex-shrink-0 bg-white border-r border-slate-100 h-screen sticky top-0">
+  <div class="px-5 py-5 border-b border-slate-100 flex items-center gap-2.5">
+    <img src="../brand/logo.svg" alt="MindMosaic" style="height:40px;width:auto;">
+    <span class="pill bg-brand-50 text-brand-600 border border-brand-200 ml-auto text-[10px]">Teacher</span>
+  </div>
+  <div class="px-4 py-3 border-b border-slate-100">
+    <p class="sl mb-2">Class</p>
+    <button class="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-150 text-sm font-medium text-slate-800 hover:bg-slate-75 transition-colors"><span>7A &mdash; Numeracy</span><svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+  </div>
+  <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <a href="teacher-dashboard.html" class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Overview</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Students</a>
+    <a class="snav snav-on"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Assignments</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Analytics</a>
+    <a class="snav"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Insights</a>
+  </nav>
+  <div class="px-4 py-4 border-t border-slate-100">
+    <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">MS</div><div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 truncate">Ms. Sarah Chen</p><p class="text-[11px] text-slate-400">Mathematics</p></div></div>
+  </div>
+</aside>
+
+<!-- ================================================================== -->
+<!-- MAIN                                                                -->
+<!-- ================================================================== -->
+<div class="flex-1 min-w-0 flex flex-col">
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="px-6 lg:px-8 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-[15px] font-semibold text-slate-900">Assignments</h1>
+        <span class="pill bg-slate-50 text-slate-500 border border-slate-150">7A &mdash; Numeracy</span>
+      </div>
+      <button class="btn btn-primary gap-1.5 text-sm" id="btn-new" onclick="W.startCreate()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Assignment</button>
+    </div>
+  </header>
+
+  <main class="flex-1 px-6 lg:px-8 py-6 overflow-y-auto" id="main-area">
+
+    <!-- ============================================================ -->
+    <!-- ASSIGNMENT DASHBOARD VIEW                                     -->
+    <!-- ============================================================ -->
+    <div id="view-dash">
+      <!-- Tabs -->
+      <div class="flex gap-0 mb-6 border-b border-slate-100 -mx-6 lg:-mx-8 px-6 lg:px-8">
+        <button class="tab tab-on" data-dt="active" onclick="W.dashTab(this)">Active<span class="tab-ct">3</span></button>
+        <button class="tab" data-dt="upcoming" onclick="W.dashTab(this)">Upcoming<span class="tab-ct">1</span></button>
+        <button class="tab" data-dt="completed" onclick="W.dashTab(this)">Completed<span class="tab-ct">2</span></button>
+      </div>
+      <div id="dash-content"></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CREATE WIZARD VIEW                                            -->
+    <!-- ============================================================ -->
+    <div id="view-create" style="display:none">
+      <!-- Step indicator -->
+      <div class="max-w-2xl mx-auto mb-8">
+        <div class="flex items-center" id="step-bar"></div>
+        <div class="flex justify-between mt-1" id="step-labels"></div>
+      </div>
+      <!-- Step content -->
+      <div class="max-w-2xl mx-auto" id="step-content"></div>
+      <!-- Navigation -->
+      <div class="max-w-2xl mx-auto mt-8 flex items-center justify-between" id="step-nav"></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TRACKING VIEW                                                 -->
+    <!-- ============================================================ -->
+    <div id="view-track" style="display:none">
+      <div id="track-content"></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SUCCESS VIEW                                                  -->
+    <!-- ============================================================ -->
+    <div id="view-success" style="display:none" class="flex items-center justify-center py-20">
+      <div class="text-center max-w-md asc">
+        <div class="w-16 h-16 rounded-2xl bg-correct-50 border border-correct-200 text-correct-500 flex items-center justify-center mx-auto mb-6"><svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-2">Assignment Published</h2>
+        <p class="text-sm text-slate-500 leading-relaxed mb-6">Your assignment has been created and assigned to the selected students. They will see it in their Learning Hub.</p>
+        <div class="flex items-center justify-center gap-3">
+          <button class="btn btn-primary" onclick="W.showDash()">View Assignments</button>
+          <button class="btn btn-secondary" onclick="W.startCreate()">Create Another</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var views=["dash","create","track","success"];
+function showView(v){views.forEach(function(n){$("view-"+n).style.display=n===v?"":"none"});$("btn-new").style.display=v==="create"||v==="success"?"none":""}
+
+// ── Assignment Data ───────────────────────────────────────────────
+var assignments=[
+  {id:1,title:"Fractions Practice",type:"Practice",target:"All Students",due:"11 Apr 2026",status:"active",completion:42,students:[
+    {name:"Ava Mitchell",status:"done",score:88},{name:"Noah Williams",status:"done",score:76},{name:"Chloe Park",status:"progress",score:null},{name:"Lucas Chen",status:"done",score:82},{name:"Sophie Brown",status:"progress",score:null},{name:"James Lee",status:"notstarted",score:null},{name:"Isabella Nguyen",status:"done",score:70},{name:"Liam Carter",status:"notstarted",score:null},{name:"Priya Sharma",status:"notstarted",score:null},{name:"Jordan Blake",status:"notstarted",score:null},{name:"Olivia Taylor",status:"notstarted",score:null},{name:"Ethan Davis",status:"notstarted",score:null}
+  ]},
+  {id:2,title:"Geometry Diagnostic",type:"Diagnostic",target:"All Students",due:"14 Apr 2026",status:"active",completion:18,students:[]},
+  {id:3,title:"Algebra Quick Check",type:"Skill-based",target:"At-Risk Group",due:"10 Apr 2026",status:"active",completion:67,students:[]},
+  {id:4,title:"NAPLAN Mock Exam",type:"Exam",target:"Selected Students",due:"18 Apr 2026",status:"upcoming",completion:0,students:[]},
+  {id:5,title:"Number Patterns Review",type:"Practice",target:"All Students",due:"1 Apr 2026",status:"completed",completion:100,students:[]},
+  {id:6,title:"Probability Diagnostic",type:"Diagnostic",target:"All Students",due:"28 Mar 2026",status:"completed",completion:96,students:[]},
+];
+
+// ── Dashboard ─────────────────────────────────────────────────────
+var dashFilter="active";
+
+function stPill(s){
+  if(s==="active")return'<span class="pill st-active">Active</span>';
+  if(s==="upcoming")return'<span class="pill st-upcoming">Upcoming</span>';
+  return'<span class="pill st-complete">Completed</span>';
+}
+function compColor(p){if(p>=80)return"text-correct-600";if(p>=40)return"text-brand-600";if(p>0)return"text-warn-600";return"text-slate-300"}
+
+function renderDash(){
+  var filtered=assignments.filter(function(a){return a.status===dashFilter});
+  if(!filtered.length){$("dash-content").innerHTML='<div class="card p-10 text-center"><p class="text-sm text-slate-400">No '+dashFilter+' assignments.</p></div>';return}
+  var h='<div class="space-y-3">';
+  filtered.forEach(function(a){
+    h+='<div class="card p-5 flex items-center gap-5 hover:shadow-elevated transition-shadow">';
+    h+='<div class="flex-1 min-w-0"><div class="flex items-center gap-2 mb-1"><p class="text-sm font-semibold text-slate-800">'+a.title+'</p>'+stPill(a.status)+'</div>';
+    h+='<div class="flex items-center gap-3 text-xs text-slate-400"><span>'+a.type+'</span><span>&middot;</span><span>'+a.target+'</span><span>&middot;</span><span>Due '+a.due+'</span></div></div>';
+    h+='<div class="text-right flex-shrink-0"><p class="text-lg font-bold tabular-nums '+compColor(a.completion)+'">'+a.completion+'%</p><p class="text-[11px] text-slate-400">completed</p></div>';
+    h+='<div class="flex items-center gap-1 flex-shrink-0">';
+    if(a.students.length)h+='<button class="btn btn-ghost text-xs py-1.5 px-2.5" onclick="W.showTrack('+a.id+')"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Track</button>';
+    h+='<button class="btn btn-ghost text-xs py-1.5 px-2.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+    h+='<button class="btn btn-ghost text-xs py-1.5 px-2.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+    h+='</div></div>';
+  });
+  h+='</div>';
+  $("dash-content").innerHTML=h;
+}
+
+// ── Tracking ──────────────────────────────────────────────────────
+function renderTrack(id){
+  var a=assignments.find(function(x){return x.id===id});
+  if(!a)return;
+  var h='<div class="mb-6 flex items-center justify-between"><div><button class="btn btn-ghost text-xs gap-1 mb-2" onclick="W.showDash()"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Back</button><h2 class="text-lg font-semibold text-slate-900">'+a.title+'</h2><p class="text-xs text-slate-400 mt-0.5">'+a.type+' &middot; '+a.target+' &middot; Due '+a.due+'</p></div><div class="text-right"><p class="text-2xl font-bold tabular-nums '+compColor(a.completion)+'">'+a.completion+'%</p><p class="text-xs text-slate-400">completion</p></div></div>';
+
+  var done=a.students.filter(function(s){return s.status==="done"}).length;
+  var prog=a.students.filter(function(s){return s.status==="progress"}).length;
+  var ns=a.students.filter(function(s){return s.status==="notstarted"}).length;
+
+  h+='<div class="grid grid-cols-3 gap-3 mb-6">';
+  h+='<div class="card p-4 text-center"><p class="text-xl font-bold text-correct-600 tabular-nums">'+done+'</p><p class="text-[11px] text-slate-400">Completed</p></div>';
+  h+='<div class="card p-4 text-center"><p class="text-xl font-bold text-brand-600 tabular-nums">'+prog+'</p><p class="text-[11px] text-slate-400">In Progress</p></div>';
+  h+='<div class="card p-4 text-center"><p class="text-xl font-bold '+(ns>0?"text-warn-600":"text-slate-300")+' tabular-nums">'+ns+'</p><p class="text-[11px] text-slate-400">Not Started</p></div>';
+  h+='</div>';
+
+  h+='<div class="card"><div class="px-5 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Student Progress</h3></div><div class="overflow-x-auto"><table class="tbl"><thead><tr><th>Student</th><th>Status</th><th>Score</th></tr></thead><tbody>';
+  a.students.forEach(function(s){
+    var spill='';
+    if(s.status==="done")spill='<span class="pill st-done">Completed</span>';
+    else if(s.status==="progress")spill='<span class="pill st-progress">In Progress</span>';
+    else spill='<span class="pill st-notstarted">Not Started</span>';
+    h+='<tr><td class="font-medium text-slate-800">'+s.name+'</td><td>'+spill+'</td><td class="tabular-nums '+(s.score?compColor(s.score):"text-slate-300")+' font-semibold">'+(s.score?s.score+"%":"&mdash;")+'</td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+  $("track-content").innerHTML=h;
+}
+
+// ── Wizard ────────────────────────────────────────────────────────
+var STEPS=["Type","Target","Configure","Schedule","Review"];
+var wiz={step:0,type:null,topics:[],targetMode:"class",students:"all",qCount:15,difficulty:"mixed",timeLimit:20,attempts:1,startDate:"2026-04-09",dueDate:"2026-04-16",reminders:true};
+
+function renderStepBar(){
+  var bar="",labels="";
+  STEPS.forEach(function(name,i){
+    var cls="step-dot";if(i<wiz.step)cls+=" step-done";else if(i===wiz.step)cls+=" step-active";
+    var ico=i<wiz.step?'<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>':(i+1);
+    bar+='<div class="'+cls+'">'+ico+'</div>';
+    if(i<STEPS.length-1)bar+='<div class="step-line'+(i<wiz.step?" step-line-done":"")+'"></div>';
+    var lcls="step-label";if(i===wiz.step)lcls+=" step-label-active";else if(i<wiz.step)lcls+=" step-label-done";
+    labels+='<div class="'+lcls+'" style="width:'+(100/STEPS.length)+'%">'+name+'</div>';
+  });
+  $("step-bar").innerHTML=bar;
+  $("step-labels").innerHTML=labels;
+}
+
+function renderStep(){
+  renderStepBar();
+  var h="";
+  switch(wiz.step){
+    case 0: h=renderType();break;
+    case 1: h=renderTarget();break;
+    case 2: h=renderConfig();break;
+    case 3: h=renderSchedule();break;
+    case 4: h=renderReview();break;
+  }
+  $("step-content").innerHTML='<div class="afs">'+h+'</div>';
+
+  // Nav
+  var nav='';
+  if(wiz.step>0)nav+='<button class="btn btn-secondary gap-1.5" onclick="W.prevStep()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Back</button>';
+  else nav+='<button class="btn btn-ghost gap-1.5" onclick="W.showDash()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Cancel</button>';
+  if(wiz.step<4)nav+='<button class="btn btn-primary gap-1.5 ml-auto" id="btn-step-next" onclick="W.nextStep()">Continue<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>';
+  else nav+='<button class="btn btn-submit btn-lg gap-2 ml-auto" onclick="W.publish()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>Publish Assignment</button>';
+  $("step-nav").innerHTML=nav;
+}
+
+// Step 1: Type
+function renderType(){
+  var types=[
+    {key:"practice",name:"Practice",desc:"Targeted skill drills for reinforcement and mastery building.",use:"Daily or weekly skill practice"},
+    {key:"diagnostic",name:"Diagnostic",desc:"Broad assessment to identify strengths and gaps across topics.",use:"Start of term or after a teaching unit"},
+    {key:"exam",name:"Exam",desc:"Timed, formal assessment simulating real test conditions.",use:"NAPLAN preparation or end-of-unit tests"},
+    {key:"skill",name:"Skill-based",desc:"Focused drill on a specific weak area identified by analytics.",use:"Targeted intervention for struggling students"},
+  ];
+  var h='<div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-1">Select Assignment Type</h3><p class="text-sm text-slate-500 mb-5">Choose the format that best suits your learning objective.</p><div class="grid sm:grid-cols-2 gap-3">';
+  types.forEach(function(t){
+    var sel=wiz.type===t.key;
+    h+='<div class="type-card'+(sel?" type-sel":"")+'" onclick="W.setType(\''+t.key+'\')">';
+    h+='<div class="flex items-center gap-3 mb-2"><div class="w-9 h-9 rounded-lg '+(sel?"bg-brand-100 text-brand-600":"bg-slate-50 text-slate-400")+' flex items-center justify-center transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">'+(t.key==="practice"?'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>':t.key==="diagnostic"?'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>':t.key==="exam"?'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>':'<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>')+'</svg></div>';
+    h+='<p class="text-sm font-semibold text-slate-800">'+t.name+'</p></div>';
+    h+='<p class="text-xs text-slate-500 leading-relaxed mb-2">'+t.desc+'</p>';
+    h+='<p class="text-[11px] text-slate-400"><span class="font-semibold text-slate-500">Best for:</span> '+t.use+'</p>';
+    h+='</div>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
+// Step 2: Target
+function renderTarget(){
+  var topicList=["Fractions","Geometry","Algebra","Probability","Patterns","Data Interpretation","Decimals","Percentages"];
+  var h='<div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-1">Select Target</h3><p class="text-sm text-slate-500 mb-5">Choose what to assess and who should complete it.</p>';
+
+  // Topic selection
+  h+='<p class="sl mb-3">Topics</p><div class="flex flex-wrap gap-2 mb-6">';
+  topicList.forEach(function(t){
+    var sel=wiz.topics.indexOf(t)>-1;
+    h+='<button class="chip'+(sel?" chip-sel":"")+'" onclick="W.toggleTopic(\''+t+'\')">'+t+'</button>';
+  });
+  h+='</div>';
+
+  // Auto-suggest
+  h+='<div class="rounded-lg bg-warn-50 border border-warn-100 p-3 mb-6 flex items-start gap-3"><div class="w-6 h-6 rounded-md bg-warn-100 text-warn-600 flex items-center justify-center flex-shrink-0 mt-0.5"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div><div><p class="text-xs font-semibold text-warn-700 mb-0.5">Suggested Focus</p><p class="text-xs text-slate-600">Based on class analytics, <span class="font-semibold">Fractions</span> and <span class="font-semibold">Data Interpretation</span> are the weakest areas and would benefit from targeted practice.</p></div></div>';
+
+  // Assign to
+  h+='<p class="sl mb-3">Assign To</p><div class="space-y-2 mb-2">';
+  var targets=[{key:"class",label:"Entire Class (28 students)"},{key:"risk",label:"At-Risk Students (3)"},{key:"custom",label:"Custom Selection"}];
+  targets.forEach(function(t){
+    var sel=wiz.targetMode===t.key;
+    h+='<label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all '+(sel?"border-brand-300 bg-brand-50":"border-slate-100 hover:border-slate-200")+'" onclick="W.setTarget(\''+t.key+'\')">';
+    h+='<div class="w-5 h-5 rounded-full border-2 flex items-center justify-center '+(sel?"border-brand-500":"border-slate-300")+'">'+(sel?'<div class="w-2.5 h-2.5 rounded-full bg-brand-500"></div>':"")+'</div>';
+    h+='<span class="text-sm '+(sel?"text-brand-700 font-medium":"text-slate-600")+'">'+t.label+'</span></label>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
+// Step 3: Configure
+function renderConfig(){
+  var h='<div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-1">Configuration</h3><p class="text-sm text-slate-500 mb-5">Set the parameters for this assignment.</p>';
+  h+='<div class="grid sm:grid-cols-2 gap-4">';
+  h+='<div><label class="sl block mb-2">Number of Questions</label><select class="inp" onchange="wiz.qCount=parseInt(this.value)"><option value="10"'+(wiz.qCount===10?" selected":"")+'>10 questions</option><option value="15"'+(wiz.qCount===15?" selected":"")+'>15 questions</option><option value="20"'+(wiz.qCount===20?" selected":"")+'>20 questions</option><option value="25"'+(wiz.qCount===25?" selected":"")+'>25 questions</option></select></div>';
+  h+='<div><label class="sl block mb-2">Difficulty</label><select class="inp" onchange="wiz.difficulty=this.value"><option value="easy"'+(wiz.difficulty==="easy"?" selected":"")+'>Easy</option><option value="mixed"'+(wiz.difficulty==="mixed"?" selected":"")+'>Mixed (Recommended)</option><option value="hard"'+(wiz.difficulty==="hard"?" selected":"")+'>Hard</option><option value="adaptive"'+(wiz.difficulty==="adaptive"?" selected":"")+'>Adaptive</option></select></div>';
+  h+='<div><label class="sl block mb-2">Time Limit (minutes)</label><select class="inp" onchange="wiz.timeLimit=parseInt(this.value)"><option value="0">No limit</option><option value="10">10 min</option><option value="15">15 min</option><option value="20"'+(wiz.timeLimit===20?" selected":"")+'>20 min</option><option value="30">30 min</option><option value="40">40 min</option></select></div>';
+  h+='<div><label class="sl block mb-2">Attempts Allowed</label><select class="inp" onchange="wiz.attempts=parseInt(this.value)"><option value="1"'+(wiz.attempts===1?" selected":"")+'>1 attempt</option><option value="2">2 attempts</option><option value="3">3 attempts</option><option value="0">Unlimited</option></select></div>';
+  h+='</div></div>';
+  return h;
+}
+
+// Step 4: Schedule
+function renderSchedule(){
+  var h='<div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-1">Schedule</h3><p class="text-sm text-slate-500 mb-5">Set when this assignment becomes available and when it is due.</p>';
+  h+='<div class="grid sm:grid-cols-2 gap-4 mb-5">';
+  h+='<div><label class="sl block mb-2">Start Date</label><input type="date" class="inp" value="'+wiz.startDate+'" onchange="wiz.startDate=this.value"/></div>';
+  h+='<div><label class="sl block mb-2">Due Date</label><input type="date" class="inp" value="'+wiz.dueDate+'" onchange="wiz.dueDate=this.value"/></div>';
+  h+='</div>';
+  h+='<label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" class="w-4 h-4 accent-brand-500" '+(wiz.reminders?"checked":"")+' onchange="wiz.reminders=this.checked"/><span class="text-sm text-slate-700">Send reminders to students who have not started 2 days before the due date</span></label>';
+  h+='</div>';
+  return h;
+}
+
+// Step 5: Review
+function renderReview(){
+  var typeNames={practice:"Practice",diagnostic:"Diagnostic",exam:"Exam",skill:"Skill-based"};
+  var targetNames={class:"Entire Class (28)",risk:"At-Risk Students (3)",custom:"Custom Selection"};
+  var diffNames={easy:"Easy",mixed:"Mixed",hard:"Hard",adaptive:"Adaptive"};
+  var h='<div class="card overflow-hidden"><div class="h-1 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div><div class="p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-1">Review Assignment</h3><p class="text-sm text-slate-500 mb-5">Confirm the details before publishing.</p>';
+  h+='<div class="space-y-4">';
+  var rows=[
+    ["Type",typeNames[wiz.type]||"Not selected"],
+    ["Topics",wiz.topics.length?wiz.topics.join(", "):"None selected"],
+    ["Assign To",targetNames[wiz.targetMode]],
+    ["Questions",wiz.qCount+" questions"],
+    ["Difficulty",diffNames[wiz.difficulty]],
+    ["Time Limit",wiz.timeLimit?wiz.timeLimit+" minutes":"No limit"],
+    ["Attempts",wiz.attempts===0?"Unlimited":wiz.attempts],
+    ["Available",wiz.startDate+" to "+wiz.dueDate],
+    ["Reminders",wiz.reminders?"Enabled":"Disabled"],
+  ];
+  rows.forEach(function(r){
+    h+='<div class="flex items-center justify-between py-2 border-b border-slate-75"><span class="text-sm text-slate-500">'+r[0]+'</span><span class="text-sm font-medium text-slate-800">'+r[1]+'</span></div>';
+  });
+  h+='</div></div></div>';
+  return h;
+}
+
+// ── Exports ───────────────────────────────────────────────────────
+window.wiz=wiz;
+window.W={
+  showDash:function(){showView("dash");renderDash()},
+  dashTab:function(el){
+    el.parentElement.querySelectorAll(".tab").forEach(function(t){t.classList.remove("tab-on")});
+    el.classList.add("tab-on");
+    dashFilter=el.dataset.dt;
+    renderDash();
+  },
+  showTrack:function(id){showView("track");renderTrack(id)},
+  startCreate:function(){wiz.step=0;wiz.type=null;wiz.topics=[];wiz.targetMode="class";showView("create");renderStep()},
+  setType:function(t){wiz.type=t;renderStep()},
+  toggleTopic:function(t){var i=wiz.topics.indexOf(t);if(i>-1)wiz.topics.splice(i,1);else wiz.topics.push(t);renderStep()},
+  setTarget:function(t){wiz.targetMode=t;renderStep()},
+  nextStep:function(){if(wiz.step===0&&!wiz.type)return;if(wiz.step<4){wiz.step++;renderStep()}},
+  prevStep:function(){if(wiz.step>0){wiz.step--;renderStep()}},
+  publish:function(){showView("success")},
+};
+
+// Init
+renderDash();
+})();
+</script>
+</body>
+</html>

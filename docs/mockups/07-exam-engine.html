@@ -1,0 +1,523 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>MindMosaic — Assessment</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
+  <script>
+  tailwind.config={theme:{extend:{
+    fontFamily:{sans:['"DM Sans"','system-ui','sans-serif'],serif:['"DM Serif Display"','Georgia','serif']},
+    colors:{
+      brand:{50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#3b1584',800:'#2e0f5c',900:'#1E1B4B'},
+      slate:{25:'#FDFCFE',50:'#FAF8FF',75:'#F0EDF8',100:'#E9E5F5',150:'#D6D0E8',200:'#D6D0E8',300:'#A8A0C0',400:'#A8A0C0',500:'#7C7399',600:'#3B3566',700:'#3B3566',800:'#1E1B4B',900:'#1E1B4B',950:'#0e1118'},
+      correct:{50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',500:'#22c55e',600:'#16a34a',700:'#15803d'},
+      incorrect:{50:'#fef2f2',100:'#fee2e2',200:'#fecaca',500:'#ef4444',600:'#dc2626',700:'#b91c1c'},
+      warn:{50:'#fffbeb',100:'#fef3c7',200:'#fde68a',500:'#f59e0b',600:'#d97706',700:'#b45309'},
+    },
+    boxShadow:{card:'0 0 0 1px rgba(30,27,75,.03),0 1px 2px rgba(89,37,168,.04),0 4px 12px -4px rgba(89,37,168,.06)',elevated:'0 8px 24px rgba(89,37,168,.1),0 2px 6px rgba(89,37,168,.06)'},
+  }}}
+  </script>
+  <style>
+  :root {
+    --fast: 150ms cubic-bezier(.4,0,.2,1);
+    --base: 200ms cubic-bezier(.4,0,.2,1);
+    --slow: 400ms cubic-bezier(.4,0,.2,1);
+    --r-card: 12px;
+    --r-pill: 9999px;
+    --r-btn: 8px;
+    --r-opt: 10px;
+    --radius-card: 12px;
+    --radius-pill: 9999px;
+    --radius-button: 8px;
+    --transition-fast: var(--fast);
+    --transition-base: var(--base);
+    --transition-slow: 400ms cubic-bezier(0.4,0,0.2,1);
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'DM Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF8FF;color:#1E1B4B}
+  .card{background:white;border:1px solid #E9E5F5;border-radius:var(--r-card);box-shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.02)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:14px;line-height:1;border-radius:var(--r-btn);padding:10px 18px;transition:all var(--fast);cursor:pointer;border:none;outline:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(89,37,168,.25)}
+  .btn-primary{background:#5925a8;color:white}.btn-primary:hover{background:#4a1d96}.btn-primary:disabled{background:#C4B5FD;cursor:not-allowed}
+  .btn-secondary{background:white;color:#5925a8;border:1.5px solid #C4B5FD}.btn-secondary:hover{background:#F5F3FF}
+  .btn-secondary:disabled{color:#C4B5FD;border-color:#EDE9FE;cursor:not-allowed}
+  .btn-ghost{background:transparent;color:#3B3566}.btn-ghost:hover{background:#F0EDF8;color:#1E1B4B}
+  .btn-submit{background:linear-gradient(160deg,#6d35c4 0%,#5925a8 45%,#4a1d96 100%);color:white;font-weight:600;box-shadow:0 2px 8px rgba(89,37,168,.28)}.btn-submit:hover{background:linear-gradient(160deg,#5925a8 0%,#4a1d96 45%,#3b1584 100%);box-shadow:0 4px 16px rgba(89,37,168,.36)}
+  .btn-exit{background:white;color:#7C7399;border:1.5px solid #D6D0E8;font-weight:500}.btn-exit:hover{background:#F0EDF8;border-color:#A8A0C0;color:#3B3566}
+  .btn-lg{padding:14px 28px;font-size:15px;font-weight:600}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:4px 12px;border-radius:var(--r-pill);line-height:1.4}
+  .sl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#A8A0C0}
+  .nav-link{font-size:14px;font-weight:500;color:#7C7399;padding:6px 12px;border-radius:6px;transition:all var(--fast);text-decoration:none}.nav-link:hover{color:#1E1B4B;background:#F0EDF8}.nav-link-active{color:#5925a8;background:#F5F3FF}
+
+  .pbar{height:3px;background:linear-gradient(90deg,#E9E5F5,#D6D0E8);overflow:hidden}.pfill{height:100%;transition:width var(--slow);background:linear-gradient(90deg,#5a8ef5,#5925a8)}
+  .pbar-lg{height:6px;border-radius:100px}.pbar-lg .pfill{border-radius:100px}
+
+  .opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 18px;border:1.5px solid #E9E5F5;border-radius:var(--r-opt);background:white;font-size:15px;line-height:1.45;color:#1E1B4B;cursor:pointer;transition:all var(--base);outline:none}
+  .opt:hover:not(.opt-lock){border-color:#C4B5FD;background:#FAF9FE;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .opt:focus-visible:not(.opt-lock){border-color:#5925a8;box-shadow:0 0 0 3px rgba(89,37,168,.15)}
+  .opt.opt-sel{border-color:#5925a8;background:#F5F3FF;box-shadow:0 0 0 3px rgba(89,37,168,.1)}
+  .opt.opt-lock{cursor:default;pointer-events:none}
+  .opt.opt-ok{border-color:#22c55e;background:#f0fdf4;box-shadow:0 0 0 3px rgba(34,197,94,.12)}
+  .opt.opt-no{border-color:#ef4444;background:#fef2f2;box-shadow:0 0 0 3px rgba(239,68,68,.12)}
+  .opt.opt-dim{opacity:.45}
+  .ol{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;transition:all var(--base);background:#F0EDF8;color:#7C7399}
+  .opt-sel .ol{background:#5925a8;color:white}.opt-ok .ol{background:#22c55e;color:white}.opt-no .ol{background:#ef4444;color:white}
+
+  .qd{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;transition:all var(--fast);border:1.5px solid #D6D0E8;background:white;color:#A8A0C0;position:relative}
+  .qd:hover{border-color:#C4B5FD;background:#FAF9FE}
+  .qd.qd-cur{border-color:#5925a8;background:#EDE9FE;color:#4a1d96;box-shadow:0 0 0 3px rgba(89,37,168,.12)}
+  .qd.qd-ans{background:#5925a8;border-color:#5925a8;color:white}
+  .qd.qd-ans.qd-cur{box-shadow:0 0 0 3px rgba(89,37,168,.3)}
+  .qd.qd-flag{border-color:#d97706}
+  .qd.qd-flag::after{content:'';position:absolute;top:1px;right:1px;width:8px;height:8px;background:#f59e0b;border-radius:50%;border:1.5px solid white}
+  .qd.qd-ans.qd-flag::after{background:#f59e0b}
+  .qd.qd-ok{background:#22c55e;border-color:#22c55e;color:white}.qd.qd-no{background:#ef4444;border-color:#ef4444;color:white}.qd.qd-skip{background:#F0EDF8;border-color:#D6D0E8;color:#A8A0C0}
+
+  .flag-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:#A8A0C0;padding:5px 10px;border-radius:6px;border:1px solid transparent;background:none;cursor:pointer;transition:all var(--fast)}
+  .flag-btn:hover{background:#fffbeb;color:#d97706;border-color:#fde68a}
+  .flag-btn.flagged{background:#fffbeb;color:#d97706;border-color:#fde68a}
+
+  .mbg{position:fixed;inset:0;z-index:200;background:rgba(14,17,24,.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity var(--base)}
+  .mbg.open{opacity:1;pointer-events:auto}
+  .mbox{background:white;border-radius:16px;box-shadow:0 24px 48px rgba(0,0,0,.12);max-width:520px;width:100%;padding:0;transform:scale(.95);transition:transform var(--base);overflow:hidden}
+  .mbg.open .mbox{transform:scale(1)}
+
+  .fb-ok{background:#f0fdf4;border:1px solid #dcfce7;border-radius:var(--r-card);padding:14px 18px}
+  .fb-no{background:#fef2f2;border:1px solid #fee2e2;border-radius:var(--r-card);padding:14px 18px}
+
+  .tab{font-size:13px;font-weight:500;color:#7C7399;padding:8px 14px;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;transition:all var(--fast)}.tab:hover{color:#1E1B4B}.tab.tab-on{color:#5925a8;border-bottom-color:#5925a8}
+  .tab-ct{font-size:11px;font-weight:600;padding:1px 6px;border-radius:var(--r-pill);background:#F0EDF8;color:#7C7399;margin-left:4px}.tab-on .tab-ct{background:#EDE9FE;color:#5925a8}
+
+  .acc-trg{cursor:pointer;display:flex;align-items:center;width:100%;text-align:left;padding:14px 18px;border:none;background:none;gap:12px;transition:background var(--fast)}.acc-trg:hover{background:#FDFCFE}
+  .acc-body{max-height:0;overflow:hidden;transition:max-height 300ms cubic-bezier(.4,0,.2,1),padding 300ms}.acc-body.acc-on{max-height:700px;padding:0 18px 18px 18px}
+  .acc-chev{transition:transform var(--base);flex-shrink:0}.acc-trg-on .acc-chev{transform:rotate(180deg)}
+
+  .sring{position:relative;display:flex;align-items:center;justify-content:center}.sring svg{position:absolute;top:0;left:0;width:100%;height:100%;transform:rotate(-90deg)}.sring circle{fill:none;stroke-linecap:round}.sring .trk{stroke:#E9E5F5;stroke-width:5}.sring .fl{stroke-width:5;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+
+  .media-wrap{position:relative;background:#FAF8FF;border:1px solid #E9E5F5;border-radius:var(--r-card);overflow:hidden;display:flex;align-items:center;justify-content:center;min-height:140px;max-height:280px}
+  .media-wrap svg,.media-wrap img{max-width:100%;max-height:260px;transition:transform var(--base)}
+  .zoom-ctrl{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;background:white;border:1px solid #E9E5F5;border-radius:8px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .zoom-btn{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;background:none;color:#7C7399;transition:all var(--fast);font-size:14px;font-weight:600}
+  .zoom-btn:hover{background:#F0EDF8;color:#1E1B4B}
+
+  .timer{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:#7C7399;padding:4px 10px;border-radius:6px;border:1px solid #E9E5F5;background:#FAF8FF}
+  .timer.timer-warn{color:#d97706;background:#fffbeb;border-color:#fde68a}
+  .timer.timer-danger{color:#dc2626;background:#fef2f2;border-color:#fecaca}
+
+  @keyframes fadeSlide{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes scaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .afs{animation:fadeSlide 350ms cubic-bezier(.4,0,.2,1) both}.asc{animation:scaleIn 250ms cubic-bezier(.4,0,.2,1) both}
+  .d1{animation-delay:60ms}.d2{animation-delay:120ms}.d3{animation-delay:180ms}.d4{animation-delay:240ms}
+  .phase{transition:opacity 400ms ease,transform 400ms ease}.phase-out{opacity:0;transform:translateY(-6px);pointer-events:none}.phase-in{opacity:1;transform:translateY(0)}
+
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#D6D0E8;border-radius:100px}
+  
+    /* Link reset for clickable cards */
+    a.card, a.card-interactive { text-decoration: none; color: inherit; display: block; }
+      
+    /* ── Cross-file Shared Classes ── */
+    .section-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #A8A0C0;
+    }
+    .table-row { transition: background 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .table-row:hover { background: #FAF8FF; }
+  
+    /* ── Premium Interaction Polish ── */
+    .btn { transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+    .btn:active { transform: scale(0.97); }
+    
+    /* Clickable row cue */
+    tr.table-row { cursor: pointer; }
+    tr.table-row td:last-child svg { transition: transform 150ms ease, color 150ms ease; }
+    tr.table-row:hover td:last-child svg { transform: translateX(2px); color: #7C7399; }
+    
+    /* Card link hover enhancement */
+    a.card:hover, a.card-interactive:hover { text-decoration: none; }
+    
+    /* Focus visible for accessibility */
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid #5925a8;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    
+    /* Smooth page transitions feel */
+    main { animation: fadeIn 300ms ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+<!-- ================================================================== -->
+<!-- START SCREEN                                                        -->
+<!-- ================================================================== -->
+<div id="phase-start" class="phase phase-in flex-1 flex items-center justify-center p-6">
+  <div class="max-w-lg w-full">
+    <div class="flex items-center justify-center gap-2.5 mb-8">
+      <img src="../brand/logo.svg" alt="MindMosaic" style="height:36px;width:auto;">
+    </div>
+    <div class="card overflow-hidden afs">
+      <div class="h-1.5 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div>
+      <div class="p-8 sm:p-10">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-12 h-12 rounded-xl bg-brand-50 border border-brand-200 text-brand-500 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <div>
+            <h1 class="text-lg font-semibold text-slate-900 tracking-tight">NAPLAN Practice &mdash; Numeracy</h1>
+            <p class="text-xs text-slate-400 mt-0.5">Year 7 &middot; Number &amp; Algebra, Measurement &amp; Geometry, Statistics &amp; Probability</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">25</p><p class="text-[11px] text-slate-400 font-medium">Questions</p></div>
+          <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">40 min</p><p class="text-[11px] text-slate-400 font-medium">Suggested</p></div>
+          <div class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center"><p class="text-lg font-bold text-slate-800 tabular-nums">Year 7</p><p class="text-[11px] text-slate-400 font-medium">Level</p></div>
+        </div>
+        <div class="rounded-xl bg-slate-50 border border-slate-100 p-5 mb-8">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Assessment Guidelines</p>
+          <div class="space-y-2.5 text-[13px] text-slate-600 leading-relaxed">
+            <div class="flex items-start gap-2.5"><div class="w-5 h-5 rounded-full bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">1</div><p>Read each question carefully and select the response that best matches your reasoning.</p></div>
+            <div class="flex items-start gap-2.5"><div class="w-5 h-5 rounded-full bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">2</div><p>You may move between questions, update responses, and review flagged items before submission.</p></div>
+            <div class="flex items-start gap-2.5"><div class="w-5 h-5 rounded-full bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">3</div><p>Visual content such as diagrams or charts can be enlarged where available.</p></div>
+            <div class="flex items-start gap-2.5"><div class="w-5 h-5 rounded-full bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0 mt-0.5 text-[10px] font-bold">4</div><p>Your results, explanations, and next steps will be available immediately after submission.</p></div>
+          </div>
+        </div>
+        <button class="btn btn-submit btn-lg w-full text-[15px]" onclick="E.start()">Start Assessment <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- EXAM PLAYER                                                         -->
+<!-- ================================================================== -->
+<div id="phase-exam" class="phase phase-out flex-1 flex flex-col" style="display:none">
+  <header class="sticky top-0 z-50 bg-white border-b border-slate-100">
+    <div class="pbar w-full"><div class="pfill" id="hdr-p" style="width:0%"></div></div>
+    <div class="max-w-[960px] mx-auto px-4 sm:px-6 h-[52px] flex items-center justify-between gap-3">
+      <button class="btn btn-exit text-xs py-1.5 px-3 gap-1.5" onclick="E.modal('exit')"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Exit</button>
+      <div class="text-center flex-1 min-w-0">
+        <p class="text-[13px] font-semibold text-slate-800 truncate" id="hdr-topic">NAPLAN Practice &mdash; Numeracy</p>
+        <p class="text-[11px] text-slate-400 font-medium tabular-nums mt-0.5" id="hdr-ans"></p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="timer" id="timer"><svg class="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span id="timer-val">40:00</span></div>
+        <button class="btn btn-ghost p-1.5 rounded-lg lg:hidden" onclick="E.toggleMap()"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="hidden lg:flex flex-col w-[240px] flex-shrink-0 bg-white border-r border-slate-100 overflow-y-auto">
+      <div class="p-4 pb-3 border-b border-slate-100"><p class="sl">Questions</p></div>
+      <div class="p-4 flex-1"><div id="side-map" class="grid grid-cols-5 gap-2"></div></div>
+      <div class="p-4 border-t border-slate-100 space-y-3">
+        <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px] text-slate-400">
+          <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded bg-brand-500"></div>Answered</div>
+          <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded border-2 border-brand-400 bg-brand-50"></div>Current</div>
+          <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded border border-slate-200"></div>Unanswered</div>
+          <div class="flex items-center gap-2"><div class="w-3.5 h-3.5 rounded border border-warn-500 relative"><span class="absolute -top-px -right-px w-1.5 h-1.5 bg-warn-500 rounded-full"></span></div>Flagged</div>
+        </div>
+        <button class="btn btn-submit w-full text-sm py-2.5 gap-2" id="side-submit" onclick="E.handleSubmit()">Review &amp; Submit</button>
+      </div>
+    </aside>
+
+    <!-- Mobile map overlay -->
+    <div id="mob-map-bg" class="mbg lg:hidden" onclick="if(event.target===this)E.toggleMap()">
+      <div class="mbox p-6 max-w-sm" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4"><p class="text-sm font-semibold text-slate-900">Questions</p><button class="btn btn-ghost p-1.5" onclick="E.toggleMap()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+        <div id="mob-map" class="grid grid-cols-5 gap-2 mb-4"></div>
+        <button class="btn btn-submit w-full text-sm py-2.5" onclick="E.toggleMap();E.handleSubmit()">Review &amp; Submit</button>
+      </div>
+    </div>
+
+    <!-- Question area -->
+    <main class="flex-1 overflow-y-auto" id="q-scroll">
+      <div class="max-w-[680px] mx-auto px-5 sm:px-6 pt-6 pb-28">
+        <div id="q-ctx" class="mb-4 hidden"><div class="rounded-lg bg-slate-50 border border-slate-100 px-4 py-3"><p class="sl mb-1">Context</p><p class="text-sm text-slate-600 leading-relaxed" id="q-ctx-t"></p></div></div>
+        <div id="q-media" class="mb-4 hidden"><div class="media-wrap" id="media-inner"><div id="media-content"></div><div class="zoom-ctrl"><button class="zoom-btn" onclick="E.zoom(-1)" title="Zoom out">&minus;</button><button class="zoom-btn" onclick="E.zoom(0)" title="Reset">&#x21BB;</button><button class="zoom-btn" onclick="E.zoom(1)" title="Zoom in">+</button></div></div></div>
+        <div class="mb-6">
+          <div class="flex items-center gap-3 mb-3">
+            <p class="sl" id="q-lbl"></p>
+            <button class="flag-btn ml-auto" id="flag-btn" onclick="E.toggleFlag()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg><span id="flag-label">Flag</span></button>
+          </div>
+          <h2 class="text-[20px] sm:text-[22px] font-semibold text-slate-900 leading-snug tracking-tight" id="q-txt"></h2>
+        </div>
+        <div id="q-opts" class="space-y-2.5" role="radiogroup"></div>
+        <div id="q-fb" class="mt-5 hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Sticky footer -->
+  <div class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-100" id="exam-footer">
+    <div class="max-w-[680px] mx-auto px-5 sm:px-6 h-[64px] flex items-center justify-between">
+      <button class="btn btn-secondary gap-1.5 text-sm" id="btn-prev" onclick="E.nav(-1)"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Previous</button>
+      <div class="flex items-center gap-2 text-xs text-slate-400 tabular-nums" id="ft-status"></div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-primary gap-1.5 text-sm" id="btn-next" onclick="E.nav(1)">Next<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+        <button class="btn btn-submit gap-1.5 text-sm hidden" id="btn-ft-submit" onclick="E.handleSubmit()">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- TRANSITION                                                          -->
+<!-- ================================================================== -->
+<div id="phase-trans" class="phase phase-out flex-1 flex items-center justify-center" style="display:none">
+  <div class="text-center max-w-sm px-6">
+    <div class="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-8"><svg class="w-7 h-7 text-brand-500" style="animation:spin 1.2s linear infinite" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>
+    <h2 class="text-xl font-semibold text-slate-900 tracking-tight mb-2">Evaluating your performance</h2>
+    <p class="text-sm text-slate-500 leading-relaxed mb-8">Analysing your responses and preparing a detailed breakdown.</p>
+    <div class="pbar pbar-lg w-full max-w-xs mx-auto"><div class="pfill" id="trans-bar" style="width:0%"></div></div>
+    <p class="text-[11px] text-slate-400 mt-3" id="trans-lbl">Processing...</p>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- RESULTS                                                             -->
+<!-- ================================================================== -->
+<div id="phase-results" class="phase phase-out flex-1 flex flex-col" style="display:none">
+  <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+    <div class="max-w-[1360px] mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-10"><a href="dashboard.html" class="flex items-center gap-2.5" aria-label="MindMosaic home"><img src="../brand/logo.svg" alt="MindMosaic" style="height:36px;width:auto;"></a><nav class="hidden md:flex items-center gap-1"><a href="dashboard.html" class="nav-link">Dashboard</a><a href="learn.html" class="nav-link">Learn</a><a href="session-selection.html" class="nav-link">Practice</a><a href="student-assignments.html" class="nav-link">Assignments</a><a href="results.html" class="nav-link nav-link-active">Results</a></nav></div>
+      <button class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-50 transition-colors"><div class="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center text-sm font-semibold">V</div><div class="hidden sm:block text-left"><p class="text-sm font-medium text-slate-800 leading-none">Vish</p><p class="text-[11px] text-slate-400 mt-0.5">Year 7</p></div></button>
+    </div>
+  </header>
+  <main class="max-w-[1360px] mx-auto px-6 lg:px-8 pb-24 flex-1" id="res-root"></main>
+</div>
+
+<!-- ================================================================== -->
+<!-- MODALS                                                              -->
+<!-- ================================================================== -->
+<div id="modal-review" class="mbg" onclick="if(event.target===this)E.closeModal('review')">
+  <div class="mbox max-w-lg" onclick="event.stopPropagation()">
+    <div class="h-1 bg-gradient-to-r from-brand-400 via-brand-500 to-brand-700"></div>
+    <div class="p-6 pb-5 border-b border-slate-100"><h3 class="text-lg font-semibold text-slate-900 mb-1">Review Before Submitting</h3><p class="text-sm text-slate-500">Check your progress before final submission.</p></div>
+    <div class="p-6 space-y-4" id="review-body"></div>
+    <div class="p-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+      <button class="btn btn-secondary flex-1" onclick="E.closeModal('review')">Continue Assessment</button>
+      <button class="btn btn-submit flex-1 btn-lg" onclick="E.submit()">Submit Assessment</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-exit" class="mbg" onclick="if(event.target===this)E.closeModal('exit')">
+  <div class="mbox p-0 max-w-sm" onclick="event.stopPropagation()">
+    <div class="h-1 bg-gradient-to-r from-warn-500 to-warn-600"></div>
+    <div class="p-8 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-warn-50 text-warn-500 flex items-center justify-center mx-auto mb-5"><svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <h3 class="text-lg font-semibold text-slate-900 mb-2">Leave This Assessment?</h3>
+      <div class="text-sm text-slate-500 leading-relaxed space-y-2 mb-6 text-left">
+        <p>Your current progress will be saved and you may be able to resume from the Learning Hub.</p>
+        <p>Please note this attempt may still be counted. Unanswered questions at the time of exit will not be scored.</p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button class="btn btn-secondary flex-1" onclick="E.closeModal('exit')">Cancel</button>
+        <a href="learn.html" class="btn flex-1 bg-warn-500 text-white hover:bg-warn-600 font-semibold">Save &amp; Exit</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- ENGINE                                                              -->
+<!-- ================================================================== -->
+<script>
+(function(){
+"use strict";
+var L=["A","B","C","D"],$=function(id){return document.getElementById(id)};
+var EXAM_TIME=40*60; // 40 minutes in seconds
+
+var questions=[
+  {id:1,text:"What is the value of 3\u00B2 + 4\u00B2?",ctx:null,media:null,topic:"Number & Algebra",skill:"Indices",opts:["25","12","7","49"],ci:0,expl:"3\u00B2 = 9 and 4\u00B2 = 16. Adding: 9 + 16 = 25.",tip:"Indices apply to the base number only."},
+  {id:2,text:"Simplify: 2(3x + 4) \u2212 5x",ctx:null,media:null,topic:"Number & Algebra",skill:"Algebraic Expressions",opts:["x + 8","11x + 8","x + 4","6x + 8"],ci:0,expl:"Expand: 6x + 8 \u2212 5x = x + 8.",tip:"Expand brackets first, then collect like terms."},
+  {id:3,text:"What is the perimeter of this rectangle?",ctx:null,media:'<svg viewBox="0 0 280 180" xmlns="http://www.w3.org/2000/svg"><rect x="40" y="30" width="200" height="120" fill="none" stroke="#5925a8" stroke-width="2" rx="2"/><text x="140" y="22" text-anchor="middle" font-size="13" fill="#1E1B4B" font-weight="600">12 cm</text><text x="140" y="168" text-anchor="middle" font-size="13" fill="#1E1B4B" font-weight="600">12 cm</text><text x="18" y="95" text-anchor="middle" font-size="13" fill="#1E1B4B" font-weight="600" transform="rotate(-90,18,95)">8 cm</text><text x="262" y="95" text-anchor="middle" font-size="13" fill="#1E1B4B" font-weight="600" transform="rotate(90,262,95)">8 cm</text></svg>',topic:"Measurement & Geometry",skill:"Perimeter",opts:["96 cm","20 cm","40 cm","48 cm"],ci:2,expl:"Perimeter = 2(12 + 8) = 40 cm.",tip:null},
+  {id:4,text:"What is \u00B3\u2044\u2085 of 45?",ctx:null,media:null,topic:"Number & Algebra",skill:"Fractions",opts:["15","27","30","9"],ci:1,expl:"\u00B3\u2044\u2085 \u00D7 45 = 3 \u00D7 9 = 27.",tip:"Divide by the denominator first, then multiply."},
+  {id:5,text:"Convert 0.625 to a fraction in simplest form.",ctx:null,media:null,topic:"Number & Algebra",skill:"Fractions",opts:["3/10","3/8","5/12","7/20"],ci:1,expl:"0.625 = 625/1000 = 5/8.",tip:"Place over 1000 and simplify by the GCF."},
+  {id:6,text:"Based on the diagram, what is the largest angle?",ctx:"The angles of a triangle are in the ratio 2:3:4.",media:'<svg viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg"><polygon points="130,20 30,180 230,180" fill="none" stroke="#5925a8" stroke-width="2"/><text x="130" y="15" text-anchor="middle" font-size="12" fill="#A8A0C0">2x</text><text x="20" y="195" font-size="12" fill="#A8A0C0">3x</text><text x="240" y="195" font-size="12" fill="#A8A0C0">4x</text><text x="130" y="120" text-anchor="middle" font-size="11" fill="#A8A0C0">Sum = 180\u00B0</text></svg>',topic:"Measurement & Geometry",skill:"Angles",opts:["60\u00B0","80\u00B0","90\u00B0","100\u00B0"],ci:1,expl:"Sum = 180\u00B0. Largest = (4/9) \u00D7 180 = 80\u00B0.",tip:null},
+  {id:7,text:"What is the mean of 12, 15, 18, 21, and 24?",ctx:null,media:null,topic:"Statistics & Probability",skill:"Averages",opts:["18","15","21","90"],ci:0,expl:"Sum = 90. Mean = 90 \u00F7 5 = 18.",tip:null},
+  {id:8,text:"What is the sale price after a 15% discount?",ctx:"A clothing store is running an end-of-season sale. A shirt originally costs $40.",media:null,topic:"Number & Algebra",skill:"Percentages",opts:["$34","$25","$38","$6"],ci:0,expl:"15% of $40 = $6. Sale price = $34.",tip:"Find the percentage amount, then subtract."},
+  {id:9,text:"What is the next number in this sequence: 2, 6, 18, 54, ...?",ctx:null,media:null,topic:"Number & Algebra",skill:"Patterns",opts:["72","108","162","216"],ci:2,expl:"Each term is multiplied by 3. 54 \u00D7 3 = 162.",tip:null},
+  {id:10,text:"Express 7/20 as a percentage.",ctx:null,media:null,topic:"Number & Algebra",skill:"Percentages",opts:["35%","70%","3.5%","14%"],ci:0,expl:"7/20 = 0.35 = 35%.",tip:null},
+  {id:11,text:"What is the volume of this cube?",ctx:null,media:'<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><path d="M60,140 L60,60 L120,30 L180,60 L180,140 L120,170 Z" fill="none" stroke="#5925a8" stroke-width="2"/><path d="M60,60 L120,90 L180,60" fill="none" stroke="#5925a8" stroke-width="1.5" stroke-dasharray="4"/><path d="M120,90 L120,170" fill="none" stroke="#5925a8" stroke-width="1.5" stroke-dasharray="4"/><text x="88" y="178" font-size="12" fill="#1E1B4B" font-weight="600">5 cm</text></svg>',topic:"Measurement & Geometry",skill:"Volume",opts:["25 cm\u00B3","125 cm\u00B3","150 cm\u00B3","75 cm\u00B3"],ci:1,expl:"Volume = 5\u00B3 = 125 cm\u00B3.",tip:null},
+  {id:12,text:"Solve for x: 3x \u2212 7 = 14",ctx:null,media:null,topic:"Number & Algebra",skill:"Equations",opts:["x = 3","x = 7","x = 21","x = 5"],ci:1,expl:"3x = 21, therefore x = 7.",tip:null},
+  {id:13,text:"What is the probability of rolling an even number on a standard die?",ctx:null,media:null,topic:"Statistics & Probability",skill:"Probability",opts:["1/3","1/2","2/3","1/6"],ci:1,expl:"Even numbers: 2, 4, 6. That is 3 out of 6 = 1/2.",tip:null},
+  {id:14,text:"A car travels 240 km in 3 hours. What is the average speed?",ctx:null,media:null,topic:"Measurement & Geometry",skill:"Speed & Distance",opts:["60 km/h","80 km/h","720 km/h","120 km/h"],ci:1,expl:"Speed = distance / time = 240 / 3 = 80 km/h.",tip:"Speed = Distance / Time."},
+  {id:15,text:"What is the area of a triangle with base 10 cm and height 6 cm?",ctx:null,media:null,topic:"Measurement & Geometry",skill:"Area",opts:["60 cm\u00B2","30 cm\u00B2","16 cm\u00B2","36 cm\u00B2"],ci:1,expl:"Area = 1/2 \u00D7 10 \u00D7 6 = 30 cm\u00B2.",tip:null},
+  {id:16,text:"Round 3.4567 to two decimal places.",ctx:null,media:null,topic:"Number & Algebra",skill:"Rounding",opts:["3.45","3.46","3.50","3.47"],ci:1,expl:"The third decimal digit is 6 (5 or more), so round up to 3.46.",tip:"Check the digit immediately after the rounding position."},
+  {id:17,text:"What is \u22123 \u00D7 (\u22124)?",ctx:null,media:null,topic:"Number & Algebra",skill:"Negative Numbers",opts:["\u221212","12","\u22127","7"],ci:1,expl:"A negative multiplied by a negative gives a positive: 12.",tip:null},
+  {id:18,text:"A bag contains 3 red, 5 blue, and 2 green marbles. What is the probability of drawing a blue marble?",ctx:null,media:null,topic:"Statistics & Probability",skill:"Probability",opts:["1/2","3/10","1/5","5/10"],ci:0,expl:"Total = 10 marbles. P(blue) = 5/10 = 1/2.",tip:null},
+  {id:19,text:"Simplify: 4a + 3b \u2212 2a + 5b",ctx:null,media:null,topic:"Number & Algebra",skill:"Algebraic Expressions",opts:["2a + 8b","6a + 8b","2a + 2b","10ab"],ci:0,expl:"Combine like terms: (4a \u2212 2a) + (3b + 5b) = 2a + 8b.",tip:"Group terms with the same variable before combining."},
+  {id:20,text:"On a map with scale 1:50,000, two towns are 6 cm apart. What is the actual distance?",ctx:null,media:null,topic:"Measurement & Geometry",skill:"Scale & Maps",opts:["30 km","3 km","300 km","0.3 km"],ci:1,expl:"6 \u00D7 50,000 = 300,000 cm = 3 km.",tip:null},
+  {id:21,text:"What is the median of: 5, 8, 3, 12, 7?",ctx:null,media:null,topic:"Statistics & Probability",skill:"Averages",opts:["8","5","7","3"],ci:2,expl:"Ordered: 3, 5, 7, 8, 12. The middle value is 7.",tip:null},
+  {id:22,text:"Calculate: 2.5 \u00D7 0.4",ctx:null,media:null,topic:"Number & Algebra",skill:"Decimals",opts:["10","1","0.1","1.0"],ci:1,expl:"2.5 \u00D7 0.4 = 1.0.",tip:"Count the total decimal places in both numbers, then apply to the product."},
+  {id:23,text:"A circle has a radius of 7 cm. What is its circumference? (Use \u03C0 \u2248 22/7)",ctx:null,media:null,topic:"Measurement & Geometry",skill:"Circles",opts:["44 cm","154 cm","22 cm","14 cm"],ci:0,expl:"C = 2\u03C0r = 2 \u00D7 22/7 \u00D7 7 = 44 cm.",tip:null},
+  {id:24,text:"If y = 2x + 3, what is y when x = \u22122?",ctx:null,media:null,topic:"Number & Algebra",skill:"Substitution",opts:["\u22121","1","7","\u22127"],ci:0,expl:"y = 2(\u22122) + 3 = \u22124 + 3 = \u22121.",tip:"Apply the sign carefully when substituting negative values."},
+  {id:25,text:"A class has 30 students, 18 of whom are girls. What percentage are boys?",ctx:null,media:null,topic:"Statistics & Probability",skill:"Percentages",opts:["60%","40%","12%","18%"],ci:1,expl:"Boys = 30 \u2212 18 = 12. Percentage = 12/30 \u00D7 100 = 40%.",tip:null}
+];
+var T=questions.length;
+var S={phase:"start",idx:0,answers:new Map(),flags:new Set(),mapOpen:false,startTime:null,remaining:EXAM_TIME,openAcc:-1,filter:"all",zoom:1};
+var timerInterval=null;
+
+var phases=["start","exam","trans","results"];
+function showPhase(n){S.phase=n;phases.forEach(function(p){var el=$("phase-"+p);if(p===n){el.style.display="";requestAnimationFrame(function(){el.classList.remove("phase-out");el.classList.add("phase-in")})}else{el.classList.remove("phase-in");el.classList.add("phase-out");setTimeout(function(){if(S.phase!==p)el.style.display="none"},400)}});var ft=$("exam-footer");if(ft)ft.style.display=n==="exam"?"":"none"}
+function openM(n){$("modal-"+n).classList.add("open")}
+function closeM(n){$("modal-"+n).classList.remove("open")}
+
+// Countdown timer
+function startTimer(){S.startTime=Date.now();S.remaining=EXAM_TIME;timerInterval=setInterval(tickTimer,1000);tickTimer()}
+function tickTimer(){
+  var elapsed=Math.floor((Date.now()-S.startTime)/1000);
+  S.remaining=Math.max(0,EXAM_TIME-elapsed);
+  var m=Math.floor(S.remaining/60),s=S.remaining%60;
+  $("timer-val").textContent=(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  var el=$("timer");
+  el.classList.remove("timer-warn","timer-danger");
+  if(S.remaining<=60)el.classList.add("timer-danger");
+  else if(S.remaining<=120)el.classList.add("timer-warn");
+  else if(S.remaining<=300)el.classList.add("timer-warn");
+  if(S.remaining<=0){stopTimer();E.autoSubmit()}
+}
+function stopTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null}}
+
+function setZoom(v){S.zoom=Math.max(.5,Math.min(2,v));var mc=$("media-content");if(mc)mc.style.transform="scale("+S.zoom+")"}
+
+// Render
+function render(){
+  if(S.phase!=="exam"&&S.phase!=="results")return;
+  var q=questions[S.idx],ans=S.answers.size,fl=S.flags.size,isR=S.phase==="results",isLast=S.idx===T-1;
+  $("hdr-p").style.width=((S.idx+1)/T*100).toFixed(0)+"%";
+  $("hdr-topic").innerHTML="NAPLAN Practice &mdash; Numeracy";
+  $("hdr-ans").textContent=ans+"/"+T+" answered"+(fl>0?" \u00B7 "+fl+" flagged":"");
+
+  if(q.ctx){$("q-ctx").classList.remove("hidden");$("q-ctx-t").textContent=q.ctx}else $("q-ctx").classList.add("hidden");
+  if(q.media){$("q-media").classList.remove("hidden");$("media-content").innerHTML=q.media;S.zoom=1;$("media-content").style.transform="scale(1)"}else $("q-media").classList.add("hidden");
+
+  $("q-lbl").textContent="Question "+(S.idx+1)+" of "+T;
+  $("q-txt").textContent=q.text;
+
+  var fb=$("flag-btn");
+  if(isR){fb.style.display="none"}else{fb.style.display="";var isFl=S.flags.has(S.idx);fb.classList.toggle("flagged",isFl);$("flag-label").textContent=isFl?"Flagged":"Flag"}
+
+  var sel=S.answers.get(S.idx);
+  if(isR){
+    var ui=S.answers.get(S.idx);
+    $("q-opts").innerHTML=q.opts.map(function(o,i){var c="opt opt-lock";if(i===q.ci)c+=" opt-ok";else if(ui===i&&i!==q.ci)c+=" opt-no";else c+=" opt-dim";return'<button class="'+c+'"><span class="ol">'+L[i]+'</span><span>'+o+'</span></button>'}).join("");
+    var isC=ui===q.ci,isU=ui===undefined;
+    var ico=isC?'<svg class="w-5 h-5 text-correct-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>':isU?'<svg class="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>':'<svg class="w-5 h-5 text-incorrect-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    var lbl=isC?"Correct":isU?"Not answered":"Incorrect",lc=isC?"text-correct-700":isU?"text-slate-500":"text-incorrect-700";
+    $("q-fb").innerHTML='<div class="'+(isC?"fb-ok":"fb-no")+' asc"><div class="flex items-start gap-3">'+ico+'<div><p class="text-sm font-semibold '+lc+' mb-1">'+lbl+'</p><p class="text-sm text-slate-600 leading-relaxed">'+q.expl+'</p>'+(q.tip?'<p class="text-sm text-brand-600 mt-2 font-medium">'+q.tip+'</p>':'')+'</div></div></div>';
+    $("q-fb").classList.remove("hidden");
+  }else{
+    $("q-opts").innerHTML=q.opts.map(function(o,i){var c="opt afs d"+(i+1);if(i===sel)c+=" opt-sel";return'<button class="'+c+'" onclick="E.sel('+i+')" onkeydown="E.ok(event,'+i+')" role="radio" aria-checked="'+(i===sel)+'" tabindex="0"><span class="ol">'+L[i]+'</span><span>'+o+'</span></button>'}).join("");
+    $("q-fb").classList.add("hidden");
+  }
+
+  // Maps
+  var mh=questions.map(function(_,i){var c="qd";if(isR){var u=S.answers.get(i);if(u===undefined)c+=" qd-skip";else if(u===questions[i].ci)c+=" qd-ok";else c+=" qd-no"}else{if(S.answers.has(i))c+=" qd-ans";if(S.flags.has(i))c+=" qd-flag"}if(i===S.idx)c+=" qd-cur";return'<button class="'+c+'" onclick="E.goQ('+i+')">'+(i+1)+'</button>'}).join("");
+  $("side-map").innerHTML=mh;$("mob-map").innerHTML=mh;
+
+  $("ft-status").innerHTML=isR?"<span>Reviewing</span>":"<span>"+ans+"/"+T+"</span>"+(fl>0?"<span class='text-warn-600'>&middot; "+fl+" flagged</span>":"");
+  $("btn-prev").disabled=S.idx===0;
+
+  // Submit button logic: last Q = direct submit, otherwise = review
+  if(!isR&&isLast){
+    $("btn-next").classList.add("hidden");
+    $("btn-ft-submit").classList.remove("hidden");
+    $("btn-ft-submit").innerHTML='<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>Submit Assessment';
+    var sb=$("side-submit");if(sb)sb.innerHTML='<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>Submit Assessment';
+  }else{
+    $("btn-next").classList.remove("hidden");
+    $("btn-next").disabled=isLast;
+    $("btn-ft-submit").classList.add("hidden");
+    var sb2=$("side-submit");if(sb2)sb2.innerHTML='<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Review &amp; Submit';
+  }
+}
+
+window.E={
+  start:function(){startTimer();showPhase("exam");render()},
+  nav:function(d){var n=S.idx+d;if(n>=0&&n<T){S.idx=n;if(S.mapOpen)E.toggleMap();$("q-scroll").scrollTo({top:0,behavior:"smooth"});render()}},
+  goQ:function(i){if(i>=0&&i<T){S.idx=i;if(S.mapOpen)E.toggleMap();$("q-scroll").scrollTo({top:0,behavior:"smooth"});render()}},
+  sel:function(i){if(S.phase==="exam"){S.answers.set(S.idx,i);render()}},
+  ok:function(e,i){if(e.key==="Enter"||e.key===" "){e.preventDefault();E.sel(i)}},
+  toggleMap:function(){S.mapOpen=!S.mapOpen;$("mob-map-bg").classList.toggle("open",S.mapOpen)},
+  toggleFlag:function(){if(S.flags.has(S.idx))S.flags.delete(S.idx);else S.flags.add(S.idx);render()},
+  zoom:function(d){if(d===0)setZoom(1);else setZoom(S.zoom+(d*0.25))},
+  modal:function(n){openM(n)},closeModal:function(n){closeM(n)},
+
+  handleSubmit:function(){
+    if(S.idx===T-1){E.openReview()}else{E.openReview()}
+  },
+
+  autoSubmit:function(){E.submit()},
+
+  openReview:function(){
+    var ans=S.answers.size,unan=T-ans,fl=S.flags.size;
+    var h='<div class="grid grid-cols-3 gap-3">';
+    h+='<div class="rounded-lg bg-brand-50 border border-brand-200 p-3 text-center"><p class="text-xl font-bold text-brand-600 tabular-nums">'+ans+'</p><p class="text-[11px] text-brand-500 font-medium">Answered</p></div>';
+    h+='<div class="rounded-lg '+(unan>0?'bg-warn-50 border border-warn-200':'bg-slate-50 border border-slate-100')+' p-3 text-center"><p class="text-xl font-bold '+(unan>0?'text-warn-600':'text-slate-300')+' tabular-nums">'+unan+'</p><p class="text-[11px] '+(unan>0?'text-warn-500':'text-slate-400')+' font-medium">Unanswered</p></div>';
+    h+='<div class="rounded-lg '+(fl>0?'bg-warn-50 border border-warn-200':'bg-slate-50 border border-slate-100')+' p-3 text-center"><p class="text-xl font-bold '+(fl>0?'text-warn-600':'text-slate-300')+' tabular-nums">'+fl+'</p><p class="text-[11px] '+(fl>0?'text-warn-500':'text-slate-400')+' font-medium">Flagged</p></div></div>';
+    if(unan>0){h+='<div><p class="text-xs font-semibold text-warn-600 mb-2">Unanswered:</p><div class="flex flex-wrap gap-1.5">';questions.forEach(function(_,i){if(!S.answers.has(i))h+='<button class="qd" onclick="E.closeModal(\'review\');E.goQ('+i+')">'+(i+1)+'</button>'});h+='</div></div>'}
+    if(fl>0){h+='<div><p class="text-xs font-semibold text-warn-600 mb-2">Flagged for review:</p><div class="flex flex-wrap gap-1.5">';S.flags.forEach(function(i){h+='<button class="qd qd-flag" onclick="E.closeModal(\'review\');E.goQ('+i+')">'+(i+1)+'</button>'});h+='</div></div>'}
+    if(unan===0&&fl===0)h+='<div class="flex items-center gap-3 p-3 rounded-lg bg-correct-50 border border-correct-200"><svg class="w-5 h-5 text-correct-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><p class="text-sm text-correct-700">All questions answered. Ready to submit.</p></div>';
+    else if(unan>0)h+='<p class="text-xs text-slate-500">Unanswered questions will be marked as incorrect.</p>';
+    $("review-body").innerHTML=h;openM("review");
+  },
+
+  submit:function(){closeM("review");stopTimer();showPhase("trans");var bar=$("trans-bar"),lbl=$("trans-lbl");var steps=[{p:20,t:"Scoring answers...",d:500},{p:55,t:"Analysing topics...",d:600},{p:85,t:"Calculating mastery...",d:500},{p:100,t:"Preparing results...",d:350}];var i=0;function nx(){if(i>=steps.length){setTimeout(function(){showPhase("results");buildResults()},300);return}bar.style.width=steps[i].p+"%";lbl.textContent=steps[i].t;i++;setTimeout(nx,steps[i-1].d)}setTimeout(nx,200)},
+  retake:function(){S.idx=0;S.answers=new Map();S.flags=new Set();S.openAcc=-1;S.filter="all";S.zoom=1;S.startTime=null;S.remaining=EXAM_TIME;$("trans-bar").style.width="0%";showPhase("start")}
+};
+
+document.addEventListener("keydown",function(e){if(S.phase!=="exam"&&S.phase!=="results")return;if($("modal-review").classList.contains("open")||$("modal-exit").classList.contains("open"))return;if(e.key==="ArrowRight"){e.preventDefault();E.nav(1)}if(e.key==="ArrowLeft"){e.preventDefault();E.nav(-1)}if(S.phase==="exam"){var n=parseInt(e.key);if(n>=1&&n<=4)E.sel(n-1);if(e.key==="f"||e.key==="F")E.toggleFlag()}});
+
+// Results
+function sc(p){if(p>=80)return{t:"text-correct-600",bg:"bg-correct-50",bd:"border-correct-200",fl:"bg-correct-500",st:"#16a34a"};if(p>=60)return{t:"text-brand-600",bg:"bg-brand-50",bd:"border-brand-200",fl:"bg-brand-500",st:"#5925a8"};if(p>=40)return{t:"text-warn-600",bg:"bg-warn-50",bd:"border-warn-200",fl:"bg-warn-500",st:"#d97706"};return{t:"text-incorrect-600",bg:"bg-incorrect-50",bd:"border-incorrect-200",fl:"bg-incorrect-500",st:"#dc2626"}}
+function vt(p){if(p>=85)return{h:"Excellent Result",s:"Strong understanding demonstrated across this assessment."};if(p>=70)return{h:"Solid Performance",s:"Good foundations with a few areas to strengthen."};if(p>=55)return{h:"Room to Grow",s:"Building understanding. Focused practice will close the gaps."};return{h:"Building From Here",s:"Clear areas to target. Review the breakdown below."}}
+function stL(q,ui){if(ui===undefined)return{cls:"text-slate-400",lbl:"Unanswered",bg:"bg-slate-50 border-slate-200",ico:'<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'};if(ui===q.ci)return{cls:"text-correct-600",lbl:"Correct",bg:"bg-correct-50 border-correct-200",ico:'<svg class="w-4 h-4 text-correct-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>'};return{cls:"text-incorrect-600",lbl:"Incorrect",bg:"bg-incorrect-50 border-incorrect-200",ico:'<svg class="w-4 h-4 text-incorrect-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'}}
+
+function buildResults(){
+  var elapsed=Math.round((EXAM_TIME-S.remaining)/60);var tStr=elapsed<1?"< 1 min":elapsed+" min";
+  var correct=0,incorrect=0,unanswered=0,tMap={};
+  questions.forEach(function(q,i){var ui=S.answers.get(i);if(ui===undefined)unanswered++;else if(ui===q.ci)correct++;else incorrect++;if(!tMap[q.topic])tMap[q.topic]={t:0,c:0,sk:{}};var tm=tMap[q.topic];tm.t++;if(ui===q.ci)tm.c++;if(!tm.sk[q.skill])tm.sk[q.skill]={t:0,c:0};var s=tm.sk[q.skill];s.t++;if(ui===q.ci)s.c++});
+  var acc=Math.round(correct/T*100),clr=sc(acc),v=vt(acc);
+  var topics=Object.keys(tMap).map(function(n){var d=tMap[n];var sks=Object.keys(d.sk).map(function(sn){var sd=d.sk[sn];return{name:sn,t:sd.t,c:sd.c,p:Math.round(sd.c/sd.t*100)}}).sort(function(a,b){return a.p-b.p});return{name:n,t:d.t,c:d.c,p:Math.round(d.c/d.t*100),skills:sks}}).sort(function(a,b){return a.p-b.p});
+  var weakest=topics[0],strongest=topics[topics.length-1];
+  var circ=2*Math.PI*52;
+  var h='<section class="pt-8 pb-2 afs"><div class="flex flex-col md:flex-row md:items-center gap-6 md:gap-10"><div class="sring w-[120px] h-[120px] flex-shrink-0 mx-auto md:mx-0"><svg viewBox="0 0 120 120"><circle class="trk" cx="60" cy="60" r="52"/><circle class="fl" cx="60" cy="60" r="52" stroke="'+clr.st+'" stroke-dasharray="'+circ+'" id="res-ring" stroke-dashoffset="'+circ+'"/></svg><span class="text-3xl font-bold '+clr.t+' tabular-nums relative z-10">'+acc+'%</span></div><div class="text-center md:text-left flex-1"><p class="sl mb-2">Assessment Complete</p><h1 class="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight mb-1">'+v.h+'</h1><p class="text-[15px] text-slate-500 leading-relaxed max-w-xl">'+v.s+'</p><div class="flex flex-wrap items-center gap-2 mt-3 justify-center md:justify-start"><span class="pill '+clr.bg+' '+clr.t+' border '+clr.bd+'">NAPLAN Practice</span><span class="pill bg-slate-50 text-slate-600 border border-slate-150">'+tStr+'</span></div></div></div></section>';
+  h+='<section class="py-6 afs d1"><div class="grid grid-cols-2 sm:grid-cols-4 gap-3"><div class="card p-4"><p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Correct</p><p class="text-2xl font-bold text-correct-600 tabular-nums">'+correct+'</p></div><div class="card p-4"><p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Incorrect</p><p class="text-2xl font-bold text-incorrect-600 tabular-nums">'+incorrect+'</p></div><div class="card p-4"><p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Unanswered</p><p class="text-2xl font-bold '+(unanswered>0?'text-warn-600':'text-slate-300')+' tabular-nums">'+unanswered+'</p></div><div class="card p-4"><p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Accuracy</p><p class="text-2xl font-bold '+clr.t+' tabular-nums">'+acc+'%</p></div></div></section>';
+  h+='<section class="py-2 afs d2"><div class="grid lg:grid-cols-5 gap-6"><div class="lg:col-span-3 space-y-6"><div class="card"><div class="px-6 pt-5 pb-4 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Topic Breakdown</h3></div><div class="divide-y divide-slate-75">';
+  topics.forEach(function(t){var tc=sc(t.p);h+='<div class="px-6 py-4"><div class="flex items-center justify-between mb-2"><span class="text-sm font-medium text-slate-800">'+t.name+'</span><span class="pill text-[10px] '+tc.bg+' '+tc.t+' border '+tc.bd+'">'+t.p+'%</span></div><div class="pbar pbar-lg mb-3"><div class="pfill" data-w="'+t.p+'" style="width:0%"></div></div><div class="flex flex-wrap gap-2">';t.skills.forEach(function(s){var skc=sc(s.p);h+='<span class="text-[11px] font-medium px-2 py-0.5 rounded '+skc.bg+' '+skc.t+'">'+s.name+' '+s.c+'/'+s.t+'</span>'});h+='</div></div>'});
+  h+='</div></div></div><div class="lg:col-span-2 space-y-6"><div class="card p-6"><h3 class="text-[15px] font-semibold text-slate-900 mb-4">Insights</h3><div class="space-y-3 text-sm text-slate-600 leading-relaxed"><p>Score: <span class="font-semibold '+clr.t+'">'+acc+'%</span> ('+correct+'/'+T+')</p><p>Strongest: <span class="font-semibold text-correct-700">'+strongest.name+'</span> ('+strongest.p+'%)</p><p>Focus area: <span class="font-semibold text-incorrect-700">'+weakest.name+'</span> ('+weakest.p+'%), especially '+weakest.skills[0].name+' ('+weakest.skills[0].p+'%)</p></div></div>';
+  h+='<div class="card bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 border-0 p-6 text-white relative overflow-hidden"><div class="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3"></div><div class="relative z-10"><p class="sl text-white/60 mb-2">Recommended Next Step</p><h3 class="text-lg font-semibold mb-2">Practice '+weakest.skills[0].name+'</h3><p class="text-white/70 text-sm leading-relaxed mb-5">Your weakest skill at '+weakest.skills[0].p+'%. Targeted practice will close this gap.</p><a href="practice.html" class="btn bg-white text-brand-700 font-semibold hover:bg-brand-50 px-5 py-3">Start Practice <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a></div></div>';
+  h+='<div class="card p-5 space-y-2"><a href="#" onclick="E.retake();return false" class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors group"><div class="w-8 h-8 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></div><div class="flex-1"><p class="text-sm font-medium text-slate-800">Retake Assessment</p></div><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></a>';
+  h+='<a href="learn.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors group"><div class="w-8 h-8 rounded-lg bg-slate-75 text-slate-500 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="flex-1"><p class="text-sm font-medium text-slate-800">Learning Hub</p></div><svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></a></div></div></div></section>';
+  h+='<section class="py-8 afs d3"><div class="card"><div class="px-6 pt-5 pb-0 border-b border-slate-100"><h3 class="text-[15px] font-semibold text-slate-900">Question Review</h3><div class="flex gap-0 mt-3 -mb-px overflow-x-auto" id="rev-tabs"><button class="tab tab-on" data-f="all">All<span class="tab-ct">'+T+'</span></button><button class="tab" data-f="incorrect">Incorrect<span class="tab-ct">'+incorrect+'</span></button><button class="tab" data-f="unanswered">Unanswered<span class="tab-ct">'+unanswered+'</span></button><button class="tab" data-f="correct">Correct<span class="tab-ct">'+correct+'</span></button></div></div><div id="rev-list"></div></div></section>';
+  $("res-root").innerHTML=h;
+  requestAnimationFrame(function(){setTimeout(function(){document.querySelectorAll("[data-w]").forEach(function(el){el.style.width=el.dataset.w+"%"});var r=$("res-ring");if(r)r.style.strokeDashoffset=circ-(acc/100)*circ},200)});
+  $("rev-tabs").addEventListener("click",function(e){var btn=e.target.closest(".tab");if(!btn)return;S.filter=btn.dataset.f;S.openAcc=-1;$("rev-tabs").querySelectorAll(".tab").forEach(function(t){t.classList.remove("tab-on")});btn.classList.add("tab-on");renderRev()});
+  renderRev();render();
+}
+function qSt(q,i){var ui=S.answers.get(i);if(ui===undefined)return"unanswered";return ui===q.ci?"correct":"incorrect"}
+window.togAcc=function(id){S.openAcc=S.openAcc===id?-1:id;renderRev()};
+function renderRev(){
+  var filtered=[];questions.forEach(function(q,i){if(S.filter==="all"||qSt(q,i)===S.filter)filtered.push({q:q,i:i})});
+  var el=$("rev-list");if(!filtered.length){el.innerHTML='<div class="px-6 py-10 text-center"><p class="text-sm text-slate-400">No questions match this filter.</p></div>';return}
+  el.innerHTML=filtered.map(function(item){
+    var q=item.q,i=item.i,ui=S.answers.get(i),st=stL(q,ui),isO=S.openAcc===q.id,uA=ui!==undefined?q.opts[ui]:"&mdash;",cA=q.opts[q.ci],stat=qSt(q,i);
+    var oH=q.opts.map(function(o,j){var c="flex items-center gap-3 px-3 py-2 rounded-lg text-sm border";if(j===q.ci)c+=" bg-correct-50 border-correct-200 text-correct-700";else if(ui===j&&j!==q.ci)c+=" bg-incorrect-50 border-incorrect-200 text-incorrect-700 line-through";else c+=" bg-white border-slate-100 text-slate-500";var ind="";if(j===q.ci)ind='<svg class="w-3.5 h-3.5 text-correct-500 ml-auto" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>';else if(ui===j)ind='<svg class="w-3.5 h-3.5 text-incorrect-500 ml-auto" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';return'<div class="'+c+'"><span class="text-xs font-semibold w-5">'+L[j]+'</span><span class="flex-1">'+o+'</span>'+ind+'</div>'}).join("");
+    return'<div><button class="acc-trg '+(isO?"acc-trg-on":"")+'" onclick="togAcc('+q.id+')"><div class="w-7 h-7 rounded-lg '+st.bg+' border flex items-center justify-center flex-shrink-0">'+st.ico+'</div><div class="flex-1 min-w-0 text-left"><div class="flex items-center gap-2"><span class="text-[11px] font-semibold text-slate-400">Q'+q.id+'</span><span class="text-[11px] text-slate-300">&middot;</span><span class="text-[11px] text-slate-400">'+q.skill+'</span></div><p class="text-sm text-slate-800 mt-0.5 truncate">'+q.text+'</p></div><span class="pill text-[10px] '+st.bg+' border '+st.cls+' hidden sm:inline-flex">'+st.lbl+'</span><svg class="acc-chev w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button><div class="acc-body '+(isO?"acc-on":"")+'"><div class="pl-11 space-y-3"><p class="text-sm text-slate-700 leading-relaxed">'+q.text+'</p><div class="space-y-2">'+oH+'</div><div class="flex flex-wrap items-center gap-x-4 text-xs text-slate-500"><span>Your answer: <span class="font-medium '+(stat==="correct"?"text-correct-600":stat==="incorrect"?"text-incorrect-600":"text-slate-400")+'">'+uA+'</span></span>'+(stat!=="correct"?'<span>Correct: <span class="font-medium text-correct-600">'+cA+'</span></span>':"")+'</div><div class="rounded-lg bg-slate-50 border border-slate-100 px-4 py-3"><p class="sl mb-1">Explanation</p><p class="text-sm text-slate-600 leading-relaxed">'+q.expl+'</p></div>'+(q.tip?'<div class="rounded-lg bg-brand-50 border border-brand-100 px-4 py-3"><p class="text-[11px] font-semibold text-brand-400 uppercase tracking-wider mb-1">Tip</p><p class="text-sm text-brand-700">'+q.tip+'</p></div>':'')+'</div></div></div>'
+  }).join('<div class="border-t border-slate-75"></div>');
+}
+})();
+</script>
+</body>
+</html>
