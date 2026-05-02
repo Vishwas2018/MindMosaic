@@ -55,6 +55,7 @@ Path: `supabase/functions/content-svc`
   raise on violation. v1 writers: seeder (Stage 14). v1.1 writer: L8 content
   recalibration. No trigger enforces ordering in v1 — caller responsibility.
 - `pathway`, `framework_config`, `assessment_profile`, `blueprint`, `diagnostic_rule` — seeded in v1
+  - `pathway.required_feature_key` is read by assessment-svc on POST /sessions/create to gate session creation. content-svc surfaces the field in GET /pathways responses for client-side filtering; authoritative entitlement enforcement is server-side in assessment-svc (Stage 19).
 
 ### Endpoints Owned [v1]
 - `GET /pathways` (entitlement-filtered)

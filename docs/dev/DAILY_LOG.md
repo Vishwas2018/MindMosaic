@@ -2,6 +2,52 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 4 — 2026-05-02
+
+**Planned (from DEV_PLAN.md Stage 4):** Migration 0003 — Assessment Configuration; 5 tables; RLS Pattern F admin-write public-read; pgTAP plan(40).
+
+**Actually delivered:**
+
+- `supabase/migrations/0003_assessment_config.sql` — 5 tables (framework_config, blueprint, pathway, assessment_profile, diagnostic_rule), UNIQUE index on framework_config(exam_family, version), btree index on pathway(required_feature_key), Pattern F RLS per ADR-0009 (platform_admin write only; is_active=true SELECT filter for pathway + assessment_profile).
+- `supabase/migrations/down/0003_assessment_config.down.sql` — 5 DROP TABLE in reverse FK order; roundtrip verified clean via manual docker exec psql. Migration 0002 tables (skill_node etc.) confirmed intact after down.
+- `supabase/tests/rls/003_assessment_config.sql` — pgTAP plan(40), 40/40 pass. 8 groups: RLS enabled (5), key columns (15), indexes (2), non-admin INSERT rejected (5), platform_admin INSERT succeeds (5), SELECT active rows visible (5), inactive rows hidden (2), CHECK constraint (1).
+- ADR-0009 filed: platform-catalog tables use platform_admin-only write policies (not org_admin). Table-classification heuristic added to ADR-0009 Follow-ups for Stages 5–10.
+- OWNERS.md addendum: pathway.required_feature_key service contract documented.
+- PROJECT_STATE.md updated; pgTAP pattern library extended with JWT claims role simulation skeleton.
+
+**Time spent:** ~2h (including 2-cycle §2A review + pre-execution verifications)
+
+**Surprises / departures:**
+
+1. **org_admin vs platform_admin write scope** (§2A Substantive 1): arch §3.2 Pattern F template lists both org_admin and platform_admin as write roles. Corrected before coding: assessment configuration is platform-level catalog (not tenant-scoped); org_admin is tenant-scoped per OWNERS.md and arch §3.1. Allowing org_admin write would corrupt content for all tenants sharing the same pathway. ADR-0009 captures the precedent for future platform-catalog tables.
+
+2. **JWT claims path for auth_role()** (§2A Substantive 2 + VERIFICATION 1): auth_role() reads `request.jwt.claims -> 'app_metadata' ->> 'role'` (nested under app_metadata, not top-level). §2A skeleton must match verbatim. New pgTAP pattern documented: `set_config('request.jwt.claims', '{"sub":"...","app_metadata":{"role":"platform_admin",...}}', true)` before `SET ROLE authenticated`.
+
+3. **framework_config.blueprint jsonb + blueprint table** (§2A Correction 2): naming collision in arch §2.4 — both a `blueprint jsonb` column on framework_config (embedded default template) and a separate `blueprint` table (specific profile instances) exist verbatim. Implemented both per arch; comment added in migration to clarify purpose distinction.
+
+4. **pathway.required_feature_key convention deferred to Stage 14** (VERIFICATION 2): NOT NULL column with no CHECK constraint on value; convention for free-tier vs paid pathways (e.g., 'pathway.feature.public' vs 'pathway.feature.naplan.numeracy_y5') deferred. Forward-flag recorded in PROJECT_STATE Notes for next session.
+
+**Decisions made (not in stage):**
+
+- ADR-0009: Platform-catalog tables use platform_admin-only write policies + table-classification heuristic for Stages 5–10
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- none new
+
+**Quality gates at close:**
+
+- Lint ✅ (cached, 18/18) · Typecheck ✅ (cached, 18/18) · Tests ✅ (18/18 workspaces) · Build ✅ (cached) · RLS ✅ (pgTAP 145/145, 21 tables) · Migration roundtrip ✅ (manual docker exec, down→verify→up)
+
+**Tomorrow — first thing:**
+Stage 5 — Migration 0004 — Sessions + Canonical Events. Run §2A pre-implementation review before C-C-D-V. High-risk stage (create_session_response_atomic optimistic lock). Also: ISSUE-0001 CI Node upgrade (deadline 2026-06-02) due Stage 5 audit day.
+
+---
+
 ## Stage 3 — 2026-05-02
 
 **Planned (from DEV_PLAN.md Stage 3):** Migration 0002 — Content & Skill Graph; 10 tables; v_item_current view; publish_skill_graph (SECURITY DEFINER); fn_graph_version_is_published helper; Pattern F RLS with draft isolation; pgTAP plan(40).
