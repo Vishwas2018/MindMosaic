@@ -5,6 +5,24 @@
 
 ## Open
 
+### ISSUE-0003 — GitHub Actions internal Node.js 20 runtime — upstream action upgrade required before 2026-06-02
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-02 (post Stage 5 close)
+- Deadline: Before Stage 10 audit (2026-06-02 hard external deadline)
+- Scope: `actions/checkout@v4`, `actions/setup-node@v4`, `pnpm/action-setup@v4` internally run
+  on Node.js 20. GitHub Actions has a forced-upgrade deadline of 2026-06-02 after which Node 20
+  action runners will be removed (confirmed: September 16, 2026 removal; forced to Node 24 from
+  June 2, 2026). ISSUE-0001 (ADR-0010) addressed the project's own `node-version: "22"` setting
+  but these third-party actions remain pinned to their Node 20 internal runtime.
+- Practical exposure: nil today — CI is passing. Hard deadline 2026-06-02. Stage 10 audit
+  (~day 10) provides ample slack.
+- Resolution path: Pin to newer major-version tags (likely @v5 or current at Stage 10 audit
+  time). Run CI on bump. File ADR if non-trivial behaviour change. Single small commit.
+  Optionally: set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` env var as an interim guard.
+- Linked: ISSUE-0001 (closed, ADR-0010), commit 5bb1156 (Node 22 bump)
+
 ### ISSUE-0002 — SECURITY DEFINER helpers: Stage 2/3 helpers missing `REVOKE EXECUTE FROM anon`
 
 - Status: open
