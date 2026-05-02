@@ -2,6 +2,71 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 3 — 2026-05-02
+
+**Planned (from DEV_PLAN.md Stage 3):** Migration 0002 — Content & Skill Graph; 10 tables; v_item_current view; publish_skill_graph (SECURITY DEFINER); fn_graph_version_is_published helper; Pattern F RLS with draft isolation; pgTAP plan(40).
+
+**Actually delivered:**
+
+- `supabase/migrations/0002_content_skill_graph.sql` — 9 tables (skill_graph_version, skill_node, skill_edge, skill_migration_map, misconception, repair_sequence, stimulus, item, item_version), v_item_current WITH (security_invoker=true), fn_graph_version_is_published SECURITY DEFINER helper, 5 set_updated_at triggers, publish_skill_graph SECURITY DEFINER function with to_regclass+EXECUTE G4 guard + slug-path cycle RAISE, Pattern F RLS on all 9 tables. Commit: [this session].
+- `supabase/migrations/down/0002_content_skill_graph.down.sql` — full reverse in FK dependency order; roundtrip verified clean via manual docker exec psql.
+- `supabase/tests/rls/002_content.sql` — pgTAP plan(40), 40/40 pass. 12 groups covering RLS enabled, function shapes, triggers, v_item_current, cycle detection, forked DAG, draft isolation pre/post, clean publish, G4 guard stub, permission check.
+- ADR-0007 correction appended: EXECUTE required for G4 guard (plain SELECT short-circuit insufficient in PL/pgSQL).
+- ADR-0008 filed (2026-05-02): Pattern F content-table RLS decisions.
+- PROJECT_STATE.md updated; pgTAP pattern library extended.
+
+**Time spent:** ~3h (including §2A carried from previous context + 3-round debugging session)
+
+**Surprises / departures:**
+
+1. **PL/pgSQL parses full SQL at execution time regardless of short-circuit.** The ADR-0007 spec SQL `SELECT (to_regclass(...) IS NOT NULL AND EXISTS (SELECT 1 FROM skill_mastery ...))` fails with "relation does not exist" when Stage 6 tables are absent, even with the to_regclass guard. PL/pgSQL resolves ALL table references in a SQL statement during parse/plan, before boolean evaluation. Fix: `IF to_regclass() IS NOT NULL THEN EXECUTE '...' END IF`. ADR-0007 implementation correction appended. Lesson: to_regclass guard only works inside an IF block with dynamic EXECUTE, not inline in a static SQL statement.
+
+2. **throws_ok 3-arg is (sql, errcode, errmsg) — not (sql, errcode, description).** This pgTAP version treats the 3rd argument as the expected message, not the test description. A test named 'G6.1: ...' as arg3 failed because the actual CYCLE_DETECTED message didn't match. Fix: use throws_like(sql, '%pattern%', description) for message checks; use 4-arg throws_ok(sql, errcode, errmsg, description) when both code and description are needed. Note: 4-arg form with NULL errmsg crashes this pgTAP version (server connection loss). Use has_function_privilege() for permission-denied assertions instead.
+
+3. **Supabase local dev grants EXECUTE to authenticated by default.** REVOKE FROM PUBLIC alone does not prevent authenticated from calling publish_skill_graph — a default environment-level grant exists. Fix: add `REVOKE EXECUTE FROM authenticated` explicitly. Double REVOKE documented in migration with comment.
+
+4. **Container restart timeouts on Windows/Docker Desktop.** `supabase db reset --local` intermittently fails at the "Restarting containers" step with 502/timeout errors. The migration itself applies successfully; the failure is in a post-reset health check. Workaround: run migrations and tests via docker exec psql + supabase test db directly. No migration content impact.
+
+**Decisions made (not in stage):**
+
+- ADR-0007: to_regclass forward-compatibility for G4 guard (accepted 2026-05-02; implementation correction appended same day)
+- ADR-0008: Content-table RLS Pattern F with draft graph isolation (accepted 2026-05-02)
+
+**Deviations logged:**
+
+- none (all items resolved within the stage; corrections documented in ADRs)
+
+**Issues opened / closed / questions raised:**
+
+- none new
+
+**Quality gates at close:**
+
+- Lint ✅ (cached, 6/6) · Typecheck ✅ (cached, 6/6) · Tests ✅ (6/6 workspaces) · Build ✅ (cached) · RLS ✅ (pgTAP 105/105, 16 tables) · Migration roundtrip ✅ (manual docker exec verification, both migrations)
+
+**Tomorrow — first thing:**
+Stage 4 — Migration 0003 — Assessment Configuration. Run §2A pre-implementation review (schema/policy stage) before C-C-D-V.
+
+---
+
+## Correction — 2026-05-02 (pre-Stage 3 morning reconciliation — ISSUE-0001 renumber)
+
+ISSUE-0001 recycled per pre-Stage 2 direction (discrepancy surfaced in Stage 3 morning prompt):
+
+- **Closed**: ISSUE-0001 (original, 2026-05-01) "UTA-table SELECT policies: tenant-scoped only,
+  per-role absent until Stage 5" — closed wont-fix. Rationale: duplicate of ADR-0004 deferral.
+  ADR-0004 + PROJECT_STATE.md Notes for next session already capture the Stage 5 obligation fully.
+  No hard deadline; planned Stage 5 deliverable. A separate issue added noise without information.
+
+- **Filed**: ISSUE-0001 (new, 2026-05-02) "CI node-version: GitHub Actions Node 20 deprecation;
+  upgrade to Node 22 LTS required" — medium severity, hard deadline before 2026-06-02, due Stage 5
+  audit day. This was the pre-Stage 2 intended content of ISSUE-0001.
+
+- **Updated**: PROJECT_STATE.md Notes for next session — removed stale ISSUE-0001/RLS reference;
+  added ISSUE-0001 = Node CI upgrade with deadline. Open items count unchanged (0/0/1/0).
+
+---
+
 ## Stage 2 — 2026-05-01
 
 **Planned (from DEV_PLAN.md Stage 2):** All custom enums + tenancy/identity tables + RLS helpers + handle_new_user + set_updated_at().

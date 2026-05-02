@@ -56,4 +56,13 @@ benefit. ISSUE-0001 tracks the gap explicitly.
 ## Implementation notes
 
 Files: `supabase/migrations/0001_enums_tenancy_auth.sql` §9 · Commit: e58a925
-Related: ISSUE-0001, ADR-0005
+Related: ISSUE-0001 (closed wont-fix 2026-05-02 — see correction below), ADR-0005
+
+## Correction (2026-05-02)
+
+The `Related: ISSUE-0001` reference above is now a stale pointer. ISSUE-0001 (original,
+filed 2026-05-01) was closed as wont-fix on 2026-05-02 (Stage 3 morning reconciliation)
+with rationale: duplicate of this ADR's deferral. The Stage 5 obligation is fully captured
+in this ADR's "Follow-ups" section. ISSUE-0001 was subsequently refiled as the Node CI
+runtime upgrade (GitHub Actions Node 20 deprecation — unrelated to RLS). No change to
+Context, Decision, Rationale, or Consequences. The Stage 5 forward-flag stands.
