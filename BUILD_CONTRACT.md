@@ -95,7 +95,7 @@ Six decisions resolve open questions in the spec and mockups. All v1 work must c
 ## 6. Security & Data Integrity
 
 - **RLS** mandatory on all tenant-scoped tables. Use `auth_tenant_id()`, `auth_user_id()`, `auth_role()`. CI runs tenant-isolation tests on every commit — **zero cross-tenant reads** across two seeded tenants.
-- **RLS cross-table subquery rule (ADR-0005, binding).** Any RLS policy that must reference another tenant-scoped table with RLS enabled must call a `SECURITY DEFINER` helper function (prefix `fn_`), never an inline subquery. Inline cross-table subqueries cause infinite recursion because PostgreSQL cannot fold `STABLE` functions to constants at plan time. Each helper: `SET search_path = public, pg_temp`; `REVOKE EXECUTE FROM PUBLIC`; `GRANT EXECUTE TO authenticated`; `STABLE`; returns ids only. Reviewers must reject any new policy with an inline cross-table subquery.
+- **RLS cross-table subquery rule (ADR-0005, binding).** Any RLS policy that must reference another tenant-scoped table with RLS enabled must call a `SECURITY DEFINER` helper function (prefix `fn_`), never an inline subquery. Inline cross-table subqueries cause infinite recursion because PostgreSQL cannot fold `STABLE` functions to constants at plan time. Each helper: `SET search_path = public, pg_temp`; **triple REVOKE** (`REVOKE EXECUTE FROM PUBLIC` twice, then `REVOKE EXECUTE FROM anon`); `GRANT EXECUTE TO authenticated`; `STABLE`; returns ids only. The double `REVOKE FROM PUBLIC` strips the pseudo-role; the explicit `REVOKE FROM anon` strips the direct grant that Supabase default privileges auto-apply to `anon` on every new function (discovered Stage 5, BUG-C; supersedes ADR-0008 double-REVOKE pattern). Reviewers must reject any new SECURITY DEFINER helper missing the triple REVOKE.
 - **Stripe webhooks** signature-verified within 300ms before any state change. Invalid → `400` + `billing_event` row with `processing_error='invalid_signature'`. (Stages 42+ only.)
 - **PII redaction.** Logging middleware strips `response_data`, `stem`, `payload.answers`, raw webhook bodies. Only `student_id`/`tenant_id` logged for correlation.
 - **Admin audit.** Every `org_admin`/`platform_admin` write to mutable config, subscription, or feature-flag tables writes a row to `admin_action_log`.
@@ -225,8 +225,12 @@ Every migration that creates tables, policies, or functions MUST:
    - Every new table has at least one RLS policy
    - Tenant isolation: a JWT for tenant A reads zero rows from
      tenant B's seeded data, for every new tenant-scoped table
-   - Any new SECURITY DEFINER helper has REVOKE PUBLIC + GRANT
-     authenticated, search_path set, STABLE volatility (per ADR-0005)
+   - Any new SECURITY DEFINER helper has triple REVOKE (PUBLIC × 2 +
+     anon) + GRANT authenticated, search_path set, STABLE volatility
+     (per ADR-0005; anon clause per BUG-C Stage 5)
+   - Any new partitioned table: every UNIQUE constraint and PRIMARY
+     KEY includes all partition key columns (SQLSTATE 0A000 at DDL
+     time if missing; per ADR-0012)
 
 ---
 
