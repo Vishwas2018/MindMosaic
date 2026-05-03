@@ -111,7 +111,7 @@ Each stage has: **Day**, **Title**, **Objective**, **Deliverables**, **Spec refs
 ### Stage 9 — Day 9 — pg_cron Setup
 
 - **Objective:** All scheduled jobs wired idempotently.
-- **Deliverables:** `0008_cron.sql` scheduling crons from Arch §5.5 that are v1-relevant: `jobs.reaper`, `jobs.archive`, `pipeline.cleanup`, `idem.cleanup`, `abandoned.cleanup`, `plan.expiry`, `rate_limit.cleanup`. Deferred: `audit.archive` (cold storage v1.1), `content.recalibration` (v1.1), `engagement.streaks` (v1.1), `follow_up.probe` (v1.1). Idempotent via `ON CONFLICT DO NOTHING` on `cron.job(jobname)`.
+- **Deliverables:** `0008_cron.sql` scheduling crons from Arch §5.5 that are v1-relevant: `jobs.reaper`, `jobs.archive`, `pipeline.cleanup`, `idem.cleanup`, `abandoned.cleanup`, `plan.expiry`, `rate_limit.cleanup`, `content.recalibration` (PHASE-2 no-op stub per arch Part XI — DEV-20260503-2). Deferred entirely: `audit.archive` (cold storage v1.1), `engagement.streaks` (v1.1), `follow_up.probe` (v1.1). Idempotent via unschedule-first + `cron.schedule()` API — NOT direct INSERT into `cron.job` (ADR-0017; original "ON CONFLICT DO NOTHING" wording was documentation imprecision corrected at Stage 10 audit).
 - **Spec refs:** Arch §5.5.
 - **Exit criteria:** `SELECT jobname FROM cron.job` shows v1 crons. Direct function invocation of each works cleanly.
 - **Risk:** Low.
