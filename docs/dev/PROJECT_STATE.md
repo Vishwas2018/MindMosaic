@@ -5,9 +5,9 @@
 
 ## Position
 
-- Last completed stage: Stage 7 — Migration 0006 — Jobs + Outbox + Rate Limit (2026-05-03)
-- Next stage: Stage 8 — Migration 0007 — New Domains (Assignments + Billing + Engagement + Notifications)
-- Days remaining (target 75): 69
+- Last completed stage: Stage 8 — Migration 0007 — New Domains (2026-05-03)
+- Next stage: Stage 9 — (read DEV_PLAN.md)
+- Days remaining (target 75): 68
 - Buffer days consumed in Phase 0 (Stages 1–14): 0 of 3
 
 ## Test suite
@@ -16,9 +16,9 @@
 | ------------ | -------- | --------- | ---------- |
 | Unit         | ✅ green  | 0 (pass-with-no-tests) | 2026-05-03 |
 | Integration  | n/a      | n/a       | n/a        |
-| pgTAP        | ✅ green  | 334/334   | 2026-05-03 |
+| pgTAP        | ✅ green  | 406/406   | 2026-05-03 |
 | Contract     | n/a      | n/a       | n/a        |
-| RLS          | ✅ green  | 334/334 (42 tables) | 2026-05-03 |
+| RLS          | ✅ green  | 406/406 (53 tables) | 2026-05-03 |
 | E2E          | n/a      | n/a       | n/a        |
 
 ## Quality gates
@@ -29,7 +29,7 @@
 | pnpm typecheck  | ✅ green (18/18, cached) | 2026-05-03 |
 | pnpm test       | ✅ green (18/18, cached) | 2026-05-03 |
 | pnpm build      | ✅ green (cached from Stage 1) | 2026-04-30 |
-| RLS coverage    | ✅ 42/42 tables enabled + tested | 2026-05-03 |
+| RLS coverage    | ✅ 53/53 tables enabled + tested | 2026-05-03 |
 | pnpm audit      | unknown — TODO measure | n/a |
 | pnpm test:migration | ✅ green (roundtrip up→down→up) | 2026-05-03 |
 
@@ -44,7 +44,7 @@
 
 ## Open items
 
-- ADRs accepted: 14 (ADR-0001 through ADR-0014)
+- ADRs accepted: 16 (ADR-0001 through ADR-0016)
 - ADRs proposed: 0
 - Issues critical / high / medium / low: 0/0/1/1
 - Open questions: 0
@@ -53,15 +53,37 @@
 
 ## Notes for next session
 
-**Stage 8 is Migration 0007 — New Domains (Assignments + Billing + Engagement + Notifications).**
-§2A pre-implementation review required before C-C-D-V. User to provide Stage 8 §2A
-pre-cues (i)–(v) at session start (provided in Stage 7 morning ritual but not captured
-verbatim due to context compaction; topics covered assignments, billing, engagement, and
-notification domain tables including session_record.assignment_id FK wiring).
+**Stage 9 is the next stage.** Run morning ritual: read DEV_PLAN.md Stage 9 and confirm
+§2A pre-implementation review before C-C-D-V.
 
-**outbox_event scope note:** arch §2.15 and DEV_PLAN Stage 7 both list outbox_event as
-a Stage 7 deliverable, but it was silently included in migration 0004. Do NOT include it
-again in any future migration. Its RLS, index, and column tests are in 004_sessions_events.sql.
+**A1 correction (Stage 8):** Triple REVOKE canonical pattern updated to PUBLIC + authenticated
++ anon. BUILD_CONTRACT §6 and PGTAP_PATTERNS P3 corrected. All new SECURITY DEFINER helpers
+from Stage 8+ must use: REVOKE FROM PUBLIC; REVOKE FROM authenticated; REVOKE FROM anon;
+GRANT TO authenticated. The Stage 2/3 helpers (auth_tenant_id, auth_user_id, auth_role,
+fn_user_in_my_tenant, fn_class_in_my_tenant) and Stage 2 helpers (fn_graph_version_is_published)
+are still using the old pattern (single REVOKE FROM PUBLIC only) — ISSUE-0002 (low) tracks this.
+Stage 8 fn_my_assignment_ids() uses the correct A1 pattern.
+
+**LANGUAGE sql function ordering:** PostgreSQL validates LANGUAGE sql function bodies against the
+current schema at CREATE time. Any function referencing tables created in the same migration must
+be defined AFTER those tables. (Lesson: fn_my_assignment_ids() initially placed before
+assignment_target — moved after. Apply this ordering rule to all future migrations.)
+
+**realtime.subscription conflict (Stage 8):** Supabase Realtime uses a `subscription` table in
+the `realtime` schema. pg_class queries on relname = 'subscription' return two rows. Always add
+`AND relnamespace = 'public'::regnamespace` when querying pg_class for public schema tables.
+Similarly, pg_policies queries: add `AND schemaname = 'public'`. Future migrations should apply
+this pattern for any table name that might conflict with Supabase system schemas (realtime,
+storage, auth).
+
+**DML CTE top-level restriction:** PostgreSQL requires CTEs with DML (INSERT/UPDATE/DELETE) to
+be at the statement top level — not inside a subquery expression. Correct pattern for silent-deny
+tests: `WITH _x AS (UPDATE ... RETURNING 1) SELECT is((SELECT count(*)::int FROM _x), 0, ...)`.
+Do NOT wrap inside SELECT is((WITH x AS (...) SELECT ...), 0, ...).
+
+**outbox_event scope note:** arch §2.15 and DEV_PLAN Stage 7 both list outbox_event as a Stage 7
+deliverable, but it was silently included in migration 0004. Do NOT include it again.
+Its RLS, index, and column tests are in 004_sessions_events.sql.
 
 **ADR-0014 cleanup:** `docs/dev/decisions/0014-pgtap-index-assertions-catalog-not-explain.md`
 is an incorrectly-named stub left untracked. Delete before Stage 10 audit. Correct committed
@@ -72,11 +94,11 @@ all indexes (existence proof); use P5 dedup (throws_like '%duplicate key%') for 
 partial-unique indexes (predicate correctness proof). EXPLAIN-based assertions deferred
 to Stage 26 load tests.
 
-**ISSUE-0002 (low, open):** Stage 2/3 helpers (`auth_tenant_id`, `auth_user_id`, `auth_role`,
-`fn_user_in_my_tenant`, `fn_class_in_my_tenant`, `fn_graph_version_is_published`) are missing
-`REVOKE EXECUTE FROM anon`. Remediation is a small follow-up migration. Due before Stage 10 audit.
-Any new SECURITY DEFINER function created in Stage 8+ must use the triple-REVOKE pattern per
-BUILD_CONTRACT §6 + §10.
+**ISSUE-0002 (low, open):** Stage 2/3 helpers (auth_tenant_id, auth_user_id, auth_role,
+fn_user_in_my_tenant, fn_class_in_my_tenant, fn_graph_version_is_published) are missing
+REVOKE EXECUTE FROM authenticated and/or REVOKE EXECUTE FROM anon. Remediation is a small
+follow-up migration. Due before Stage 10 audit. All new SECURITY DEFINER functions created
+in Stage 8+ use the correct A1 triple-REVOKE pattern.
 
 **ISSUE-0003 (medium, open):** GitHub Actions action runners (actions/checkout@v4 etc.) pin to
 Node.js 20 runtime. Hard external deadline 2026-06-02. Address at Stage 10 audit.
@@ -85,8 +107,8 @@ Node.js 20 runtime. Hard external deadline 2026-06-02. Address at Stage 10 audit
 RLS policies calling SECURITY DEFINER helpers (fn_teacher_student_ids, fn_my_child_ids,
 auth_role, auth_tenant_id — all REVOKE'd from anon). Anon evaluation of such policies raises
 "permission denied for function". Correct test: `has_function_privilege('anon', 'fn()', 'execute')
-= false` (Stage 4 G16 pattern). Exception: tables with NO policies (Pattern G deny-all) are
-safe to test with anon via SELECT — no function calls in zero-policy RLS.
+= false` (Stage 4 G16 pattern). Exception: tables with NO policies (Pattern G) are safe to
+test with anon via SELECT — no function calls in zero-policy RLS.
 
 **INSERT RLS deny pattern (established Stage 6):** For INSERT denied by RLS, use
 `throws_like($$INSERT...$$, '%row-level security%', description)`. Do NOT use nested CTE.
@@ -120,13 +142,9 @@ verify this gap does not become a security issue as the application layer evolve
 (PostgreSQL will scan partitions). Any hypothetical FK to `learning_event(id)` from a future table
 would need to include `created_at`. No such FK exists in v1.
 
-**session_record.assignment_id FK (from 0004 header):** Added to session_record in migration 0004
-without a FK constraint. FK (`assignment_id REFERENCES assignment(id) ON DELETE SET NULL`) must
-be added in Stage 8 (Migration 0007) when the assignment table is created.
-
-**pgTAP patterns established through Stage 7:**
+**pgTAP patterns established through Stage 8:**
 - SELECT isolation: `SET ROLE authenticated; SELECT set_config(...); SELECT is(COUNT(*)::int, ...)`
-- DML deny (silent UPDATE/DELETE): `WITH x AS (UPDATE/DELETE ... RETURNING 1) SELECT is(..., 0, ...)`
+- DML deny (silent UPDATE/DELETE): `WITH _x AS (UPDATE/DELETE ... RETURNING 1) SELECT is((SELECT count(*)::int FROM _x), 0, ...)` — WITH must be top-level, not inside subquery expression
 - DML deny (INSERT raises): `SELECT throws_like($$INSERT...$$, '%row-level security%', description)`
 - Trigger sentinel: insert with `updated_at = '2000-01-01'`; assert `> '2000-01-01'` after UPDATE
 - Function raises (errcode + message): `SELECT throws_ok(sql, 'PCODE', 'MESSAGE_KEY', description)`
@@ -137,12 +155,12 @@ be added in Stage 8 (Migration 0007) when the assignment table is created.
 - Optimistic-lock: call atomic fn with stale version → `throws_ok(sql, 'P0001', 'VERSION_CONFLICT', description)`
 - Dedup unique index: `throws_like($$INSERT...$$, '%duplicate key%', description)`
 - Partial unique index (one-active): `throws_like($$INSERT...$$, '%duplicate key%', description)`
-- Partial index predicate proof (ADR-0014, Stage 7): 3-subtest: lives_ok first insert /
-  throws_like '%duplicate key%' duplicate / lives_ok excluded-status insert (proves WHERE clause honored)
+- Partial index predicate proof (ADR-0014, Stage 7): 3-subtest: lives_ok first insert / throws_like '%duplicate key%' duplicate / lives_ok excluded-status insert (proves WHERE clause honored)
 - Anon permission check (no SELECT on helper-policy table): `has_function_privilege('anon', 'fn()', 'execute') = false`
-  (do NOT use SET ROLE anon + SELECT COUNT(*) on tables with SECURITY DEFINER helper policies)
 - Structural index existence (ADR-0014): `SELECT ok(EXISTS(SELECT 1 FROM pg_indexes WHERE tablename='T' AND indexname='I'), ...)`
-- Policy count = 0 check (Pattern G structural): `SELECT is((SELECT count(*)::int FROM pg_policies WHERE tablename='T'), 0, ...)`
+- Policy count = 0 check (Pattern G structural): `SELECT is((SELECT count(*)::int FROM pg_policies WHERE tablename='T' AND schemaname='public'), 0, ...)` — note: always add schemaname='public' to avoid Supabase system schema collisions
+- pg_class RLS check: `(SELECT relrowsecurity FROM pg_class WHERE relname='T' AND relnamespace='public'::regnamespace)` — always add relnamespace filter; 'subscription' conflicts with realtime schema
+- FOR ALL + WITH CHECK enforcement: `throws_like($$INSERT ... WHERE user_id = other_user_id$$, '%row-level security%', ...)` (A3 pattern, Stage 8)
 
 **Supabase remote project:** https://tohmshcpdhcdfsubvnok.supabase.co (ap-southeast-2)
 

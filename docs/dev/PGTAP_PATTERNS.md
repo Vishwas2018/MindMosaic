@@ -205,3 +205,42 @@ security policy for table "<table>"` (SQLSTATE 42501, message contains
 "row-level security"). Data-modifying CTEs are additionally restricted from
 nesting inside subqueries. Use `throws_like` + `'%row-level security%'`
 for INSERT, DML-CTE for UPDATE/DELETE.
+
+---
+
+## Pattern 6 — Schema-qualified pg_class and pg_policies queries (Stage 8)
+
+**Discovered:** Stage 8 — Supabase Realtime schema conflict.
+**Applies to:** Any pg_class or pg_policies query on a table name that may exist in
+Supabase system schemas (realtime, auth, storage).
+
+**Problem:** Supabase Realtime uses a `subscription` table in the `realtime` schema.
+`SELECT relrowsecurity FROM pg_class WHERE relname = 'subscription'` returns two rows
+(public.subscription AND realtime.subscription), causing "more than one row returned
+by a subquery used as an expression".
+
+**Always use schema filters:**
+```sql
+-- pg_class RLS check — always add relnamespace filter:
+SELECT is(
+  (SELECT relrowsecurity FROM pg_class
+   WHERE relname = 'subscription'
+     AND relnamespace = 'public'::regnamespace)::bool,
+  true,
+  'subscription RLS enabled');
+
+-- pg_policies count check — always add schemaname filter:
+SELECT is(
+  (SELECT count(*)::int FROM pg_policies
+   WHERE tablename = 'subscription' AND schemaname = 'public'),
+  0,
+  'subscription has 0 RLS policies');
+```
+
+**Known Supabase system-schema conflicts:**
+- `subscription` — conflicts with `realtime.subscription`
+- When in doubt, always add the namespace/schema filter.
+
+**Rationale:** Supabase local dev runs multiple schemas. pg_class and pg_policies
+catalog views span all schemas. Safe to omit the filter only when the table name is
+guaranteed unique across all Supabase schemas (job_queue, pipeline_event, etc.).

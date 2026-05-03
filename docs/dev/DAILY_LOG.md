@@ -2,6 +2,64 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 8 — 2026-05-03
+
+**Planned (from DEV_PLAN.md Stage 8):** Migration 0007 — New Domains (Assignments + Billing +
+Engagement + Notifications); 11 tables, fn_my_assignment_ids() helper, 406/406 pgTAP.
+
+**Actually delivered:**
+
+- `feat(db): migration 0007 — New Domains ...` — commit ae47bb6
+  - `supabase/migrations/0007_new_domains.sql` — 11 tables (assignment, assignment_target,
+    assignment_session, subscription, billing_customer, invoice, billing_event,
+    engagement_streak, achievement_definition, student_achievement, notification);
+    fn_my_assignment_ids() SECURITY DEFINER helper; ALTER TABLE session_record ADD CONSTRAINT
+    fk_session_assignment; 11 indexes; 5 updated_at triggers; full RLS
+  - `supabase/migrations/down/0007_new_domains.down.sql` — DROP in reverse FK order
+  - `supabase/tests/rls/007_new_domains.sql` — plan(72), 406/406 cumulative
+  - `BUILD_CONTRACT.md` §6 + `PGTAP_PATTERNS.md` P3: A1 correction — triple REVOKE updated
+    from "PUBLIC×2 + anon" to canonical "PUBLIC + authenticated + anon"
+- `chore(dev-context): stage 8 close — New Domains` (this commit)
+  - ADR-0015: Pattern G for tables with no v1 writer
+  - ADR-0016: service-owned state machine (no DB state-transition triggers)
+
+**Time spent:** ~3h (§2A review + amendments A1–A3 + V1/V2 verification + impl + verification)
+
+**Surprises / departures:**
+
+- A1 correction: BUILD_CONTRACT §6 "PUBLIC×2 + anon" was wrong — second REVOKE FROM PUBLIC
+  is a no-op. Corrected to PUBLIC + authenticated + anon. §6 and PGTAP_PATTERNS P3 updated.
+- Migration Section 1 ordering: fn_my_assignment_ids() (LANGUAGE sql) validates table refs at
+  CREATE time. Must follow assignment_target creation. Moved to Section 2 after the tables.
+- realtime.subscription conflict: pg_class WHERE relname = 'subscription' returned two rows
+  (public.subscription + realtime.subscription). Fixed G4.1 with relnamespace filter; G_meta.2
+  with schemaname = 'public' filter. Added note to PROJECT_STATE for future stages.
+- DML CTE top-level restriction: WITH x AS (UPDATE ... RETURNING 1) must be at statement top
+  level, not inside SELECT is(...). G11.5 refactored to top-level WITH + inline SELECT is().
+
+**Decisions made (not in stage):**
+
+- ADR-0015: Pattern G for tables with no v1 writer (billing, engagement, assignment_target).
+- ADR-0016: service-owned state machine; no DB CHECK/trigger for state transitions.
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- none
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (0/0 pass-with-no-tests) · Build ✅ (cached) · RLS ✅ (406/406)
+
+**Tomorrow — first thing:**
+
+Stage 9 — read DEV_PLAN.md Stage 9 and run morning ritual.
+
+---
+
 ## Stage 7 — 2026-05-03
 
 **Planned (from DEV_PLAN.md Stage 7):** Migration 0006 — Jobs + Outbox + Rate Limit;
