@@ -54,5 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: No migrations yet — stub for Stage 2
-        run: echo "no migrations yet; this job will run supabase db push --dry-run from Stage 2 onward"
+      - name: Validate seed file count
+        run: |
+          COUNT=$(ls supabase/seeds/*.sql 2>/dev/null | wc -l)
+          echo "Found $COUNT seed files"
+          [ "$COUNT" -ge 6 ] || (echo "Expected ≥6 seed files" && exit 1)
+      - name: Supabase migration dry-run (requires Supabase CLI + Docker in CI)
+        run: echo "TODO Stage 2 follow-up — wire supabase db push --dry-run with Supabase CLI action"
