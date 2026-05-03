@@ -114,8 +114,9 @@ SELECT is(
 **Rationale:** SECURITY DEFINER helpers must not be callable by unauthenticated
 roles. Supabase local dev applies `ALTER DEFAULT PRIVILEGES GRANT EXECUTE TO anon`
 on all new functions — REVOKE FROM PUBLIC alone is insufficient (ISSUE-0002).
-BUILD_CONTRACT §6 mandates triple REVOKE: `REVOKE FROM PUBLIC; REVOKE FROM PUBLIC;
-REVOKE FROM anon;` after each new SECURITY DEFINER function.
+BUILD_CONTRACT §6 mandates triple REVOKE: `REVOKE FROM PUBLIC; REVOKE FROM authenticated;
+REVOKE FROM anon;` after each new SECURITY DEFINER function (A1 correction Stage 8:
+the prior "PUBLIC × 2 + anon" was wrong — second PUBLIC revoke was a no-op).
 
 ---
 
