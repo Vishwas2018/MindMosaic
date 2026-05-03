@@ -21,7 +21,7 @@ const dmSerifDisplay = DM_Serif_Display({
 
 export const metadata: Metadata = {
   title: 'MindMosaic',
-  description: 'Adaptive learning for NAPLAN Y5 Numeracy + ICAS Math',
+  description: 'Turning practice into Mastery!',
   icons: { icon: '/favicon.png' },
 }
 
