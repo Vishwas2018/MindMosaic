@@ -22,16 +22,16 @@
 
 **Surprises / departures:**
 
-- outbox_event already in migration 0004 (arch §2.15 and DEV_PLAN Stage 7 both list it
-  but it was silently included in Stage 5). Excluded from 0006 scope; no deviation filed
-  (stage-plan mismatch, not a build deviation from DEV_PLAN intent).
-- plan(26) not plan(30) (X3 target projection): outbox_event removal = -4 tests.
-  Cumulative 334, not 338 as X3 projected.
-- ADR-0014 slug error: initially filed as `catalog-not-explain.md`. Correct committed
-  slug: `structural-not-explain.md`. Stub at catalog path left untracked; clean up
-  before Stage 10 audit.
-- Pre-cues (i)–(v) provided in Stage 7 morning ritual were Stage 8 content (Claude
-  model mis-assigned them to Stage 7). Deferred to Stage 8 per user direction.
+- DEV_PLAN.md Stage 7 listed outbox_event as deliverable but Migration 0004 already
+  created it (Stage 5). Skipped duplicate creation; G3 tests dropped (4 assertions).
+  plan(26), cumulative 334. DEV_PLAN.md not edited; the listing is informational, not a
+  binding deliverable. Stage 10 audit will reconcile.
+- Stage 8 pre-cues forward-flagged from Stage 7 morning prompt as themes only, not
+  verbatim. Substance had to be re-pasted at Stage 8 start. Lesson: forward-flagged
+  pre-cues must be captured verbatim in PROJECT_STATE.md 'Notes for next session' to
+  preserve specific decisions and framing, not just topics.
+- ADR-0014 slug error: initially filed as `catalog-not-explain.md`; correct slug is
+  `structural-not-explain.md`. Stub cleaned up via `git clean -f` before Stage 8 start.
 
 **Decisions made (not in stage):**
 
