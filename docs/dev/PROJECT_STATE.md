@@ -5,10 +5,9 @@
 
 ## Position
 
-- Last completed stage: Stage 9 — Migration 0008 — pg_cron Setup (2026-05-03)
-- Current: Stage 10 audit tasks complete; Outbox Dispatcher deliverable in progress
-- Next stage after Stage 10: Stage 11 — packages/types + Zod Schemas
-- Days remaining (target 75): 66
+- Last completed stage: Stage 10 — Outbox Dispatcher (2026-05-03)
+- Next stage: Stage 11 — packages/types + Zod Schemas
+- Days remaining (target 75): 65
 - Buffer days consumed in Phase 0 (Stages 1–14): 0 of 3
 
 ## Test suite
@@ -17,22 +16,22 @@
 | ------------ | -------- | --------- | ---------- |
 | Unit         | ✅ green  | 0 (pass-with-no-tests) | 2026-05-03 |
 | Integration  | n/a      | n/a       | n/a        |
-| pgTAP        | ✅ green  | 440/440   | 2026-05-03 |
+| pgTAP        | ✅ green  | 451/451   | 2026-05-03 |
 | Contract     | n/a      | n/a       | n/a        |
-| RLS          | ✅ green  | 440/440 (53 tables) | 2026-05-03 |
+| RLS          | ✅ green  | 451/451 (53 tables) | 2026-05-03 |
 | E2E          | n/a      | n/a       | n/a        |
 
 ## Quality gates
 
 | Gate            | Last status | Last run   |
 | --------------- | ----------- | ---------- |
-| pnpm lint       | ✅ green (18/18, cached) | 2026-05-03 |
-| pnpm typecheck  | ✅ green (18/18, cached) | 2026-05-03 |
-| pnpm test       | ✅ green (18/18, cached) | 2026-05-03 |
+| pnpm lint       | ✅ green (6/6, cached) | 2026-05-03 |
+| pnpm typecheck  | ✅ green (6/6, cached) | 2026-05-03 |
+| pnpm test       | ✅ green (6/6, cached) | 2026-05-03 |
 | pnpm build      | ✅ green (cached from Stage 1) | 2026-04-30 |
 | RLS coverage    | ✅ 53/53 tables enabled + tested | 2026-05-03 |
 | pnpm audit      | unknown — TODO measure | n/a |
-| pnpm test:migration | ✅ green (roundtrip up→down→up) | 2026-05-03 |
+| pnpm test:migration | ✅ green (roundtrip up→down→up, 10 migrations) | 2026-05-03 |
 
 ## Performance vs BUILD_CONTRACT §10 budgets
 
@@ -45,42 +44,47 @@
 
 ## Open items
 
-- ADRs accepted: 17 (ADR-0001 through ADR-0017)
+- ADRs accepted: 18 (ADR-0001 through ADR-0018)
 - ADRs proposed: 0
-- Issues critical / high / medium / low: 0/0/0/0
+- Issues critical / high / medium / low: 0/0/0/1
 - Open questions: 0
 - Open bugs: 0
 - Deviations logged: 2 (DEV-20260430-1 ongoing Stage 15; DEV-20260503-2 ongoing v1.1)
 
 ## Notes for next session
 
-**Stage 10 audit tasks complete (2026-05-03):**
-- ISSUE-0002 closed: migration 0009 triple-REVOKE retrofit, 440/440 pgTAP (commit 75ac299)
-- ISSUE-0003 closed: GHA actions @v4 → @v5 (commit 9eb2f4b), ahead of 2026-06-02 deadline
-- DEV_PLAN.md Stage 9 corrected: cron.schedule() API + content.recalibration stub noted
-- All deviations reviewed; DEV-20260430-1 and DEV-20260503-2 still ongoing as expected
-- Quality gates: all green (440/440 pgTAP, 18/18 turbo cached)
-- Phase buffer: 0/3 consumed; 10 stages through audit tasks; Outbox Dispatcher in progress
+**Stage 10 complete (2026-05-03):**
+- Audit tasks: ISSUE-0002 closed (migration 0009, 440/440), ISSUE-0003 closed (GHA @v5),
+  DEV_PLAN.md cron text correction, audit chore commit.
+- Deliverable: migration 0010 — fn_drain_outbox_batch + outbox.dispatch cron (every minute).
+  Edge Function: supabase/functions/outbox-dispatcher/index.ts (thin wrapper, { drained, took_ms }).
+- pgTAP: 451/451. Roundtrip: all 10 migrations clean.
+- ADR-0018 filed: outbox every-minute vs arch "every 2s"; v1.1 = Database Webhook rewrite.
+- ISSUE-0004 filed: outbox_event 7-day cleanup, low, Stage 14 deadline.
 
-**Outbox Dispatcher (Stage 10 deliverable, in progress):**
-See DAILY_LOG Stage 10 entry after deliverable complete.
+**X1 privilege pattern (durable — Stage 10):**
+fn_drain_outbox_batch proacl = "postgres=X/postgres, service_role=X/postgres".
+Supabase did NOT auto-grant EXECUTE to PUBLIC on LANGUAGE plpgsql (non-SECURITY DEFINER).
+Triple REVOKE idempotent. GRANT TO service_role required for Edge Function RPC path.
+Pattern going forward: cron-only functions (no RPC callers) need no GRANT; functions with
+an Edge Function RPC caller need explicit GRANT TO service_role.
 
-**Triple-REVOKE A1 canonical — fully remediated (Stage 10 audit):**
-All SECURITY DEFINER helpers now comply: Stage 2/3 retrofitted via migration 0009.
-Stage 8+ helpers used correct pattern from creation. No remaining ISSUE on this topic.
+**ISSUE-0004 (open, low):** outbox_event 7-day cleanup. Stage 14 close. Add pg_cron job
+`outbox.cleanup` DELETE WHERE processed_at < now() - interval '7 days'.
 
-**pgTAP retrofit pattern (established Stage 10):**
-Security permission retrofits get a standalone test file (009_security_definer_retrofit.sql).
-Do not modify existing test file plan counts for retrofits.
+**Pre-existing partition RLS advisory:**
+intelligence_audit_log_default + learning_event_default reported RLS-disabled by supabase db query.
+These are pg_partman default partitions (Stage 5/6). Application code routes through parent tables
+(RLS-enabled). Not a Stage 10 issue. Note for Stage 11+ if partition RLS becomes relevant.
+
+**Stage 15+ pipeline_event forward-flag:**
+Pipeline worker creates pipeline_event rows when consuming pipeline.run_sync jobs per arch §5.1.
 
 **DEV-20260430-1:** ongoing, resolves Stage 15.
 **DEV-20260503-2:** ongoing, resolves v1.1 (content.recalibration stub).
 
 **cron.schedule() pattern (ADR-0017):** Stage 9 onwards uses cron.schedule() / cron.unschedule()
 public API. Avoid direct INSERT into cron.job.
-
-**LANGUAGE sql function ordering:** Functions referencing tables in same migration must be
-defined AFTER those tables.
 
 **realtime.subscription conflict (Stage 8):** Always add relnamespace filter to pg_class queries;
 schemaname filter to pg_policies queries.

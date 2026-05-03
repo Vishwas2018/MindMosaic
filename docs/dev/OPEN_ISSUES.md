@@ -5,7 +5,20 @@
 
 ## Open
 
-<!-- none -->
+### ISSUE-0004 — outbox_event 7-day cleanup not wired (arch §5.6)
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-03 (Stage 10)
+- Deadline: Stage 14 close
+- Area: backend
+- Tags: data | cron
+
+Arch §5.6 specifies that processed `outbox_event` rows are purged after 7 days. Migration 0010
+does not add a cleanup cron job. Without it, the `outbox_event` table grows unbounded but
+correctness is unaffected (processed events are never re-picked by `fn_drain_outbox_batch`).
+Resolution: Stage 14 — add a pg_cron job (e.g., `outbox.cleanup`) that DELETEs rows where
+`processed_at < now() - interval '7 days'`.
 
 ## Resolved
 

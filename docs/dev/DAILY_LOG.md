@@ -33,7 +33,68 @@ ISSUE-0003, DEV_PLAN cron correction). Audit tasks committed first; deliverable 
 - Quality gate replay: pnpm turbo (18/18 cached), pnpm test:rls (440/440), pnpm test:migration ✅.
 - Phase buffer: 0/3 consumed. 10 stages completed through audit tasks.
 
-**Outbox Dispatcher (Stage 10 deliverable) — see continuation below.**
+### Outbox Dispatcher (Stage 10 deliverable, commit 5 of stage):
+
+**Actually delivered (deliverable):**
+
+- `feat(db): migration 0010 — outbox dispatcher (fn_drain_outbox_batch + outbox.dispatch cron)` — TBD
+  - `supabase/migrations/0010_outbox_dispatcher.sql` — fn_drain_outbox_batch(batch_size int DEFAULT 100)
+    RETURNS int LANGUAGE plpgsql VOLATILE; FOR UPDATE SKIP LOCKED batch drain; session.submitted →
+    pipeline.run_sync (high), assignment.published → notification.create (medium); RAISE EXCEPTION on
+    unknown event_type (P0001, fail loud, transaction rollback); idempotency_key = 'outbox:' || id::text;
+    ON CONFLICT DO NOTHING; X1 privilege hardening — triple REVOKE (PUBLIC/authenticated/anon) + GRANT
+    to service_role; outbox.dispatch cron every minute (ADR-0018).
+  - `supabase/migrations/down/0010_outbox_dispatcher.down.sql` — unschedule + DROP FUNCTION.
+  - `supabase/functions/outbox-dispatcher/index.ts` — Deno Edge Function thin wrapper; calls
+    fn_drain_outbox_batch via supabase-js service_role; returns `{ drained: int, took_ms: int }` with
+    explicit Content-Type: application/json (X3).
+  - `supabase/tests/rls/010_outbox_dispatcher.sql` — plan(11): G_shape(3) + G_behavioral(8).
+    451/451 cumulative pgTAP.
+  - `docs/dev/decisions/0018-outbox-cron-every-minute.md` — ADR-0018 accepted.
+  - `docs/dev/OPEN_ISSUES.md` — ISSUE-0004 filed (outbox_event 7-day cleanup, low, Stage 14 deadline).
+
+**X1 privilege verification result (durable lesson):**
+`proacl = "postgres=X/postgres, service_role=X/postgres"` — no PUBLIC/authenticated/anon entry.
+Supabase did NOT auto-grant EXECUTE to PUBLIC on this LANGUAGE plpgsql (non-SECURITY DEFINER) function.
+Triple REVOKE was idempotent. GRANT to service_role is required for Edge Function RPC invocation.
+Pattern: cron functions (LANGUAGE sql, called only by pg_cron) need no GRANT; dispatcher functions
+(LANGUAGE plpgsql, called also via Edge Function RPC) need explicit GRANT TO service_role.
+
+**Time spent:** ~2h (§2A pre-cues x2 rounds + audit triage + deliverable + verification)
+
+**Surprises / departures:**
+
+- outbox_event has no tenant_id column (confirmed at impl time). job_queue.tenant_id is nullable;
+  omitted from INSERT. Pipeline worker derives tenant_id from session_id/assignment_id in payload.
+- X1: Supabase did not auto-grant on non-SECURITY DEFINER LANGUAGE plpgsql. REVOKE idempotent.
+  GRANT TO service_role mandatory for Edge Function RPC path.
+- pre-existing advisory: intelligence_audit_log_default + learning_event_default (pg_partman default
+  partitions from Stage 5/6) reported RLS-disabled by supabase db query. Not introduced in Stage 10;
+  partitioned table routing means direct partition access is not the application code path. Not filed
+  as new issue — logged here for awareness.
+
+**Decisions made (not in stage):**
+
+- ADR-0018: outbox dispatcher scheduled every minute via pg_cron; v1.1 upgrade path is Database
+  Webhook rewrite (not schedule tuning).
+
+**Deviations logged:**
+
+- none (outbox dispatcher followed approved §2A plan; every-minute deviation documented in ADR-0018,
+  not filed as DEV- since it was approved pre-implementation in §2A).
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0004 opened: outbox_event 7-day cleanup (arch §5.6), low, deadline Stage 14 close.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (0/0 pass-with-no-tests, turbo cached) · Build ✅ (cached) · RLS ✅ (451/451)
+- pnpm test:migration ✅ (roundtrip up→down→up, all 10 migrations)
+
+**Tomorrow — first thing:**
+
+Stage 11 — packages/types + Zod Schemas. Run morning ritual before any work.
 
 ---
 
