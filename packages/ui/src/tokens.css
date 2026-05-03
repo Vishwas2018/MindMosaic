@@ -1,0 +1,134 @@
+/* packages/ui/src/tokens.css — MindMosaic design token source of truth (UI_CONTRACT §2) */
+/* Import once in apps/web via layout.tsx. Never duplicate vars in component files. */
+
+:root {
+  /* ── Brand (purple) ── */
+  --brand-50:  #F5F3FF;
+  --brand-100: #EDE9FE;
+  --brand-200: #DDD6FE;
+  --brand-300: #C4B5FD;
+  --brand-400: #8B5CF6;
+  --brand-500: #5925a8;  /* primary */
+  --brand-600: #4a1d96;  /* primary-d: hover */
+  --brand-700: #3b1584;  /* primary-ink: active */
+  --brand-800: #2e0f5c;
+  --brand-900: #1E1B4B;
+
+  /* ── Slate (neutral, cool-cast toward brand) ── */
+  --slate-25:  #FDFCFE;
+  --slate-50:  #FAF8FF;  /* page background */
+  --slate-75:  #F0EDF8;  /* hovered nav, subtle surface */
+  --slate-100: #E9E5F5;  /* border default */
+  --slate-150: #D6D0E8;  /* border strong */
+  --slate-300: #A8A0C0;  /* icon disabled, muted-2 */
+  --slate-500: #7C7399;  /* muted text */
+  --slate-600: #3B3566;  /* secondary text */
+  --slate-800: #1E1B4B;  /* primary text */
+  --slate-950: #0e1118;  /* admin dark sidebar only */
+
+  /* ── Semantic ── */
+  --correct-50:  #f0fdf4;
+  --correct-100: #dcfce7;
+  --correct-200: #bbf7d0;
+  --correct-500: #22c55e;
+  --correct-600: #16a34a;   /* success text on light */
+  --correct-700: #15803d;
+
+  --incorrect-50:  #fef2f2;
+  --incorrect-100: #fee2e2;
+  --incorrect-200: #fecaca;
+  --incorrect-500: #ef4444;
+  --incorrect-600: #dc2626;  /* error text on light */
+  --incorrect-700: #b91c1c;
+
+  --warn-50:  #fffbeb;
+  --warn-100: #fef3c7;
+  --warn-200: #fde68a;
+  --warn-500: #f59e0b;
+  --warn-600: #d97706;       /* warning text on light */
+  --warn-700: #b45309;
+
+  /* ── Accent (orange) ── */
+  --accent-500: #ef6843;     /* in-app accent: wordmark, results hero glow */
+  --accent-400: #ef8c56;     /* accent on purple surface (overlays) */
+  --accent-300: #f9a825;     /* marketing-only warm amber (landing page only) */
+
+  /* ── Semantic surface aliases ── */
+  --bg:            var(--slate-50);
+  --surface:       #FFFFFF;
+  --surface-alt:   var(--slate-25);
+  --field-bg:      var(--slate-25);
+  --border:        var(--slate-100);
+  --border-strong: var(--slate-150);
+
+  --text:        var(--slate-800);
+  --text-2:      var(--slate-600);
+  --muted:       var(--slate-500);
+  --muted-2:     var(--slate-300);
+
+  --primary:     var(--brand-500);
+  --primary-d:   var(--brand-600);
+  --primary-ink: var(--brand-700);
+  --primary-l:   var(--brand-100);
+
+  --ring:        rgba(89,37,168,.14);  /* focus ring base */
+  --ring-strong: rgba(89,37,168,.25);  /* focus-visible on buttons */
+
+  --success:    var(--correct-600);
+  --success-bg: var(--correct-50);
+  --error:      var(--incorrect-600);
+  --error-bg:   var(--incorrect-50);
+  --warning:    var(--warn-600);
+  --warning-bg: var(--warn-50);
+
+  /* ── Typography ── */
+  --font-sans:  'DM Sans', system-ui, sans-serif;
+  --font-serif: 'DM Serif Display', Georgia, serif;
+
+  /* ── Shape ── */
+  --r-btn:      8px;
+  --r-card:     12px;
+  --r-card-lg:  16px;
+  --r-field:    10px;
+  --r-opt:      10px;
+  --r-pill:     9999px;
+
+  --border-width:        1px;
+  --border-width-strong: 1.5px;
+
+  /* ── Shadow ── */
+  --shadow-card:         0 0 0 1px rgba(30,27,75,.03), 0 1px 2px rgba(89,37,168,.04), 0 4px 12px -4px rgba(89,37,168,.06);
+  --shadow-card-hover:   0 0 0 1px rgba(30,27,75,.03), 0 4px 12px rgba(89,37,168,.08), 0 8px 24px -8px rgba(89,37,168,.12);
+  --shadow-elevated:     0 8px 24px rgba(89,37,168,.1), 0 2px 6px rgba(89,37,168,.06);
+  --shadow-modal:        0 24px 56px -12px rgba(30,27,75,.25);
+  --shadow-form:         0 2px 6px rgba(89,37,168,.05), 0 8px 24px -8px rgba(89,37,168,.08);
+  --shadow-focus:        0 0 0 3px var(--ring-strong);
+  --shadow-focus-subtle: 0 0 0 3px var(--ring);
+
+  /* ── Motion ── */
+  --fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --duration-progress: 800ms;
+  --duration-ring:     1000ms;
+}
+
+/* ── Admin dark sidebar scope only ── */
+[data-surface="admin-dark"] {
+  --surface:   var(--slate-950);
+  --text:      #D5D9E2;
+  --muted:     #6B7488;
+  --border:    #1A1F2B;
+}
+
+/* ── Reduced motion: collapse all transitions to instant ── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --fast: 0.01ms;
+    --base: 0.01ms;
+    --slow: 0.01ms;
+    --duration-progress: 0.01ms;
+    --duration-ring:     0.01ms;
+  }
+}
