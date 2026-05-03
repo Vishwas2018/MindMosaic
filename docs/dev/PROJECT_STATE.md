@@ -5,8 +5,8 @@
 
 ## Position
 
-- Last completed stage: Stage 12 — SDK + API Client (packages/sdk) (2026-05-03)
-- Next stage: Stage 13 — packages/ui Primitives + Design Tokens + axe-core Gate
+- Last completed stage: Stage 13 — packages/ui Primitives + Design Tokens + axe-core Gate (2026-05-03)
+- Next stage: Stage 14 — apps/web scaffold + Next.js 14 App Router setup
 - Days remaining (target 75): 64
 - Buffer days consumed in Phase 0 (Stages 1–14): 0 of 3
 
@@ -14,14 +14,14 @@
 
 | Suite        | Status   | Count     | Last run   |
 | ------------ | -------- | --------- | ---------- |
-| Unit         | ✅ green  | 121/121   | 2026-05-03 |
+| Unit         | ✅ green  | 171/171   | 2026-05-03 |
 | Integration  | n/a      | n/a       | n/a        |
 | pgTAP        | ✅ green  | 451/451   | 2026-05-03 |
 | Contract     | n/a      | n/a       | n/a        |
 | RLS          | ✅ green  | 451/451 (53 tables) | 2026-05-03 |
 | E2E          | n/a      | n/a       | n/a        |
 
-Unit breakdown: 97 (@mm/types) + 24 (@mm/sdk: 13 client + 9 keys + 2 hooks jsdom)
+Unit breakdown: 97 (@mm/types) + 24 (@mm/sdk) + 50 (@mm/ui: 26 axe + 24 functional)
 
 ## Quality gates
 
@@ -29,7 +29,7 @@ Unit breakdown: 97 (@mm/types) + 24 (@mm/sdk: 13 client + 9 keys + 2 hooks jsdom
 | --------------- | ----------- | ---------- |
 | pnpm lint       | ✅ green (7/7 packages) | 2026-05-03 |
 | pnpm typecheck  | ✅ green (7/7 packages) | 2026-05-03 |
-| pnpm test       | ✅ green (121/121 unit) | 2026-05-03 |
+| pnpm test       | ✅ green (171/171 unit) | 2026-05-03 |
 | pnpm build      | ✅ green (cached from Stage 1) | 2026-04-30 |
 | RLS coverage    | ✅ 53/53 tables enabled + tested | 2026-05-03 |
 | pnpm audit      | unknown — TODO measure | n/a |
@@ -46,7 +46,7 @@ Unit breakdown: 97 (@mm/types) + 24 (@mm/sdk: 13 client + 9 keys + 2 hooks jsdom
 
 ## Open items
 
-- ADRs accepted: 19 (ADR-0001 through ADR-0019)
+- ADRs accepted: 20 (ADR-0001 through ADR-0020)
 - ADRs proposed: 0
 - Issues critical / high / medium / low: 0/0/0/1
 - Open questions: 0
@@ -55,18 +55,21 @@ Unit breakdown: 97 (@mm/types) + 24 (@mm/sdk: 13 client + 9 keys + 2 hooks jsdom
 
 ## Notes for next session
 
-**Stage 12 complete (2026-05-03):**
-- packages/sdk: MmClient (raw fetch, no library), SDKResponse<T> wrapper (ADR-0019), APIError shape (X1).
-- X-Trace-Id on all requests; response header preferred (X2). X-Client-Version = SCHEMA_VERSION (X3/G3).
-- Idempotency-Key threading: mutations accept `{ idempotencyKey?: string }`; auto-generated via useRef; JSDoc warns not retry-safe without stable key (X3).
-- MmClientProvider via React.createElement (no JSX, no tsconfig jsx change).
-- 5 hook groups: identity, content, session, intelligence, orchestration (Q3 revision — no speculative stubs).
-- mmKeys factory with .all()/.byId() hierarchy for 7 domains (X4).
-- 24 SDK tests: 13 client (incl. X5 SCHEMA_VERSION drift guard), 9 keys, 2 hooks (jsdom).
-- ADR-0019: SDKResponse<T> = { data: T; traceId: string } precedent for all future SDK methods.
-- Lint fixes: removed useless try/catch (X1), dropped `_data` param from ack schemas (parse(): void).
-- children?: ReactNode optional in MmClientProviderProps (createElement TS compatibility).
-- Commit: 0c3b311
+**Stage 13 complete (2026-05-03):**
+- packages/ui: tokens.css + tailwind.preset.ts + 26 primitives (Layout/Nav/Data/Forms/Overlay)
+- Each primitive: TSX (forwardRef/CSS vars/44px touch targets) + Storybook story + axe test
+- axe-core CI gate: Vitest + jest-axe + toHaveNoSeriousViolations (X2 — fail serious/critical only)
+- Two-layer a11y: CI = Vitest+jest-axe; dev-time = Storybook+@storybook/addon-a11y
+- ADR-0020: Radix UI directly (not shadcn CLI); Q-0001 resolved
+- UI-DIVERGENCE: axe CI gate moved from storybook:test (BUILD_CONTRACT §10) → pnpm test (Vitest).
+  BUILD_CONTRACT §10 correction deferred to Stage 14 audit.
+- Key TS infra note: jest-axe@9 has no types → ambient module declaration in script-mode .d.ts.
+  @testing-library/jest-dom toHaveAttribute declared directly in vitest augmentation (NodeNext
+  propagation limitation from .ts setup file).
+- afterEach(cleanup) must be explicit in Vitest setup; auto-cleanup not reliable.
+- aria-label required on Radix Checkbox.Root, RadioGroup.Item, Select.Trigger for axe in jsdom
+  (sibling <label for> not computed by axe-core's jsdom accessible name algorithm).
+- Commit: d2be303
 
 **ISSUE-0004 (open, low):** outbox_event 7-day cleanup. Stage 14 close. Add pg_cron job
 `outbox.cleanup` DELETE WHERE processed_at < now() - interval '7 days'.
@@ -83,3 +86,8 @@ These are pg_partman default partitions (Stage 5/6). Application code routes thr
 public API. Avoid direct INSERT into cron.job.
 
 **Supabase remote project:** https://tohmshcpdhcdfsubvnok.supabase.co (ap-southeast-2)
+
+**Stage 14 pre-cues:**
+- ISSUE-0004 outbox cleanup pg_cron job to add
+- BUILD_CONTRACT §10 axe gate reference to update (storybook:test → pnpm test)
+- apps/web Next.js 14 App Router scaffold (RootLayout, providers, route structure)

@@ -26,7 +26,7 @@ If reality and the plan disagree: log a deviation, file an ADR if the answer is 
 
 ## Tech stack (locked — change requires an ADR)
 
-Turborepo + pnpm 9; Next.js 14 App Router; TypeScript strict; Tailwind + shadcn/ui; Supabase (Postgres 15, RLS, Edge Functions in Deno); Vitest + Playwright + pgTAP; Recharts; KaTeX; @dnd-kit/core; Stripe (from Stage 42 only).
+Turborepo + pnpm 9; Next.js 14 App Router; TypeScript strict; Tailwind + Radix UI primitives (ADR-0020: "shadcn/ui" wording in earlier versions meant Radix-based; Stage 13 implements Radix directly without shadcn CLI); Supabase (Postgres 15, RLS, Edge Functions in Deno); Vitest + Playwright + pgTAP; Recharts; KaTeX; @dnd-kit/core; Stripe (from Stage 42 only).
 
 ---
 

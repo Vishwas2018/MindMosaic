@@ -2,6 +2,86 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 13 — 2026-05-03
+
+**Planned (from DEV_PLAN.md Stage 13):** packages/ui Primitives + Design Tokens + axe-core Gate.
+Radix UI headless layer, CSS custom properties token system, 26 component primitives, Storybook,
+jest-axe CI gate.
+
+**Actually delivered:**
+
+- `feat(ui): stage 13 — design tokens + 26 primitives + axe-core gate + ADR-0020` — commit d2be303
+  - `packages/ui/src/tokens.css` — full CSS custom property system per UI_CONTRACT §2: brand palette
+    (brand-500→700, primary/primary-l/primary-d/primary-ink), semantic surface/text/border/field/error/
+    success aliases, semantic shadows (card/elevated/focus), motion tokens (fast/base/slow), admin-dark
+    surface variant, prefers-reduced-motion collapse to 0.01ms (all vars).
+  - `packages/ui/src/tailwind.preset.ts` — Tailwind theme extension mirroring token values:
+    fontFamily (sans/serif), brand/primary/surface/text/border color keys, boxShadow (card/elevated/
+    focus), borderRadius (btn/field/card/pill).
+  - 26 primitives (each with .tsx + .stories.tsx + .test.tsx):
+    Layout: AppShell, Sidebar, TopBar, PageHeader, EmptyState, ErrorBoundary, LoadingState;
+    Nav: NavLink, Tabs, Breadcrumbs;
+    Data: Card, StatTile, ProgressBar, SkillBar, Table (loading/empty states);
+    Forms: Button (forwardRef, X6 h-11=44px), IconButton (X6 h-11 w-11), Input (floating label via
+    Tailwind peer), Select (Radix combobox), Checkbox (Radix), RadioGroup (Radix), TextArea, FormField;
+    Overlay: Dialog (Radix, DialogContent forwardRef), Toast (Radix, Provider + useToast hook),
+    Tooltip (Radix, TooltipProvider forwardRef).
+  - `packages/ui/src/__tests__/setup.ts` — afterEach(cleanup) + jest-axe extend + X2 custom
+    toHaveNoSeriousViolations matcher (fail serious/critical, warn moderate/minor as console.info).
+  - `packages/ui/src/__tests__/jest-axe.d.ts` — ambient module declaration for jest-axe@9 (no types).
+  - `packages/ui/src/__tests__/types.d.ts` — vitest Assertion augmentation for custom matchers +
+    toHaveAttribute (from @testing-library/jest-dom, which lacks NodeNext propagation in .d.ts).
+  - `packages/ui/src/index.ts` — full barrel with NodeNext .js extensions.
+  - `packages/ui/vitest.config.ts` — jsdom environment + setupFiles.
+  - `packages/ui/.storybook/` — @storybook/react-vite + @storybook/addon-a11y (dev-time visual review).
+  - `packages/ui/README.md` — two-layer a11y doc (CI gate = Vitest+jest-axe; dev = Storybook+addon-a11y).
+  - `docs/dev/decisions/0020-radix-not-shadcn.md` — ADR-0020 accepted (Radix directly, no shadcn CLI).
+  - `CLAUDE.md` — tech stack updated: Tailwind + Radix UI primitives (ADR-0020).
+  - `docs/dev/QUESTIONS.md` — Q-0001 marked resolved (Option B approved 2026-05-03).
+
+**Time spent:** ~4h (multi-session: Phase A foundation + Phase B 26 primitives + Phase C wiring + TS
+debug: jest-axe NodeNext resolution, @testing-library/jest-dom augmentation, AxeResultsWithViolations
+mismatch, DOM cleanup between tests, Checkbox/RadioGroup/Select button-name axe violations)
+
+**Surprises / departures:**
+
+- jest-axe@9 ships NO TypeScript declarations (pure JS). NodeNext resolution requires an ambient
+  module declaration in a script-mode .d.ts file. Used `import()` type expressions inside
+  `declare module 'jest-axe'` — required eslint-disable for `consistent-type-imports`.
+- @testing-library/jest-dom/vitest type augmentation doesn't propagate globally from a .ts import
+  in setup.ts; had to declare `toHaveAttribute` directly in types.d.ts vitest augmentation.
+- @testing-library/react@16 auto-cleanup requires explicit `afterEach(cleanup)` in Vitest setup;
+  without it, DOM from prior tests accumulates and causes `getByRole` multiple-element errors.
+- Radix Checkbox/RadioGroup/Select `<label for>` sibling association not computed by axe-core in
+  jsdom (works in real browser). Fixed by adding `aria-label` to Radix root/item/trigger elements.
+  This is a jsdom limitation, not a spec violation.
+- UI-DIVERGENCE (X4): BUILD_CONTRACT §10 references `storybook:test` as axe CI gate. Stage 13
+  moves this to `pnpm test` (Vitest + jest-axe). Logged in README.md; BUILD_CONTRACT correction
+  deferred to Stage 14 audit.
+
+**Decisions made (not in stage):**
+
+- ADR-0020: Radix UI directly (not shadcn/ui CLI). Q-0001 resolved.
+
+**Deviations logged:**
+
+- UI-DIVERGENCE (X4 directive): axe CI gate = pnpm test (Vitest), not storybook:test. BUILD_CONTRACT
+  §10 needs update at Stage 14 audit.
+
+**Issues opened / closed / questions raised:**
+
+- Q-0001 RESOLVED: shadcn vs Radix approach → Option B (Radix directly) approved.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (50/50 axe+functional, 26 files) · Build ✅ (cached) · RLS ✅ (451/451, unchanged)
+
+**Tomorrow — first thing:**
+
+Stage 14 — apps/web scaffold + Next.js 14 App Router setup. Run morning ritual before any work.
+
+---
+
 ## Stage 10 (Audit Day 2) — 2026-05-03
 
 **Planned (from DEV_PLAN.md Stage 10):** Outbox Dispatcher + Audit Day 2 (ISSUE-0002,
