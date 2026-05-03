@@ -2,6 +2,60 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 9 — 2026-05-03
+
+**Planned (from DEV_PLAN.md Stage 9):** Migration 0008 — pg_cron Setup; 8 cron functions +
+8 cron job registrations; plan(22); 428/428 cumulative pgTAP.
+
+**Actually delivered:**
+
+- `feat(db): migration 0008 — pg_cron Setup` — commit d2d2090
+  - `supabase/migrations/0008_cron.sql` — CREATE EXTENSION IF NOT EXISTS pg_cron; 8 LANGUAGE sql
+    VOLATILE functions (fn_reap_stuck_jobs, fn_archive_jobs, fn_cleanup_pipeline,
+    fn_cleanup_idem_keys, fn_cleanup_abandoned_sessions, fn_expire_plans, fn_cleanup_rate_limit,
+    fn_recalibrate_content); 8 cron registrations via unschedule-first + cron.schedule() pattern
+  - `supabase/migrations/down/0008_cron.down.sql` — unschedule×8 + DROP FUNCTION×8 (extension
+    not dropped; Supabase pre-loads pg_cron)
+  - `supabase/tests/rls/008_cron.sql` — plan(22), 428/428 cumulative
+- `chore(dev-context): stage 9 close — pg_cron Setup` (this commit)
+  - ADR-0017: cron.schedule() not direct INSERT into cron.job
+  - DEVIATION DEV-20260503-2: content.recalibration wired as PHASE-2 no-op stub
+
+**Time spent:** ~1.5h (§2A pre-cues + restatement + impl + verification)
+
+**Surprises / departures:**
+
+- fn_recalibrate_content no-op body: `SELECT 1` is invalid for LANGUAGE sql RETURNS void
+  (SELECT returning int is not castable to void at CREATE time). Used
+  `UPDATE job_queue SET status = status WHERE FALSE` — valid DML no-op. Comment explains stub.
+- cron.schedule() API confirmed correct (iv REVERSED from DEV_PLAN.md "ON CONFLICT DO NOTHING");
+  correction to DEV_PLAN.md deferred to Stage 10 audit.
+- Down migration: extension NOT dropped — pg_cron is pre-loaded in Supabase Postgres; IF NOT
+  EXISTS in up migration handles idempotent re-run after down.
+
+**Decisions made (not in stage):**
+
+- ADR-0017: cron.schedule() / cron.unschedule() API preferred over direct INSERT into cron.job.
+
+**Deviations logged:**
+
+- DEV-20260503-2: content.recalibration as PHASE-2 no-op stub (arch Part XI override).
+
+**Issues opened / closed / questions raised:**
+
+- none
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (0/0 pass-with-no-tests) · Build ✅ (cached) · RLS ✅ (428/428)
+
+**Tomorrow — first thing:**
+
+Stage 10 — audit day (ISSUE-0002 retrofit, ISSUE-0003 GHA action upgrade, DEV_PLAN.md cron
+registration text correction). Run morning ritual before any work.
+
+---
+
 ## Stage 8 — 2026-05-03
 
 **Planned (from DEV_PLAN.md Stage 8):** Migration 0007 — New Domains (Assignments + Billing +

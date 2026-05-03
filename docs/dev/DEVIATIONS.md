@@ -3,6 +3,25 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260503-2 — content.recalibration wired as PHASE-2 no-op stub per arch Part XI
+
+- Date: 2026-05-03
+- Stage: 9
+- Type: scope-reduction (v1.1 deferral)
+- What the stage said: DEV_PLAN.md Stage 9 listed content.recalibration as one of 8 cron jobs,
+  implying it should perform real content recalibration.
+- What I actually did: Created fn_recalibrate_content() with a no-op body
+  (`UPDATE job_queue SET status = status WHERE FALSE` — valid LANGUAGE sql RETURNS void no-op).
+  Registered `content.recalibration` cron job pointing to this stub. PHASE-2 comment applied.
+- Why: arch Part XI explicitly states the content recalibration job "exists from Stage 9 but
+  invokes a no-op function in v1". The content recalibration engine is a v1.1 feature. Wiring
+  a real implementation would require v1.1 tables and logic that don't exist yet.
+- Impact on later stages: v1.1 migration must replace fn_recalibrate_content() body with real
+  implementation. The cron job registration in 0008_cron.sql stands (correct schedule 0 * * * *);
+  only the function body changes.
+- Linked: ADR-0017, arch Part XI, commit d2d2090
+- Resolved by: v1.1 migration (when content recalibration engine ships)
+
 ### DEV-20260430-1 — engines-client deferred from Stage 1 to Stage 15
 
 - Date: 2026-04-30
