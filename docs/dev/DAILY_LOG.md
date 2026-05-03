@@ -98,6 +98,77 @@ Stage 11 — packages/types + Zod Schemas. Run morning ritual before any work.
 
 ---
 
+## Stage 11 — 2026-05-03
+
+**Planned (from DEV_PLAN.md Stage 11):** packages/types + Zod Schemas — source-of-truth DTOs for
+client + server, branded ID types, ErrorCode + envelope, SCHEMA_VERSION, test asserting every DTO
+in Arch §6 has a schema. Add ProficiencyMapDTO (missing from Arch §6, needed Stage 24).
+
+**Actually delivered:**
+
+- `feat(types): stage 11 -- packages/types Zod schemas + branded IDs + DTO contracts` — commit 6536bdc
+  - `packages/types/src/shared.ts` — SCHEMA_VERSION '1.0.0' (X4), 10 branded ID types via unique
+    symbol pattern (X2: TenantId, UserId, SessionId, ItemId, SkillId, PathwayId, AssignmentId,
+    PlanId, GraphVersionId, FrameworkConfigId), 16 DB enum schemas with 0001_enums_tenancy_auth.sql
+    line citations, ErrorCode (15 codes per arch §1.5), APIErrorEnvelope.
+  - `packages/types/src/identity.ts` — UserMeDTOSchema, TenantDTOSchema (§6.1)
+  - `packages/types/src/content.ts` — PathwayDTOSchema, AssessmentProfileDTOSchema, ItemDTOSchema (§6.2)
+  - `packages/types/src/session.ts` — 8 schemas: CreateSessionRequest/Response, RecordResponseRequest/
+    Response, SubmitSessionResponse, SessionStateDTO, SessionSummaryDTO, CheckpointRequest (§6.3)
+  - `packages/types/src/intelligence.ts` — BehaviourProfileDTO, SkillProgressDTO, RepairSessionDTO,
+    CausalMapDTO, ExplanationDTO, LearningDNADTO (§6.4; imports PathwayReadinessDTOSchema from orchestration)
+  - `packages/types/src/orchestration.ts` — LearningPlanItemDTO, LearningPlanDTO, PathwayReadinessDTO,
+    PlanOverrideRequest (§6.5)
+  - `packages/types/src/assignments.ts` — AssignmentDTO, CreateAssignmentRequest,
+    StudentAssignmentDTO (extends AssignmentDTO via .extend()), AssignmentTrackingDTO (§6.6)
+  - `packages/types/src/analytics.ts` — InterventionAlertDTO, CohortOverviewDTO, AutoGroupDTO (§6.7;
+    imports ExplanationDTOSchema from intelligence)
+  - `packages/types/src/billing.ts` — PlanCatalogDTO, SubscriptionDTO, CheckoutRequest/Response,
+    InvoiceDTO (§6.8)
+  - `packages/types/src/engagement.ts` — EngagementSummaryDTO, AchievementDTO, NotificationDTO (§6.9)
+  - `packages/types/src/admin.ts` — JobStatusDTO, PipelineEventDTO (§6.10)
+  - `packages/types/src/proficiency.ts` — MasteryBandSchema (4 bands: novice/developing/proficient/
+    mastered), ProficiencyMapDTO (arch §6 gap; Stage 24 Results screen)
+  - `packages/types/src/index.ts` — re-exports all 12 domain files with .js extensions (NodeNext)
+  - `packages/types/src/__tests__/schemas.test.ts` — 97 tests: X1 DB enum parity (16 enums,
+    hardcoded values citing migration line numbers), X3 exhaustive schema registry (≥30 ZodType
+    exports), parse/safeParse smoke tests per domain.
+  - `packages/types/package.json` — zod@3.25.76 added as production dependency.
+
+**Time spent:** ~3h (morning ritual + pre-cues analysis + 13 source files + test file + quality gates)
+
+**Surprises / departures:**
+
+- Zod was not installed in any package.json — needed `pnpm add zod@^3.23 --filter @mm/types` before
+  any code could be written. Resolved to zod@3.25.76.
+- ProficiencyMapDTO 4-band vocabulary (novice/developing/proficient/mastered) confirmed distinct from
+  SkillProgressDTO.status 5-band vocabulary (not_started/developing/proficient/advanced/mastered)
+  per arch §6.4. Different fields, different purposes; no conflict.
+- No cross-domain circular deps: orchestration ← intelligence ← analytics; content ← session.
+  Import graph is a DAG.
+
+**Decisions made (not in stage):**
+
+- none (all X1–X4 patterns followed approved §2A plan; ADR-0019 not needed)
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- none
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (97/97) · Build ✅ (cached) · RLS ✅ (451/451, unchanged)
+
+**Tomorrow — first thing:**
+
+Stage 12 — SDK + API Client (packages/sdk). Run morning ritual before any work.
+
+---
+
 ## Stage 9 — 2026-05-03
 
 **Planned (from DEV_PLAN.md Stage 9):** Migration 0008 — pg_cron Setup; 8 cron functions +
