@@ -2,6 +2,41 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 10 (Audit Day 2) — 2026-05-03
+
+**Planned (from DEV_PLAN.md Stage 10):** Outbox Dispatcher + Audit Day 2 (ISSUE-0002,
+ISSUE-0003, DEV_PLAN cron correction). Audit tasks committed first; deliverable follows.
+
+### Audit triage (commits 1–4 of stage):
+
+**Actually delivered (audit tasks):**
+
+- `fix(db): migration 0009 — SECURITY DEFINER triple-REVOKE retrofit (ISSUE-0002)` — commit 75ac299
+  - Migration 0009: REVOKE FROM authenticated + REVOKE FROM anon + GRANT TO authenticated for
+    auth_tenant_id, auth_user_id, auth_role, fn_user_in_my_tenant, fn_class_in_my_tenant (0001)
+    + fn_graph_version_is_published (0002). All 6 helpers now A1-compliant.
+  - 009_security_definer_retrofit.sql: plan(12) — 6 anon denial + 6 authenticated access tests.
+    440/440 pgTAP cumulative.
+- `fix(ci): upgrade GHA actions from @v4 to @v5 for Node 24 runtime (ISSUE-0003)` — commit 9eb2f4b
+  - actions/checkout, pnpm/action-setup, actions/setup-node → @v5. All 4 CI jobs updated.
+  - Closes ahead of 2026-06-02 forced-upgrade deadline.
+- `docs(dev-plan): stage 9 — correct cron registration mechanism per ADR-0017` — commit 1711e29
+  - DEV_PLAN.md Stage 9 Deliverables: "ON CONFLICT DO NOTHING" → unschedule-first +
+    cron.schedule() API. content.recalibration stub noted.
+
+**Audit triage findings:**
+- DEVIATIONS: DEV-20260430-1 (engines-client) — ongoing/Stage 15. DEV-20260503-2
+  (content.recalibration stub) — ongoing/v1.1. Both expected.
+- OPEN_ISSUES: ISSUE-0002 closed (migration 0009). ISSUE-0003 closed (ci.yml @v5 bump).
+  Zero open issues after audit.
+- QUESTIONS: none open.
+- Quality gate replay: pnpm turbo (18/18 cached), pnpm test:rls (440/440), pnpm test:migration ✅.
+- Phase buffer: 0/3 consumed. 10 stages completed through audit tasks.
+
+**Outbox Dispatcher (Stage 10 deliverable) — see continuation below.**
+
+---
+
 ## Stage 9 — 2026-05-03
 
 **Planned (from DEV_PLAN.md Stage 9):** Migration 0008 — pg_cron Setup; 8 cron functions +

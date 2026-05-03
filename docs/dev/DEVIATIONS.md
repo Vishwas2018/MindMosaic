@@ -4,6 +4,7 @@
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
 ### DEV-20260503-2 — content.recalibration wired as PHASE-2 no-op stub per arch Part XI
+<!-- Audit Stage 10 (2026-05-03): still ongoing — resolves v1.1 when content recalibration engine ships. No action needed. -->
 
 - Date: 2026-05-03
 - Stage: 9
@@ -23,6 +24,7 @@
 - Resolved by: v1.1 migration (when content recalibration engine ships)
 
 ### DEV-20260430-1 — engines-client deferred from Stage 1 to Stage 15
+<!-- Audit Stage 10 (2026-05-03): still ongoing — resolves Stage 15. No action needed. -->
 
 - Date: 2026-04-30
 - Stage: 1
