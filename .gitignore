@@ -41,5 +41,8 @@ Thumbs.db
 supabase/.branches
 supabase/.temp
 
+# Dev SQL scratchpad
+supabase/snippets/
+
 # Vercel
 .vercel
