@@ -2,6 +2,52 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 16 — 2026-05-05
+
+**Planned (from DEV_PLAN.md Stage 16):** SkillEngine (Spec §3.2.3) + DiagnosticEngine (Spec §3.2.4); unit tests including the named exit criteria — cognitive load >0.8 reduces difficulty, mastery threshold terminates.
+
+**Actually delivered:**
+
+- `feat(engines): Stage 16 — SkillEngine + DiagnosticEngine` — commit `496a659`
+  - `packages/engines/src/skill.ts` — `SkillEngine: AssessmentEngine` pure-function namespace (per ADR-0022). Exports `cognitiveLoad(responses, expected_time)` (§9.5 formula), `prioritiseSkills(state)` (§7.5.2 formula), `masteryDelta(state, clock?)` helper. In-session difficulty rule (§7.5.1) implements all four branches: high-accuracy +0.1, low-accuracy −0.15, cognitive-load >0.8 −0.1, otherwise unchanged. Mastery-threshold termination signals `mastery_reached` once any item has been answered AND all target skills cross the threshold.
+  - `packages/engines/src/diagnostic.ts` — `DiagnosticEngine: AssessmentEngine` pure-function namespace. Binary-search-over-difficulty: correct response raises `low_difficulty` to current item difficulty, incorrect lowers `high_difficulty`. v1 confidence model = structural narrowing (`1 − (high − low)`); Stage 20 will plug the full Spec §8.4 model. `proficiencyMap(state, clock?)` projects state to `MasteryBand`-keyed entries; `estimateConfidence(probe)` is the helper. Termination via `confidence_threshold_met` (all skills ≥ threshold) or `max_items_reached`.
+  - `packages/engines/src/contracts.ts` — extended: `EngineItem` (extends `ItemDTO` with `skill_ids`, `difficulty`, optional `discrimination`); `EngineState` widened to `z.discriminatedUnion('engine_type', [Linear, Skill, Diagnostic])` per ADR-0023; `EngineResponse.telemetry?: { time_to_answer_ms, answer_changes }` for §9.5 cognitive-load inputs; `TerminationReason` adds `mastery_reached | max_items_reached | confidence_threshold_met`; new schemas `SkillEngineState`, `DiagnosticEngineState`, `MasteryDeltaResult`, `ProficiencyResult`; `FrameworkConfig` adds Stage 16 thresholds with v1 defaults (mastery_threshold=0.85, confidence_threshold=0.7, max_items=20, diagnostic_start_difficulty=0.5, difficulty_step_up=0.1, difficulty_step_down=0.15, cognitive_load_threshold=0.8, cognitive_load_step_down=0.1, expected_time_per_item_ms=30000); `assertLinearState`, `assertSkillState`, `assertDiagnosticState` discriminator-narrowing helpers.
+  - `packages/engines/src/linear.ts` — refactored to use `assertLinearState` narrowing (no behavioural change); two pre-existing `as LinearEngineState` casts removed. Stage 15 documented gap closed: `score().skills_touched` now aggregates real `skill_ids` from items the student has answered (was `[]`).
+  - `packages/engines/src/__tests__/_fixtures.ts` — shared deterministic builders: `buildEngineItem`, `buildEngineItems`, `buildEngineItemPool({ skills, difficulties })`, `buildResponse({ item, isCorrect, offsetMs, telemetry? })`, `clockAt(offsetMs)`, `buildLinear/Skill/DiagnosticSession`, `buildLinear/Skill/DiagnosticConfig`. UUIDs derived from indices for replay-stable test data.
+  - `packages/engines/src/__tests__/skill.test.ts` — 27 tests; both DEV_PLAN exit criteria explicitly named tests.
+  - `packages/engines/src/__tests__/diagnostic.test.ts` — 22 tests; binary-search 12-item convergence test asserts range ≤ 0.1 around true mastery 0.7.
+  - `packages/engines/src/__tests__/linear.test.ts` — refactored to consume shared fixtures (no behavioural change; 28/28 still pass).
+  - `docs/dev/decisions/0023-engine-state-union-and-engine-item.md` — ADR-0023 documenting both the discriminated-union widening and the server-side `EngineItem` introduction. Marks Stage 17 (AdaptiveEngineState) and v1.1 (RepairEngineState) as the next branches to add.
+
+**Time spent:** ~4h 30m (single session, including the Stage 16 §2A pre-implementation review earlier in the session, plus Stage 15 retroactive evening ritual closure, plus Stage 16 implementation + lint + test cleanup).
+
+**Surprises / departures:**
+
+- The §7.5.1 difficulty rule fires per-response, so 4 consecutive incorrect responses drop difficulty twice (0.5 → 0.35 after the 3rd → 0.20 after the 4th). Initial test expected a single application; adjusted to 3-incorrect cases that match the spec semantics.
+- Cognitive-load formula maxes at 0.60 without an `error_burst` (3+ incorrect run): time_inflation contributes ≤ 0.35 and answer_change_rate contributes ≤ 0.25. To trigger the `>0.8` cognitive-load branch in a test that ALSO avoids the low-accuracy branch, used `[T,T,F,F,F]` pattern over 5 responses (40% accuracy, error_burst=0.6, high telemetry → load=0.84 → −0.1 branch fires cleanly, d → 0.4).
+- ESLint's `@typescript-eslint/no-unused-vars` flagged underscore-prefixed parameters (`_state`) in `canNavigateBack`. Switched to `state` and use `assert{Skill,Diagnostic}State(state)` to enforce the runtime contract — bonus value of consistent narrowing across all engines.
+
+**Decisions made (not in stage):**
+
+- ADR-0023: `EngineState` as discriminated union by `engine_type` + `EngineItem` server-side type extending `ItemDTO`. Approved as Q-16.1 + Q-16.5 in the §2A review and applied verbatim. See `docs/dev/decisions/0023-engine-state-union-and-engine-item.md`.
+- Q-16.1 through Q-16.13 binding decisions all applied as approved; none deviated.
+
+**Deviations logged:**
+
+- none.
+
+**Issues opened / closed / questions raised:**
+
+- none.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (257/257 unit total: 97 @mm/types + 24 @mm/sdk + 59 @mm/ui + 77 @mm/engines) · Build ✅ (7/7 packages) · RLS n/a (no migrations).
+
+**Tomorrow — first thing:**
+
+Stage 17 — AdaptiveEngine (NAPLAN). Day 20–21 (2-day budget). Adds `AdaptiveEngineState` as the fourth branch of the `EngineState` union (writing-stage text capture, stage timer, testlet routing per `framework_config.adaptive_rules`). Risk: medium per DEV_PLAN — routing-table JSON shape must match the seed exactly.
+
 ## Stage 15 — 2026-05-04
 
 **Planned (from DEV_PLAN.md Stage 15):** `AssessmentEngine` interface (Spec §3.1) + ICAS `LinearEngine` implementation; create `packages/engines-client` browser-safe re-export package.
