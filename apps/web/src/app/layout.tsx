@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import type { Metadata } from 'next'
 import { DM_Sans, DM_Serif_Display } from 'next/font/google'
+import { ErrorBoundary } from '@mm/ui'
 import { createClient } from '../lib/supabase/server'
 import { Providers } from '../providers/Providers'
+import { RootErrorFallback } from '../components/RootErrorFallback'
 import '@mm/ui/tokens.css'
 import './globals.css'
 
@@ -33,7 +35,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={`${dmSans.variable} ${dmSerifDisplay.variable}`}>
       <body className="font-sans antialiased bg-white text-slate-900">
         <Providers initialSession={session}>
-          {children}
+          <ErrorBoundary fallback={<RootErrorFallback />}>
+            {children}
+          </ErrorBoundary>
         </Providers>
       </body>
     </html>

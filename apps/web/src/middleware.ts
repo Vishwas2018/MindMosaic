@@ -1,16 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getRoleHome } from './lib/auth/role-home'
 
 const PUBLIC_PREFIXES = ['/login', '/signup', '/forgot-password', '/reset-password', '/auth']
-
-const ROLE_HOME: Record<string, string> = {
-  student:        '/dashboard',
-  parent:         '/parent',
-  teacher:        '/teacher',
-  tutor:          '/teacher',
-  org_admin:      '/admin',
-  platform_admin: '/admin',
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -49,9 +41,8 @@ export async function middleware(request: NextRequest) {
 
   if (session && isPublic && pathname !== '/') {
     const role = (session.user.app_metadata?.['role'] as string) ?? 'student'
-    const home = ROLE_HOME[role] ?? '/dashboard'
     const url = request.nextUrl.clone()
-    url.pathname = home
+    url.pathname = getRoleHome(role)
     return NextResponse.redirect(url)
   }
 

@@ -6,21 +6,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button, Input } from '@mm/ui'
 import { createClient } from '../../lib/supabase/client'
+import { getRoleHome } from '../../lib/auth/role-home'
 
 const schema = z.object({
   email:    z.string().email('Enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
 })
 type FormData = z.infer<typeof schema>
-
-const ROLE_HOME: Record<string, string> = {
-  student:        '/dashboard',
-  parent:         '/parent',
-  teacher:        '/teacher',
-  tutor:          '/teacher',
-  org_admin:      '/admin',
-  platform_admin: '/admin',
-}
 
 export function LoginForm() {
   const router = useRouter()
@@ -43,7 +35,7 @@ export function LoginForm() {
       return
     }
     const role = (authData.session?.user.app_metadata?.['role'] as string) ?? 'student'
-    router.push(ROLE_HOME[role] ?? '/dashboard')
+    router.push(getRoleHome(role))
     router.refresh()
   }
 

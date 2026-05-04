@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { ToastProvider, TooltipProvider } from '@mm/ui'
 import { AuthProvider } from './AuthProvider'
 import { EntitlementsProvider } from './EntitlementsProvider'
 
@@ -20,7 +21,11 @@ export function Providers({
     <QueryClientProvider client={queryClient}>
       <AuthProvider initialSession={initialSession}>
         <EntitlementsProvider>
-          {children}
+          <TooltipProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </TooltipProvider>
         </EntitlementsProvider>
       </AuthProvider>
     </QueryClientProvider>
