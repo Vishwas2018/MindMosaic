@@ -12,7 +12,7 @@ describe('Brand — axe', () => {
 
   it('on-dark with slogan has no serious violations', async () => {
     const { container } = render(
-      <div style={{ background: '#5925a8' }}>
+      <div style={{ background: '#4A2BBA' }}>
         <Brand variant="on-dark" showSlogan size="lg" />
       </div>,
     );

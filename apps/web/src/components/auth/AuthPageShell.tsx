@@ -30,7 +30,7 @@ export function AuthPageShell({ children, heading, subheading }: AuthPageShellPr
       {/* Brand panel — hidden on mobile */}
       <div
         className="hidden lg:flex lg:w-[440px] xl:w-[520px] flex-col items-center justify-center gap-6 px-12"
-        style={{ background: 'linear-gradient(145deg, #7c3aed 0%, #5925a8 55%, #4a1d96 100%)' }}
+        style={{ background: 'var(--gradient-brand-panel)' }}
         aria-hidden="true"
       >
         <Brand variant="on-dark" size="lg" showSlogan />

@@ -30,9 +30,7 @@ export const OnDark: Story = {
     (S) => (
       <div
         className="p-8 rounded-xl"
-        style={{
-          background: 'linear-gradient(145deg, #7c3aed 0%, #5925a8 55%, #4a1d96 100%)',
-        }}
+        style={{ background: 'var(--gradient-brand-panel)' }}
       >
         <S />
       </div>

@@ -100,17 +100,17 @@ These are the only colors, typography values, radii, shadows, and motion curves 
 ```css
 /* packages/ui/src/tokens.css */
 :root {
-  /* ── Brand (purple) ── */
+  /* ── Brand (purple) — canonical palette anchored on #5D3FD3 ── */
   --brand-50:  #F5F3FF;
   --brand-100: #EDE9FE;
   --brand-200: #DDD6FE;
   --brand-300: #C4B5FD;
-  --brand-400: #8B5CF6;
-  --brand-500: #5925a8;  /* primary */
-  --brand-600: #4a1d96;  /* primary-d: hover */
-  --brand-700: #3b1584;  /* primary-ink: active */
-  --brand-800: #2e0f5c;
-  --brand-900: #1E1B4B;
+  --brand-400: #9580E5;
+  --brand-500: #5D3FD3;  /* primary — canonical brand purple */
+  --brand-600: #4A2BBA;  /* primary-d: hover — canonical hover purple */
+  --brand-700: #3A1FA0;  /* primary-ink: active */
+  --brand-800: #2A1583;
+  --brand-900: #1a1a60;  /* canonical dark brand text */
 
   /* ── Slate (neutral, cool-cast toward brand) ── */
   --slate-25:  #FDFCFE;
@@ -169,8 +169,8 @@ These are the only colors, typography values, radii, shadows, and motion curves 
   --primary-ink: var(--brand-700);
   --primary-l:   var(--brand-100);
 
-  --ring:        rgba(89,37,168,.14);  /* focus ring base */
-  --ring-strong: rgba(89,37,168,.25);  /* focus-visible on buttons */
+  --ring:        rgba(93,63,211,.14);  /* focus ring base — brand-500 */
+  --ring-strong: rgba(93,63,211,.25);  /* focus-visible on buttons — brand-500 */
 
   --success:    var(--correct-600);
   --success-bg: var(--correct-50);
@@ -245,11 +245,11 @@ These are the only colors, typography values, radii, shadows, and motion curves 
 ### 2.4 Shadow
 
 ```css
---shadow-card:       0 0 0 1px rgba(30,27,75,.03), 0 1px 2px rgba(89,37,168,.04), 0 4px 12px -4px rgba(89,37,168,.06);
---shadow-card-hover: 0 0 0 1px rgba(30,27,75,.03), 0 4px 12px rgba(89,37,168,.08), 0 8px 24px -8px rgba(89,37,168,.12);
---shadow-elevated:   0 8px 24px rgba(89,37,168,.1), 0 2px 6px rgba(89,37,168,.06);
---shadow-modal:      0 24px 56px -12px rgba(30,27,75,.25);
---shadow-form:       0 2px 6px rgba(89,37,168,.05), 0 8px 24px -8px rgba(89,37,168,.08);
+--shadow-card:       0 0 0 1px rgba(26,26,96,.03), 0 1px 2px rgba(93,63,211,.04), 0 4px 12px -4px rgba(93,63,211,.06);
+--shadow-card-hover: 0 0 0 1px rgba(26,26,96,.03), 0 4px 12px rgba(93,63,211,.08), 0 8px 24px -8px rgba(93,63,211,.12);
+--shadow-elevated:   0 8px 24px rgba(93,63,211,.1), 0 2px 6px rgba(93,63,211,.06);
+--shadow-modal:      0 24px 56px -12px rgba(26,26,96,.25);
+--shadow-form:       0 2px 6px rgba(93,63,211,.05), 0 8px 24px -8px rgba(93,63,211,.08);
 --shadow-focus:      0 0 0 3px var(--ring-strong);
 --shadow-focus-subtle: 0 0 0 3px var(--ring);
 ```
@@ -295,7 +295,8 @@ const preset: Partial<Config> = {
         serif: ['var(--font-serif)', 'Georgia', 'serif'],
       },
       colors: {
-        brand:     { 50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#8B5CF6',500:'#5925a8',600:'#4a1d96',700:'#3b1584',800:'#2e0f5c',900:'#1E1B4B' },
+        brand:        { 50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#9580E5',500:'#5D3FD3',600:'#4A2BBA',700:'#3A1FA0',800:'#2A1583',900:'#1a1a60' },
+        'brand-orange': { 50:'#FFF4ED',500:'#D35400',700:'#B34700' },
         slate:     { 25:'#FDFCFE',50:'#FAF8FF',75:'#F0EDF8',100:'#E9E5F5',150:'#D6D0E8',200:'#D6D0E8',300:'#A8A0C0',400:'#A8A0C0',500:'#7C7399',600:'#3B3566',700:'#3B3566',800:'#1E1B4B',900:'#1E1B4B',950:'#0e1118' },
         correct:   { 50:'#f0fdf4',100:'#dcfce7',200:'#bbf7d0',500:'#22c55e',600:'#16a34a',700:'#15803d' },
         incorrect: { 50:'#fef2f2',100:'#fee2e2',200:'#fecaca',500:'#ef4444',600:'#dc2626',700:'#b91c1c' },
@@ -727,7 +728,7 @@ Where the final implementation diverges from the HTML mockups, document here. Re
 
 1. **Per-file Tailwind `<script>` blocks → centralised preset.** Every mockup has an inline `tailwind.config`. In code, there is exactly one preset in `packages/ui` consumed by `apps/web/tailwind.config.ts`.
 2. **Per-file `:root` token blocks → single `tokens.css`.** Mockups re-declare tokens each file. Code has one source.
-3. **Magic-hex literals → CSS vars or Tailwind classes.** Mockup uses `#5925a8` inline; code uses `bg-brand-500` or `var(--primary)`.
+3. **Magic-hex literals → CSS vars or Tailwind classes.** Mockup uses `#5D3FD3` inline; code uses `bg-brand-500` or `var(--primary)`.
 4. **Inline JS in `<script>` → React components + hooks.** Mockup JS (timer logic, state machines) is reference only; re-implement in React/TypeScript.
 5. **`06-learning-hub.html` and `11-engagement.html`** are rich reference; v1 implements the 80% core, defers animated polish to v1.1.
 6. **Orange accent reconciled to `#ef6843` in-app.** Mockups show variants; in-app implementation locks to `#ef6843`.
