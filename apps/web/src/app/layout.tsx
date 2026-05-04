@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { DM_Sans, DM_Serif_Display } from 'next/font/google'
 import { ErrorBoundary } from '@mm/ui'
 import { createClient } from '../lib/supabase/server'
@@ -24,7 +24,19 @@ const dmSerifDisplay = DM_Serif_Display({
 export const metadata: Metadata = {
   title: 'MindMosaic',
   description: 'Turning practice into Mastery!',
-  icons: { icon: '/favicon.png' },
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+    ],
+    apple: { url: '/apple-touch-icon.png', sizes: '180x180' },
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#5D3FD3',
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
