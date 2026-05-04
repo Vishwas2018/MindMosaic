@@ -1,3 +1,5 @@
+'use client';
+
 import { forwardRef, createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import * as RadixToast from '@radix-ui/react-toast';
