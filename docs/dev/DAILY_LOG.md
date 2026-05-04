@@ -2,6 +2,52 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 17 — 2026-05-06
+
+**Planned (from DEV_PLAN.md Stage 17):** AdaptiveEngine for NAPLAN — testlet routing per `framework_config.adaptive_rules`, server-authoritative per-stage timer, stage-bound back-nav, writing-stage text capture (no auto-marking). Exit criterion: 3-stage NAPLAN session through harness routes correctly per the seed's routing table.
+
+**Actually delivered:**
+
+- `feat(engines): Stage 17 — AdaptiveEngine (NAPLAN testlet routing)` — commit `3db1234`
+  - **Seed correction (Q-17.1, ADR-0024):** Rewrote NAPLAN row's `adaptive_rules` JSON in `supabase/seeds/03_assessment_config.sql` from IRT/CAT placeholder (`theta_init`, `step_size`, `max_info`) to the spec-compliant testlet routing table. 7 testlets across 3 stages (t1; t2_easy/medium/hard; t3_easy/medium/hard), 5 items per testlet, 6-row routing_table keyed by `(stage_id, score_min, score_max) → next_testlet_id`. Per-stage timers: 15min for s1/s2, 10min for s3.
+  - `packages/engines/src/contracts.ts` — added `AdaptiveRulesSchema` (with `RoutingTableEntrySchema`, `TestletDefinitionSchema`); added `AdaptiveEngineStateSchema` with `AdaptiveStageState`, `RoutingHistoryEntry`. Widened `EngineStateSchema` to a 4-arm `z.discriminatedUnion`. Added optional `EngineItem.testlet_id?`, `stage_id?`, `is_writing_item?`. Made `EngineResponse.is_correct` nullable for writing items (Q-17.5). Added `FrameworkConfig.adaptive_rules?: AdaptiveRules`. Added `assertAdaptiveState` discriminator-narrowing helper.
+  - `packages/engines/src/adaptive.ts` — `AdaptiveEngine: AssessmentEngine` pure-function namespace per ADR-0022. `getNextItem` is a pure peek (no state mutation): in-testlet returns next item; past-end peeks the routing destination's first item via `lookupRoute`. `recordResponse` does the load-bearing work: in-testlet append+advance OR routing-transition (close current stage, append new stage, push routing_history). Helpers: `computeStageScore` (writing items excluded per Q-17.5), `lookupRoute` (Q-17.9 throws on ambiguous match). Per-stage timer in `getTimeRemaining` (anchors to first response). `scoreAdaptiveWithConfig` + `terminateAdaptiveWithConfig` engine-prefixed to avoid barrel collision with linear's `scoreWithConfig`/`terminateWithConfig`.
+  - `packages/engines/src/index.ts` — barrel re-export `adaptive.js`.
+  - `packages/engines/src/__tests__/_fixtures.ts` — added `buildAdaptiveRules` (canonical 3-stage NAPLAN), `buildAdaptiveItemPool` (35-item pool spanning all 7 testlets), `buildAdaptiveSession`, `buildAdaptiveConfig`, `buildTestletItems`, `buildWritingItem`. `buildResponse` accepts `isCorrect: boolean | null` with optional `responseData` override.
+  - `packages/engines/src/__tests__/adaptive.test.ts` — 33 tests across 10 describe blocks: initialise (6), getNextItem (3), recordResponse (4), routing table (6 incl. ambiguous-throws), stage boundaries (3), per-stage timer (3), writing stage (2), termination (2), golden 3-stage NAPLAN (1, the DEV_PLAN exit criterion), replay determinism (1), edges (2).
+  - `docs/dev/decisions/0024-adaptive-testlet-routing-model.md` — ADR-0024 documenting the testlet-routing data-model decision (Q-17.1.A) and the testlet-membership-via-config-map approach (Q-17.2). IRT/CAT model deferred to v1.1+.
+
+**Time spent:** ~5h (single session, including the §2A pre-implementation review that surfaced Q-17.1 as a blocking spec/seed mismatch + execution + lint/test cleanup).
+
+**Surprises / departures:**
+
+- **Q-17.1 spec/seed mismatch was real and load-bearing.** The seed's `adaptive_rules` JSON was IRT/CAT-shaped (`theta_init`, `step_size`, `max_info`); spec §3.2.1 explicitly describes testlet routing. Resolved per Q-17.1.A — rewrote the seed row. ADR-0024 documents the call. No new migration needed; testlet membership lives in the config JSON's `testlets` map.
+- **Symbol collision in barrel re-export.** `linear.ts` and `adaptive.ts` both wanted to export `scoreWithConfig` / `terminateWithConfig`; renamed adaptive's helpers to `scoreAdaptiveWithConfig` / `terminateAdaptiveWithConfig` to avoid the collision while keeping Stage 15/16 test surface unchanged. Stage 18+ engines should adopt engine-prefixed names from the start.
+- **`AdaptiveRulesSchema` forward declaration.** Initially used `z.lazy(() => AdaptiveRulesSchema)` so `FrameworkConfigSchema` could declare `adaptive_rules` first. TS struggled with the TDZ via closure pattern; refactored to declare the AdaptiveRules schemas BEFORE `FrameworkConfigSchema`. Cleaner.
+- **Routing-error tests originally hit Path A (recordResponse with in-testlet item)** which doesn't trigger the route lookup. Adjusted the tests to exhaust the testlet first, then call `getNextItem` (peek path) to surface the ambiguous/missing-route throws. Both paths now covered.
+- **`is_correct: boolean | null` widening is backward-compatible** — Stage 15/16 tests pass `boolean` literals, which trivially satisfy `boolean | null`. `LinearEngine`/`SkillEngine`/`DiagnosticEngine` treat `null` as falsy for scoring purposes (the v1 acceptable approximation since writing items don't appear in those modes).
+
+**Decisions made (not in stage):**
+
+- ADR-0024: AdaptiveEngine testlet routing model + seed correction (Q-17.1.A). Approved as the §2A default; applied verbatim. See `docs/dev/decisions/0024-adaptive-testlet-routing-model.md`.
+- Q-17.1 through Q-17.12 binding decisions all applied as approved (only Q-17.10 mattered — single commit).
+
+**Deviations logged:**
+
+- none. Q-17.1 was a SEED correction, not a plan deviation; the engine ships exactly what DEV_PLAN.md Stage 17 deliverables specify.
+
+**Issues opened / closed / questions raised:**
+
+- none.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (290/290 unit total: 97 @mm/types + 24 @mm/sdk + 59 @mm/ui + 110 @mm/engines) · Build ✅ (7/7 packages) · RLS n/a (no migrations).
+
+**Tomorrow — first thing:**
+
+Stage 18 — Content Service. `supabase/functions/content-svc/`: `/pathways` (entitlement-filtered), `/pathways/{slug}`, `/assessment-profiles`, `/content/items/{id}`, `/content/select` (blueprint-driven deterministic ordering), `/content/search`, `/skill-graphs/active`. Plus the in-module skill-graph cache in `packages/core` (1h TTL, watermark check). First Edge-Function-bearing stage of Phase 1. Risk: medium per DEV_PLAN — contract tests + cache hit-rate gate.
+
 ## Stage 16 — 2026-05-05
 
 **Planned (from DEV_PLAN.md Stage 16):** SkillEngine (Spec §3.2.3) + DiagnosticEngine (Spec §3.2.4); unit tests including the named exit criteria — cognitive load >0.8 reduces difficulty, mastery threshold terminates.
