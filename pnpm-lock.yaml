@@ -245,6 +245,8 @@ importers:
         specifier: ^5.4.19
         version: 5.4.21(@types/node@20.19.39)
 
+  supabase/functions/content-svc: {}
+
 packages:
 
   '@adobe/css-tools@4.4.4':
