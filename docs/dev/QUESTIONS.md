@@ -9,6 +9,28 @@
 
 ## Resolved
 
+### Q-22.1 — `useListRecentSessions` hook: endpoint path
+
+- Date raised: 2026-05-11 (Stage 22 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS.md §8 ("Recent sessions via `SessionSummaryDTO`");
+  assessment-svc Stage 19 ships `listRecentSessions` handler; OWNERS.md
+  assessment-svc Endpoints Owned [v1].
+- Question: What HTTP path does `useListRecentSessions` call? SCREEN_SPECS
+  §8 names the DTO but not the endpoint; assessment-svc handler is named
+  `listRecentSessions`.
+- Why ambiguous: Stage 19 wired the handler but the route mapping wasn't
+  surfaced in the §2A walkthrough.
+- Blocking? no — natural default is `GET /sessions/recent`.
+- Code affected: `packages/sdk/src/hooks/session.ts`,
+  `packages/sdk/src/keys.ts`, `apps/web/src/app/(student)/session-selection/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-11): `GET /sessions/recent`. Locked in
+  **OWNERS.md:99** under "Service: `assessment-svc` (ASS) → Endpoints
+  Owned [v1]". `useListRecentSessions` hook calls this path; query key
+  `mmKeys.sessions.recent()`. No ADR required — endpoint is already
+  authoritatively listed in OWNERS.md.
+
 ### Q-21.5 — 1000-request scaling test: literal vs constant
 
 - Date raised: 2026-05-09 (Stage 21 §2A)
