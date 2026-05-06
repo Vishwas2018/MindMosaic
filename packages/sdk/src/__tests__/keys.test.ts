@@ -22,6 +22,11 @@ describe('mmKeys — X4 hierarchy pattern', () => {
     expect(mmKeys.sessions.summary(id)).toEqual(['sessions', id, 'summary']);
   });
 
+  it('sessions.recent() is scoped under all() (Stage 22 / Q-22.1)', () => {
+    expect(mmKeys.sessions.recent()).toEqual(['sessions', 'recent']);
+    expect(mmKeys.sessions.recent()[0]).toBe(mmKeys.sessions.all()[0]);
+  });
+
   it('users.all() is root key', () => {
     expect(mmKeys.users.all()).toEqual(['users']);
   });

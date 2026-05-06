@@ -1,3 +1,4 @@
+// hooks/session.ts → assessment-svc (per ADR-0029)
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import {
@@ -25,7 +26,7 @@ export function useCreateSession(options?: { idempotencyKey?: string }) {
   return useMutation({
     mutationFn: (request: CreateSessionRequest) =>
       client
-        .post('/sessions', CreateSessionResponseSchema, request, idempotencyKey)
+        .post('/assessment-svc/sessions/create', CreateSessionResponseSchema, request, idempotencyKey)
         .then((r) => r.data),
   });
 }
@@ -35,7 +36,9 @@ export function useSessionState(sessionId: string) {
   return useQuery({
     queryKey: mmKeys.sessions.state(sessionId),
     queryFn: () =>
-      client.get(`/sessions/${sessionId}/state`, SessionStateDTOSchema).then((r) => r.data),
+      client
+        .get(`/assessment-svc/sessions/${sessionId}/state`, SessionStateDTOSchema)
+        .then((r) => r.data),
     enabled: sessionId.length > 0,
   });
 }
@@ -45,8 +48,25 @@ export function useSessionSummary(sessionId: string) {
   return useQuery({
     queryKey: mmKeys.sessions.summary(sessionId),
     queryFn: () =>
-      client.get(`/sessions/${sessionId}/summary`, SessionSummaryDTOSchema).then((r) => r.data),
+      // Q-22.2: dispatcher serves `GET /sessions/{id}` (no `/summary` suffix)
+      // — see assessment-svc/index.ts:353.
+      client
+        .get(`/assessment-svc/sessions/${sessionId}`, SessionSummaryDTOSchema)
+        .then((r) => r.data),
     enabled: sessionId.length > 0,
+  });
+}
+
+const SessionSummaryListSchema = SessionSummaryDTOSchema.array();
+
+/** Q-22.1: GET /sessions/recent (OWNERS.md:99). Used by Session Selection
+ *  screen (Stage 22) to render the "recent sessions" row. */
+export function useListRecentSessions() {
+  const client = useMmClient();
+  return useQuery({
+    queryKey: mmKeys.sessions.recent(),
+    queryFn: () =>
+      client.get('/assessment-svc/sessions/recent', SessionSummaryListSchema).then((r) => r.data),
   });
 }
 
@@ -59,7 +79,12 @@ export function useRecordResponse(sessionId: string, options?: { idempotencyKey?
   return useMutation({
     mutationFn: (request: RecordResponseRequest) =>
       client
-        .post(`/sessions/${sessionId}/respond`, RecordResponseResponseSchema, request, idempotencyKey)
+        .post(
+          `/assessment-svc/sessions/${sessionId}/respond`,
+          RecordResponseResponseSchema,
+          request,
+          idempotencyKey,
+        )
         .then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: mmKeys.sessions.state(sessionId) });
@@ -76,7 +101,12 @@ export function useSubmitSession(sessionId: string, options?: { idempotencyKey?:
   return useMutation({
     mutationFn: () =>
       client
-        .post(`/sessions/${sessionId}/submit`, SubmitSessionResponseSchema, {}, idempotencyKey)
+        .post(
+          `/assessment-svc/sessions/${sessionId}/submit`,
+          SubmitSessionResponseSchema,
+          {},
+          idempotencyKey,
+        )
         .then((r) => r.data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: mmKeys.sessions.byId(sessionId) });
@@ -92,7 +122,12 @@ export function useCheckpoint(sessionId: string, options?: { idempotencyKey?: st
   return useMutation({
     mutationFn: (request: CheckpointRequest) =>
       client
-        .post(`/sessions/${sessionId}/checkpoint`, CheckpointAckSchema, request, idempotencyKey)
+        .post(
+          `/assessment-svc/sessions/${sessionId}/checkpoint`,
+          CheckpointAckSchema,
+          request,
+          idempotencyKey,
+        )
         .then((r) => r.data),
   });
 }

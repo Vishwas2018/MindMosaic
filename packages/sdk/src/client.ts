@@ -21,6 +21,15 @@ interface Schema<T> {
 }
 
 export interface MmClientConfig {
+  /**
+   * Edge Functions root. Per ADR-0029, this is
+   * `${SUPABASE_URL}/functions/v1` (no trailing slash, no service segment).
+   * Each SDK hook prepends its service prefix in the path it passes to
+   * `client.get`/`client.post` (e.g. `/assessment-svc/sessions/recent`,
+   * `/content-svc/pathways`). No mapping table inside MmClient — the path
+   * the hook writes is the path the network sees, with `${baseUrl}`
+   * simply prepended.
+   */
   baseUrl: string;
   /** Return the current JWT, or null if unauthenticated. */
   getToken: () => Promise<string | null>;

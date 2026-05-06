@@ -21,6 +21,7 @@ export const mmKeys = {
     byId: (id: string) => ['sessions', id] as const,
     state: (id: string) => ['sessions', id, 'state'] as const,
     summary: (id: string) => ['sessions', id, 'summary'] as const,
+    recent: () => ['sessions', 'recent'] as const,
   },
   intelligence: {
     all: () => ['intelligence'] as const,
