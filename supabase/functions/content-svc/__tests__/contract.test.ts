@@ -20,6 +20,8 @@ import {
   invalidateSkillGraph,
   getSkillGraph,
   type SkillGraphCacheLoader,
+  type SkillNode,
+  type SkillEdge,
 } from '../../_shared/skill-graph-cache.ts';
 import {
   listPathways,
@@ -35,6 +37,18 @@ import {
   createMockSupabase,
   type MockResponses,
 } from '../../_test-helpers/mock-supabase.ts';
+
+// ─── Test constants ─────────────────────────────────────────────────────────
+//
+// Q-21.5: scaling-test request count. Constant rather than literal so the
+// load-test floor is grep-able and tunable (Stage 26 may want to raise this).
+const REQUEST_COUNT = 1000;
+
+// Q-21.2: synthetic watermark-cost gate. Real <5ms gate at Stage 26 against a
+// warm Postgres pool; here we use 50ms (10× margin) to absorb V8 warm-up,
+// stub overhead, and incidental GC in Vitest CI runs.
+const WATERMARK_COST_ITERATIONS = 100;
+const WATERMARK_COST_MEAN_MS_GATE = 50;
 
 // ─── Mock builder (Stage 19 Q-19.13: hoisted to _test-helpers/mock-supabase.ts) ──
 
@@ -536,5 +550,139 @@ describe('skill-graph-cache — contract', () => {
     const cache = await getSkillGraph(loader);
     expect(cache).toBeNull();
     expect(dataCalls()).toBe(0);
+  });
+
+  // ── Stage 21 hardening tests (ADR-0028) ───────────────────────────────────
+
+  it('concurrent cold-start: two parallel calls share one DB load (Q-21.3)', async () => {
+    // Slow loadGraphData so both callers race the in-flight sentinel.
+    const versions = [{ id: 'gv-1', version: 'v1', published_at: '2026-05-01T00:00:00.000Z' }];
+    const activeFn = vi.fn(() => Promise.resolve(versions[0]!));
+    const dataFn = vi.fn(
+      () => new Promise<{ nodes: SkillNode[]; edges: SkillEdge[] }>(resolve => {
+        setTimeout(() => resolve({ nodes: [], edges: [] }), 10);
+      }),
+    );
+    const loader: SkillGraphCacheLoader = {
+      loadActiveVersion: activeFn,
+      loadGraphData: dataFn,
+    };
+
+    // Fire both calls before the first await yields — both observe cache=null.
+    const [a, b] = await Promise.all([getSkillGraph(loader), getSkillGraph(loader)]);
+
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    // Both promises should resolve to the SAME cache instance — proves they
+    // shared the in-flight load rather than each kicking off their own.
+    expect(a).toBe(b);
+    expect(dataFn.mock.calls.length).toBe(1); // single DB round-trip
+  });
+
+  it('stale-while-revalidate: loadGraphData failure retains prior cache + warns (Q-21.4)', async () => {
+    // First call: succeeds, populates cache.
+    // Second call: new watermark, loadGraphData throws → return prior cache + warn.
+    let activeIdx = 0;
+    let dataIdx = 0;
+    const activeFn = vi.fn(() => {
+      const v = activeIdx === 0
+        ? { id: 'gv-1', version: 'v1', published_at: '2026-05-01T00:00:00.000Z' }
+        : { id: 'gv-2', version: 'v2', published_at: '2026-05-09T00:00:00.000Z' };
+      activeIdx += 1;
+      return Promise.resolve(v);
+    });
+    const dataFn = vi.fn(() => {
+      if (dataIdx === 0) {
+        dataIdx += 1;
+        return Promise.resolve({
+          nodes: [{ id: 'skill-1', slug: 's1', name: 'S1', parent_id: null }],
+          edges: [],
+        });
+      }
+      dataIdx += 1;
+      return Promise.reject(new Error('transient DB failure'));
+    });
+    const loader: SkillGraphCacheLoader = {
+      loadActiveVersion: activeFn,
+      loadGraphData: dataFn,
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const first = await getSkillGraph(loader, 1_000_000_000_000, 'trace-stage21-1');
+    expect(first?.watermark).toBe('gv-1');
+
+    // Second call: new watermark, loadGraphData rejects, prior cache preserved.
+    const second = await getSkillGraph(loader, 1_000_000_000_000 + 1000, 'trace-stage21-2');
+    expect(second?.watermark).toBe('gv-1'); // prior cache returned
+    expect(second).toBe(first);              // exact same instance
+
+    // console.warn fired once with the structured payload.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(warnSpy.mock.calls[0]![0] as string);
+    expect(payload.event).toBe('skill_graph_stale_revalidate_failed');
+    expect(payload.watermark_old).toBe('gv-1');
+    expect(payload.watermark_new).toBe('gv-2');
+    expect(payload.trace_id).toBe('trace-stage21-2');
+    expect(payload.error).toBe('transient DB failure');
+
+    warnSpy.mockRestore();
+  });
+
+  it('stale-while-revalidate does NOT swallow first-ever cold-load failure (Q-21.4 floor)', async () => {
+    // Cold cache + loadGraphData rejects → must propagate.
+    const loader: SkillGraphCacheLoader = {
+      loadActiveVersion: async () => ({ id: 'gv-1', version: 'v1', published_at: '2026-05-01T00:00:00.000Z' }),
+      loadGraphData: async () => { throw new Error('cold-start DB failure'); },
+    };
+    await expect(getSkillGraph(loader)).rejects.toThrow('cold-start DB failure');
+  });
+
+  it('in-flight sentinel cleared on rejection so subsequent calls retry (Q-21.3 floor)', async () => {
+    // Reject once, then succeed. After the rejection, the next call must
+    // observe loadingPromise=null (cleared in finally) and retry.
+    let dataIdx = 0;
+    const dataFn = vi.fn(() => {
+      if (dataIdx === 0) {
+        dataIdx += 1;
+        return Promise.reject(new Error('first-attempt failure'));
+      }
+      dataIdx += 1;
+      return Promise.resolve({ nodes: [], edges: [] });
+    });
+    const loader: SkillGraphCacheLoader = {
+      loadActiveVersion: async () => ({ id: 'gv-1', version: 'v1', published_at: '2026-05-01T00:00:00.000Z' }),
+      loadGraphData: dataFn,
+    };
+    await expect(getSkillGraph(loader)).rejects.toThrow('first-attempt failure');
+    // Second call: sentinel cleared, fresh attempt succeeds.
+    const second = await getSkillGraph(loader);
+    expect(second).not.toBeNull();
+    expect(dataFn.mock.calls.length).toBe(2);
+  });
+
+  it(`${REQUEST_COUNT} subsequent requests skip DB (DEV_PLAN exit criterion)`, async () => {
+    const { loader, dataCalls, activeCalls } = makeLoader({});
+    await getSkillGraph(loader); // cold load
+    for (let i = 0; i < REQUEST_COUNT; i += 1) {
+      await getSkillGraph(loader);
+    }
+    expect(dataCalls()).toBe(1);                     // graph loaded exactly once
+    expect(activeCalls()).toBe(REQUEST_COUNT + 1);   // cheap watermark check per call
+  });
+
+  it(`watermark check cost < ${WATERMARK_COST_MEAN_MS_GATE}ms per iteration synthetic (DEV_PLAN exit criterion 10x margin)`, async () => {
+    // Q-21.2: real <5ms gate is at Stage 26 load test against a warm Postgres
+    // pool. Here we use 50ms mean (10x margin) over 100 iterations — pinned to
+    // mean rather than max so a single GC pause doesn't fail the suite.
+    const { loader } = makeLoader({});
+    await getSkillGraph(loader); // warm the cache
+    const start = performance.now();
+    for (let i = 0; i < WATERMARK_COST_ITERATIONS; i += 1) {
+      await getSkillGraph(loader);
+    }
+    const elapsedMs = performance.now() - start;
+    const meanMs = elapsedMs / WATERMARK_COST_ITERATIONS;
+    expect(meanMs).toBeLessThan(WATERMARK_COST_MEAN_MS_GATE);
   });
 });

@@ -94,8 +94,21 @@ const TTL_MS = 60 * 60 * 1000; // 1 hour
 
 let cache: SkillGraphCache | null = null;
 
+/**
+ * Stage 21 / Q-21.3 / ADR-0028: in-flight Promise sentinel.
+ *
+ * When two requests hit a fresh worker simultaneously, both observe
+ * `cache === null` and would otherwise both call `loadGraphData`. The
+ * sentinel ensures the second caller awaits the first caller's load
+ * instead of issuing a redundant DB round-trip. Cleared in `finally` so
+ * a rejection (e.g. transient `loadGraphData` failure on cold start)
+ * does NOT permanently wedge the cache — the next caller retries.
+ */
+let loadingPromise: Promise<SkillGraphCache | null> | null = null;
+
 export function invalidateSkillGraph(): void {
   cache = null;
+  loadingPromise = null; // test hygiene — also clears the in-flight sentinel
 }
 
 /**
@@ -126,10 +139,26 @@ function buildAdjacency(nodes: SkillNode[], edges: SkillEdge[]): Map<string, str
  * or TTL expiry.
  *
  * Returns `null` when no published graph exists (clean DB).
+ *
+ * Stage 21 hardening (ADR-0028):
+ *   - Q-21.3: in-flight Promise sentinel coalesces concurrent cold-start
+ *     loads into a single DB round-trip per worker per cold cache. The
+ *     sentinel is cleared in `finally`, so a rejection unwedges the cache
+ *     for the next caller.
+ *   - Q-21.4: stale-while-revalidate. If `loadActiveVersion` returns a
+ *     new watermark and `loadGraphData` rejects, AND a prior cache
+ *     exists, retain the prior cache and emit a structured
+ *     `console.warn`. Future calls re-attempt; cache catches up on the
+ *     next successful load. Behaviour unchanged when no prior cache
+ *     exists (rejection propagates — cold start can't fall back).
+ *
+ * `traceId` is optional metadata; included in the stale-while-revalidate
+ * warn payload when provided. Existing callers can omit it.
  */
 export async function getSkillGraph(
   loader: SkillGraphCacheLoader,
   now: number = Date.now(),
+  traceId?: string | null,
 ): Promise<SkillGraphCache | null> {
   const active = await loader.loadActiveVersion();
   if (active === null) {
@@ -144,15 +173,52 @@ export async function getSkillGraph(
     return cache;
   }
 
-  const data = await loader.loadGraphData(active.id);
-  cache = {
-    watermark: active.id,
-    loaded_at: now,
-    nodes: new Map(data.nodes.map(n => [n.id, n])),
-    adjacency: buildAdjacency(data.nodes, data.edges),
-    version: active,
-  };
-  return cache;
+  // Q-21.3: if another caller is already loading, await their result.
+  if (loadingPromise !== null) {
+    return loadingPromise;
+  }
+
+  // Capture the prior cache for the Q-21.4 stale-while-revalidate fallback.
+  const priorCache = cache;
+  const previousWatermark = priorCache?.watermark ?? null;
+
+  loadingPromise = (async () => {
+    try {
+      const data = await loader.loadGraphData(active.id);
+      cache = {
+        watermark: active.id,
+        loaded_at: now,
+        nodes: new Map(data.nodes.map(n => [n.id, n])),
+        adjacency: buildAdjacency(data.nodes, data.edges),
+        version: active,
+      };
+      return cache;
+    } catch (err) {
+      // Q-21.4: stale-while-revalidate ONLY when we have prior data to fall
+      // back to. First-ever cold-load failure must propagate so the caller
+      // sees the error (no silent corruption of an empty cache).
+      if (priorCache !== null) {
+        console.warn(JSON.stringify({
+          level: 'warn',
+          event: 'skill_graph_stale_revalidate_failed',
+          error: err instanceof Error ? err.message : String(err),
+          watermark_old: previousWatermark,
+          watermark_new: active.id,
+          trace_id: traceId ?? null,
+        }));
+        return priorCache;
+      }
+      throw err;
+    }
+  })();
+
+  try {
+    return await loadingPromise;
+  } finally {
+    // Q-21.3: clear in finally so a rejected cold load does not wedge the
+    // cache. The next caller observes loadingPromise === null and retries.
+    loadingPromise = null;
+  }
 }
 
 /**
