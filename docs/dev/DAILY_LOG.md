@@ -2,6 +2,70 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 22b — 2026-05-12
+
+**Planned (carry-forward from DEV-20260511-1):** Stage 22 split into 22a (infrastructure, shipped 2026-05-11 commit `6cbe882`) + 22b (visual screens, today). Stage 22b deliverables: Session Selection screen (`/session-selection`, `student-parent` shell), session route guard at `/session/[id]/layout.tsx`, Practice screen (`/session/[id]/practice`, `focus` shell), env-guarded Playwright e2e at `practice-flow.spec.ts`. Visual references: SCREEN_SPECS §8 (line 440) + §10 (line 598), UI_CONTRACT, `docs/mockups/05-student-home.html` + `08-practice.html`, `stage-24_results-flagship`, external `portal-codebase-2026-05-06` (visual reference only per UI_CONTRACT §1.1). DEV_PLAN exit criterion: student navigates to practice session, completes 5 items with feedback, sees summary.
+
+**Actually delivered:**
+
+- `feat(web): Stage 22b — session selection + practice screens` — commit `b1dafe6`. **7 files changed, +999 / −1**.
+  - `apps/web/src/app/(student)/session-selection/page.tsx` — `student-parent` shell with `TopBar` + `Brand`. `PageHeader` for "How do you want to study today?" + subtitle. Subject chips row (`role="tablist"`, `role="tab"` with `aria-selected`, query-param defaulted from `?subject=`, client-side `match` predicates). Pathway grid from `usePathways()` — 1/2/3 column responsive layout. Each pathway card: name + `exam_family · Year XX-XX · 20–30 min` + Practice / Exam / Diagnostic buttons. Locked cards `aria-disabled="true"` + dimmed (opacity-60) + lock icon (🔒) with `aria-label="Locked — upgrade to access"` + "Upgrade to unlock" anchor → `/billing?intent=upgrade&pathway={slug}`. Click handler: `useCreateSession.mutate(...)` → on success `router.push(\`/session/${id}/${mode === 'exam' ? 'exam' : 'practice'}\`)`. Error branches: 409 → `setActiveSessionConflict(true)` showing a banner with "Resume" link to `/dashboard` (not a hard error, per watch list); 402 / `FEATURE_GATED` → warn toast "This is a Premium feature" (no nav, per spec); else → error toast. States: loading skeleton (3 placeholder cards via `role="status"`), error retry card (Card + EmptyState + retry Button), free-tier empty banner.
+  - `apps/web/src/app/(student)/session/[id]/layout.tsx` — server-side route guard. Reads `session_record { id, status }` via `createClient().from()`. `submitted` → `redirect(/results/${id})`; `abandoned` / `expired` → `redirect('/session-selection')`; missing row → `redirect('/session-selection')`. Auth + role check is enforced by parent `(student)/layout.tsx`, so this layout is purely the state-branch.
+  - `apps/web/src/app/(student)/session/[id]/practice/page.tsx` — `focus` shell with `TopBar` + `Brand` + exit `IconButton` (×) → `/dashboard`. `useSessionState(sessionId)` hydrates the working item on mount. Question card: stem (read `value` from plain_text shape), optional stimulus block, radio options from `response_config.options`. Submit → `useRecordResponse.mutate(...)` with telemetry (`time_to_answer_ms`, `time_to_first_action_ms`, `items_since_session_start`, `time_since_session_start_ms`). On success: `setFeedback({...})`, panel renders with `aria-live="polite"`, correct/incorrect/skipped headline, "Why this answer?" Button that expands the explanation card and moves focus to its `<h2>` heading via `useEffect`+`whyHeadingRef.current.focus()`. "Next question" advances to `feedback.next_item`; if `next_item === null` or `termination !== null`, calls `submitSession.mutate(undefined)` → `router.push(\`/results/${response.session_id}\`)`. Skip → `useRecordResponse` with `response_data: {}`. End session button at the bottom always active. Modals: `version-conflict` → refetch state + reinitialise; `lock-expired` → reclaim + reinitialise; `session-abandoned` → `/session-selection`. All modals are `role="dialog"` `aria-modal="true"` with focused primary action.
+  - `apps/web/playwright/e2e/practice-flow.spec.ts` — env-guarded UI happy path (`E2E_WEB_URL` + `E2E_BASE_URL` + `E2E_TEST_PATHWAY_ID` + `E2E_SUPABASE_ANON`). Signup + login via `auth-svc` API; seeds `supabase.auth.token` into `localStorage` via `addInitScript` so AuthProvider sees an authed session on first paint. Navigates `/session-selection`, clicks first Practice button, waits for `/session/{id}/practice` URL, answers 5 items via radio + Submit + Next, clicks End session, waits for `/results/{id}`. CI integration deferred to Stage 26 per Q-19.9.
+  - `docs/dev/QUESTIONS.md` — Q-22.4 resolved **A** (drop recent-sessions row from `/session-selection` per SCREEN_SPECS §8 authority; `useListRecentSessions` stays in SDK unused; first consumer becomes Screen 12 / Screen 14).
+  - `docs/prompts/2026-05-12_stage-22b.md` — header note + Deliverable §1 strikethrough recording the Q-22.4 resolution in-place.
+
+**Time spent:** ~5h (single session — full SCREEN_SPECS cross-reference + Q-22.4 resolution + page composition + Playwright spec + 2 quick diagnostics fix-ups: `RefObject<T | null>` vs `RefObject<T>` typecheck, ESLint `no-fallthrough` in the route guard's switch resolved by collapsing to `if`-returns).
+
+**Surprises / departures:**
+
+- **Q-22.4 surfaced at §2A walkthrough**, not during coding. The original Stage 22 prompt and the Q-22.1 Stage 22a SDK hook addition called for a "Recent sessions row from `useListRecentSessions()`" on `/session-selection`, but SCREEN_SPECS §8 v1 content (lines 458-461) doesn't list it — that row lives in §12 (Learning Hub) and §14 (Student Dashboard) per spec. Resolved A (spec wins); the hook stays in the SDK unused this stage. Edit applied in-place to `docs/prompts/2026-05-12_stage-22b.md` (strikethrough + header note) per the user's "small in-place edit, not a new prep commit" direction; bundled into the implementation commit.
+- **Two pre-existing SDK ↔ dispatcher gaps surfaced during page composition** (filed below as ISSUE-0007 + ISSUE-0008). Neither is Stage 22b's introduction; both are pre-existing implementation correctness issues in the SDK and types layers that the page composition exposed. Pages were written against the **status code** (which is reliable) rather than the **error code surface** (which is currently lossy on 409 paths). The opt-in e2e is gated, so neither blocks Stage 22b's verification.
+- **TypeScript: `RefObject<HTMLHeadingElement | null>` rejected by JSX `ref` prop type.** React 18 + `@types/react@18.3` accepts `useRef<HTMLHeadingElement>(null)` returning `RefObject<HTMLHeadingElement>` — the `| null` was redundant and broke the ref-callback contract. Removed.
+- **ESLint `no-fallthrough` on the route-guard `switch`.** `redirect()` is `never`-returning but ESLint can't prove it; refactored to early-return `if`s.
+
+**Caveats (env-bound; deferred to user's local environment):**
+
+- **No new migrations and no new RLS surfaces this stage** — `pnpm test:migration` and `pnpm test:rls` are not applicable to Stage 22b.
+- **Pre-deploy gate from Stages 19+20 still pending**: migrations 0012 + 0013 must run via `pnpm test:migration` locally on Docker before any deploy. Same for `pnpm test:rls`. Stage 22b is a frontend stage and adds nothing to the gate.
+
+**Decisions made (not in stage):**
+
+- **Q-22.4 = A** (filed in `docs/dev/QUESTIONS.md` ## Resolved). Drop the recent-sessions row from `/session-selection` per SCREEN_SPECS §8 authority. No ADR — spec already pins the v1 content list authoritatively.
+- No new ADRs filed at 22b close.
+
+**Deviations logged:**
+
+- **DEV-20260511-1 resolved.** Stage 22 split into 22a (infrastructure, 2026-05-11 commit `6cbe882`) + 22b (screens, today commit `b1dafe6`). Closing note appended in `docs/dev/DEVIATIONS.md`. **−1 Phase 1 buffer day** already debited at the 22a evening (no further buffer impact at 22b close).
+
+**Issues opened / closed / questions raised:**
+
+- **ISSUE-0007** — opened (medium, pre-launch): SDK `useRecordResponse` / `useCheckpoint` / `useAbandon` do not plumb the `X-Session-Lock` header per ADR-0026. The page handles 409 via the version-conflict modal which is a reliable fallback; this is real but not blocking.
+- **ISSUE-0008** — opened (medium, pre-launch): assessment-svc dispatcher emits `CONFLICT` / `LOCK_CONFLICT` error codes not in `@mm/types` `ErrorCodeSchema`. SDK envelope `safeParse` therefore fails and surfaces `code='INTERNAL_ERROR'` with a correct `status`. Pages branch on HTTP status which is reliable; pre-launch sweep recommended across all dispatchers.
+- ISSUE-0005 (`apps/web/.env.local.example` hygiene, medium) and ISSUE-0006 (intelligence-svc L3a cache bypass, medium, pre-launch) both remain open.
+- No new questions; Q-22.4 was the only one raised today.
+
+**UI-DIVERGENCE entries (per UI_CONTRACT §1.1 close requirement):**
+
+a) **Practice chrome composed from `TopBar` + `Brand` + `IconButton`.** SCREEN_SPECS §9 mentions `FocusHeader` for the Exam Engine; UI_CONTRACT §5.1 confirms it is the exam-engine-specific composite. Practice (§10) calls for the `focus` shell "with less restriction than exam" — no `FocusHeader` requirement. Composed Practice chrome from existing `@mm/ui` primitives (no new ones added). Reason: scope discipline; new primitives would expand Stage 22b beyond the day budget.
+
+b) **External `portal-codebase-2026-05-06` visual register NOT followed.** That reference uses cream surfaces (`#FBF9F4`), royal violet (`#5B21B6`), Cormorant Garamond serif, amber accent. Stage 22b honours `packages/ui/src/tokens.css` per UI_CONTRACT §1.1 ("tokens.css wins"). The external reference is visual-layout reference only per `docs/design/prototypes/INDEX.md` prohibition list.
+
+c) **Session-selection uses 1/2/3-column responsive grid; mockup `05-student-home.html` uses a vertical stack.** The grid uses desktop real estate (3 columns ≥ `lg`, 2 ≥ `md`, 1 below) for the pathway cards, which is closer to the `stage-24_results-flagship` density. Reason: the mockup pre-dates the Phase 1 visual baseline; grid scales better to the seeded pathway count for v1 testing.
+
+d) **Lock icon rendered as 🔒 emoji.** `lucide-react`'s `Lock` icon is consistent with the rest of `@mm/ui`'s icon usage (Loader2 in Button, `<span>{icon}</span>` in IconButton). Adopting it would add a one-import-per-page touch that's better made in a polish pass once a few more student-facing pages exist. Reason: v1 polish deferred; emoji + `aria-label="Locked — upgrade to access"` carries the a11y semantics either way.
+
+**Quality gates at close:**
+
+- Lint ✅ (7/7 packages — workspace count unchanged at 10) · Typecheck ✅ (10/10 packages) · Tests ✅ (**375/375** unit + contract — unchanged from 22a baseline; no new test surface added per stage discipline; new Playwright spec is opt-in and gated) · Build ✅ (7/7 packages — Next 14 build picked up `/session-selection` 2.99 kB and `/session/[id]/practice` 2.91 kB routes) · RLS / pgTAP / migration roundtrip n/a this stage (no schema changes, no Edge Function code changes).
+
+**Stage 22a verification at 22b close:** SDK 27/27 still green; service-prefix routing unchanged.
+
+**Tomorrow — first thing:**
+
+Stage 23 — Exam Engine. **3-day budget (Days 29-31)**, the most variant-heavy UI screen in v1 (timer warn/danger/offline transitions, version-conflict + lock-expired + session-abandoned modals, autosave every 30s + on blur + on nav, question map sidebar, submit-confirm dialog with unanswered count, adaptive section banner). UI_CONTRACT §5.1 is the **a11y critical-screen contract** — axe-core zero serious/critical is a merge blocker. Visual references: SCREEN_SPECS §9 (line 488), UI_CONTRACT §5.1, `docs/mockups/07-exam-engine.html`, external `portal-codebase-2026-05-06` `ExamEngine.jsx` (visual reference only per INDEX.md prohibition list). Quota check on Claude Design before Day 29 — existing references may suffice. Pre-deploy gate (migrations 0012 + 0013 + RLS) remains pending local Docker run.
+
 ## Stage 22a — 2026-05-11
 
 **Planned (from DEV_PLAN.md Stage 22 + DEV-20260511-1 split):** Stage 22 (Day 27, 1-day budget) was scoped as Session Selection + Practice screens. §2A walkthrough at implementation start surfaced two pre-existing architectural gaps that block real route consumption: (1) `MmClient`'s single `baseUrl` config does not map to the per-service Edge Function URL shape `${SUPABASE_URL}/functions/v1/<svc>/<path>`; (2) several SDK hooks call paths that do not match their dispatcher's actual route. Stage 22 split into **22a (today, infrastructure)** + **22b (tomorrow, screens)** per DEV-20260511-1, costing −1 Phase 1 buffer day. **Stage 22a delivers:** ADR-0029 implementation (single `MmClient` rooted at `${SUPABASE_URL}/functions/v1`; each hook prepends its service prefix per OWNERS.md ownership) + full SDK→dispatcher path reconciliation per Q-22.2 + `MmClientProvider` mounted in `apps/web` `Providers.tsx`.

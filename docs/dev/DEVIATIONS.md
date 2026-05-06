@@ -4,6 +4,9 @@
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
 ### DEV-20260511-1 — Stage 22 splits into 22a (infrastructure) + 22b (screens)
+<!-- Resolved 2026-05-12: Stage 22b shipped commit b1dafe6 (Session Selection
++ Practice screens + route guard + Playwright e2e); -1 buffer day spent net
+of 22a infrastructure work (already debited at 22a evening). -->
 
 - Date: 2026-05-11
 - Stage: 22
@@ -39,7 +42,9 @@
 - Linked: ADR-0029 (single-client + service-prefix-in-hook
   pattern), Q-22.2 (mechanical SDK path correction), Q-22.3
   (baseUrl strategy decision).
-- Resolved by: Stage 22b (carry-forward).
+- Resolved by: **Stage 22b shipped 2026-05-12 commit `b1dafe6`;
+  −1 buffer day spent net of 22a infrastructure work** (already
+  debited at 22a evening close).
 
 ### DEV-20260503-2 — content.recalibration wired as PHASE-2 no-op stub per arch Part XI
 <!-- Audit Stage 10 (2026-05-03): still ongoing — resolves v1.1 when content recalibration engine ships. No action needed. -->

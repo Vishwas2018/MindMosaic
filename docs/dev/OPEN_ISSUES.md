@@ -5,6 +5,109 @@
 
 ## Open
 
+### ISSUE-0008 — assessment-svc dispatcher emits `CONFLICT` / `LOCK_CONFLICT` codes not in `@mm/types` `ErrorCodeSchema`
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-12 (Stage 22b implementation)
+- Area: backend (assessment-svc) + types (`@mm/types`)
+- Tags: error-surface · pre-launch · types-discipline
+
+**Summary.** `supabase/functions/assessment-svc/handlers.ts`
+emits string codes `'CONFLICT'` and `'LOCK_CONFLICT'` for 409
+responses (e.g. one-active-session collision, version
+mismatch, stale lock token). Neither string is in
+`packages/types/src/shared.ts` `ErrorCodeSchema`, which lists
+the 15 v1 codes (`VALIDATION_ERROR`, `UNAUTHENTICATED`,
+`FEATURE_GATED`, `FORBIDDEN`, `NOT_FOUND`, `SESSION_CONFLICT`,
+`VERSION_CONFLICT`, `ACTIVE_SESSION_EXISTS`,
+`IDEMPOTENCY_IN_FLIGHT`, `GONE`, `IDEMPOTENCY_MISMATCH`,
+`UNPROCESSABLE`, `RATE_LIMITED`, `INTERNAL_ERROR`,
+`SERVICE_UNAVAILABLE`).
+
+**Effect.** SDK `MmClient.request` calls
+`APIErrorEnvelopeSchema.safeParse(body)` on every error
+response; when the envelope `code` field is not in the enum,
+`safeParse` fails and the SDK falls through to
+`throw new APIError('INTERNAL_ERROR', response.status, …)`.
+Pages branching on `err.code` would mishandle 409s; pages
+branching on `err.status === 409` work correctly. Stage 22b
+session-selection + practice pages use status-only branching
+as a defensive workaround.
+
+**Why not in Stage 22b.** Out of scope. Stage 22b is the
+visual-screens slice of DEV-20260511-1; pre-existing
+SDK↔dispatcher path reconciliation already happened at 22a
+per Q-22.2 / ADR-0029 (paths only, not error-code surface).
+Adding code-surface reconciliation would expand 22b beyond
+the day budget and re-touch every dispatcher.
+
+**Recommended fix (pre-launch sweep).**
+Two-part: (a) reconcile the dispatcher names to the
+authoritative `@mm/types` enum — `'CONFLICT'` →
+`'SESSION_CONFLICT'` for one-active-session,
+`'VERSION_CONFLICT'` for version mismatch; `'LOCK_CONFLICT'`
+needs a new enum value (`'LOCK_CONFLICT'` or
+`'SESSION_LOCKED'`) added to `ErrorCodeSchema` + a contract
+test asserting envelope round-trip. Affects:
+`packages/types/src/shared.ts` (+ tests), all 5 v1
+dispatchers (`auth-svc`, `users-svc`, `content-svc`,
+`assessment-svc`, `intelligence-svc`).
+
+**Reproduction.**
+```bash
+grep -nE "'CONFLICT'|'LOCK_CONFLICT'" supabase/functions/*/handlers.ts
+grep -nE "ErrorCodeSchema" packages/types/src/shared.ts
+```
+
+### ISSUE-0007 — SDK record/checkpoint/abandon hooks do not plumb `X-Session-Lock` header per ADR-0026
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-12 (Stage 22b implementation)
+- Area: frontend (`@mm/sdk`)
+- Tags: lock-token · sdk-discipline · pre-launch
+
+**Summary.** ADR-0026 (Stage 19) mandates that
+assessment-svc rotates `lock_token` on every successful
+`/respond` and that the client echoes the new token via the
+`X-Session-Lock` header on the next `/respond`,
+`/checkpoint`, or `/abandon`. The SDK's `useRecordResponse`,
+`useCheckpoint`, and `useAbandon` hooks
+(`packages/sdk/src/hooks/session.ts`) accept only the body
+fields (`RecordResponseRequest` / `CheckpointRequest`); they
+do not expose a way for callers to supply the rotated
+`lock_token` and `MmClient.request` does not set
+`X-Session-Lock` on any path.
+
+**Effect.** Real assessment-svc dispatcher returns
+`409 LOCK_CONFLICT` on the first `/respond` after `/create`
+because the SDK never sent the header. Pages can recover by
+refetching state and retrying (the Stage 22b Practice page
+treats any 409 as a "version-conflict" modal trigger), but
+this is a fallback, not a contract. Opt-in Playwright e2e
+will surface the gap against a real backend.
+
+**Why not in Stage 22b.** Out of scope. Stage 22b is the
+visual-screens slice; SDK plumbing changes belong in a
+follow-up touch-up stage or fold into Stage 26 e2e wiring.
+
+**Recommended fix.** Extend `MmClient.request` to accept an
+optional `lockToken?: string` and write
+`headers['X-Session-Lock'] = lockToken` when set. Extend the
+three session mutation hooks to track the latest
+`lock_token` (returned in `CreateSessionResponse` and
+`RecordResponseResponse`) in component state or a small
+ref-based registry, and pass it into the next mutation
+automatically. Add SDK contract tests asserting header
+presence + rotation across two consecutive `/respond` calls.
+
+**Reproduction.**
+```bash
+grep -n "X-Session-Lock\|lockToken\|lock_token" packages/sdk/src/client.ts packages/sdk/src/hooks/session.ts
+# Returns: zero matches.
+```
+
 ### ISSUE-0006 — intelligence-svc L3a bypasses skill-graph cache (architectural inconsistency vs arch §9.3)
 
 - Status: open
