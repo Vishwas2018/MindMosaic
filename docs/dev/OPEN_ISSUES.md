@@ -5,6 +5,35 @@
 
 ## Open
 
+### ISSUE-0012 — `.git/hooks/pre-commit` absent; BUILD_CONTRACT §11.2 trailer prohibition unenforced
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-14 (Stage 24 close)
+- Area: tooling / dx
+- Tags: git-hooks · build-contract · trailer-discipline
+
+**Summary.** No `.git/hooks/pre-commit` file exists in the repository. BUILD_CONTRACT §11.2
+prohibits "Co-Authored-By:" and similar AI-attribution trailers in commit messages. The gap was
+surfaced when a `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` trailer was drafted
+in the Stage 24 prep commit staged diff; it was caught manually and removed before the commit
+was created (commit `ad73aad` is clean). Relying on author + reviewer discipline in the interim.
+
+**Fix.** Add `apps/web/../.git/hooks/pre-commit` (or repo root `.git/hooks/pre-commit`) that
+rejects any commit message containing a `Co-Authored-By:` line (or similar AI-attribution
+patterns). Example check:
+
+```sh
+#!/bin/sh
+if git diff --cached --name-only | xargs grep -qP 'Co-Authored-By:' 2>/dev/null; then
+  echo "ERROR: Co-Authored-By trailer detected — remove per BUILD_CONTRACT §11.2" >&2
+  exit 1
+fi
+```
+
+Alternatively: a `commit-msg` hook that scans the message file directly is more reliable
+than scanning staged content. Address at the next tooling pass or Stage 25 audit day.
+
 ### ISSUE-0011 — Results screen content blocks deferred pending DTO + service shipments
 
 - Status: open

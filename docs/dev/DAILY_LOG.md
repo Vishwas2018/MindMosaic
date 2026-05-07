@@ -2,6 +2,67 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 24 — 2026-05-14
+
+**Planned (from DEV_PLAN.md Stage 24 + docs/prompts/2026-05-14_stage-24.md):** 1-day budget (Day 32). Results screen at `/results/[id]` — three real mode variants (scored, practice, diagnostic) + repair stub. Hero ring (120px SVG, `stroke-dashoffset` animation, UI_CONTRACT §9.1 copy thresholds), print-safe styles, Playwright e2e. Five SCREEN_SPECS §11 content blocks (topic breakdown, performance insights, question review, mastery delta, diagnostic proficiency map) pre-resolved as stubs via ISSUE-0011 (filed in prep commit `ad73aad`). Side-task per Q-24.7: lift `FocusHeader` to `@mm/ui` if budget allows.
+
+**Actually delivered:**
+
+- `feat(web,ui): Stage 24 — Results screen` — commit `13858e7`. **9 files changed, +612 / −52.**
+  - **`apps/web/src/app/(student)/results/[id]/page.tsx`** (+381) — four-mode Results page. Mode branching strict on `SessionSummaryDTO.mode`. **Scored**: skip link → `#results-main`, `ResultsFocusHeader` (brand + pathway name + print-hidden exit), 120px `HeroRing` centred, accuracy + skills stat row, ISSUE-0011a/b stubs. **Practice**: no ring (UI_CONTRACT §5.2), duration + skills stat, "Skill progress" placeholder card (ISSUE-0011d), question review stub (ISSUE-0011c), "Practice again" + back CTAs. **Diagnostic**: proficiency band layout (Developing / Proficient / Advanced rows with empty progress bars + `aria-valuenow`), skills stat, back CTA, ISSUE-0011e stub. **Repair**: v1.1 stub copy ("Repair session results — available in a future release.") + back link matching `// PHASE-2: RepairEngine` pattern. All modes: `print:hidden` CTAs, `print:block` on pathway name, loading spinner + error card with retry.
+  - **`apps/web/src/components/results/HeroRing.tsx`** (+106) — SVG ring component. Props: `score: number` (0–100), `scoreBand?: string | null`. Two `<circle>` elements (track at `var(--border)`, progress at band-keyed colour). `stroke-dashoffset` initialized to `CIRCUMFERENCE` then set to final offset via `requestAnimationFrame` on mount — `prefers-reduced-motion` guard reads `window.matchMedia` once on mount, skips animation entirely if true (renders final state directly). Copy: ≥80 → "Well done", 60–79 → "Good effort", <60 → "Keep practising" (UI_CONTRACT §9.1 exact). Colour: `score_band` wins; if null, derived from `raw_score` thresholds.
+  - **`apps/web/playwright/e2e/results-flow.spec.ts`** (+122) — `test.skip()`-guarded scored happy path: signup → inject token → `/session-selection` → click first start button → answer 5 items (click path) → End session → confirm → assert `/results/{sessionId}` renders `%` text + "Start new session" button + keyboard tab reaches CTA.
+  - **`packages/ui/src/FocusHeader/FocusHeader.tsx`** (+38) — **Side-task Q-24.7 SHIPPED.** `FocusHeader` lifted from `apps/web/src/components/exam/` to `@mm/ui`. API: `{ centre?, helper?, onExit, exitLabel? }`. Imports from sibling modules (`Brand`, `IconButton`, `TopBar`) directly. `'use client'` directive.
+  - **`packages/ui/src/FocusHeader/FocusHeader.test.tsx`** (+38) — 4 tests: axe scan (zero serious/critical), exit button click fires `onExit`, centre + helper slots render, custom `exitLabel` prop respected.
+  - **`packages/ui/src/index.ts`** (+4) — `FocusHeader` + `FocusHeaderProps` exported under "Focus chrome" section.
+  - **`apps/web/src/app/(student)/session/[id]/exam/page.tsx`** (import updated) — `FocusHeader` import moved from `@/components/exam/FocusHeader` to `@mm/ui`; original local import line removed.
+  - **`apps/web/src/app/(student)/session/[id]/practice/page.tsx`** (refactored) — replaced three inline `<TopBar><Brand .../><div className="ml-auto"><IconButton .../></div></TopBar>` blocks (loading / error / main) with `<FocusHeader onExit={() => router.push('/dashboard')} />`. Removed unused `Brand`, `IconButton`, `TopBar` imports. UI-DIVERGENCE (e) comment updated.
+  - **`apps/web/src/components/exam/FocusHeader.tsx`** (deleted) — superseded by `packages/ui/src/FocusHeader/FocusHeader.tsx`.
+
+**Mojibake audit (byte-level, pre-commit):** Five non-ASCII character classes found in new files — `e2 80 94` (U+2014 em-dash `—`, 12 occurrences), `e2 80 93` (U+2013 en-dash `–`, 1 occurrence in comment), `c3 97` (U+00D7 multiplication sign `×`, exit icon), `c2 a7` (U+00A7 section sign `§`, comment references), `e2 86 92` (U+2192 rightwards arrow `→`, e2e spec comments). All decode clean; no `c3 82 c2` / `c3 83 c2` double-encoding sequences; no mojibake.
+
+**Time spent:** ~3h (single session — main scope in ~2h, FocusHeader side-task ~45min including tests + practice page refactor + gate re-run. Stage shipped in 1-day budget; Phase 1 buffer unchanged at +2 net banked).
+
+**Surprises / departures:**
+
+- None material. All Q-24.1..7 resolutions held under implementation. FocusHeader lift fit cleanly within budget (Q-24.7 "if budget allows" condition met).
+
+**Decisions made (not in stage):**
+
+- ISSUE-0011 (5 deferred Results screen content blocks) filed in prep commit `ad73aad`. No further ADRs filed at Stage 24 close.
+- `ResultsFocusHeader` inline component in `results/[id]/page.tsx` has a pathway-name slot not present in `@mm/ui`'s `FocusHeader`. Not lifted to `@mm/ui` this stage — the inline variant serves a read-only screen and doesn't need the full timer/saved-pill API. Deliberate; not a divergence.
+
+**Deviations logged:**
+
+- none.
+
+**Issues opened / closed / questions raised:**
+
+- **ISSUE-0011** (medium) filed in prep commit `ad73aad` — 5 deferred Results screen content blocks.
+- **ISSUE-0012** (low) filed this evening — `.git/hooks/pre-commit` absent; BUILD_CONTRACT §11.2 trailer prohibition unenforced.
+- **ISSUE-0005** through **ISSUE-0010** remain open (carry).
+- Q-24.1..7 all resolved in prep commit; no Q-24.8+ raised at close.
+
+**UI-DIVERGENCE entries (per UI_CONTRACT §1.1 close requirement):**
+
+a) **Topic breakdown stubbed (ISSUE-0011a)** — `SessionSummaryDTO` carries no per-topic breakdown; `{/* TODO: ISSUE-0011a */}` comment marks the slot. Ships post-Stage 28 / v1.1 when `SessionSummaryDTO` is extended with `topic_breakdown: { topic_id: string; correct: number; total: number }[]`.
+
+b) **Performance Insights stubbed (ISSUE-0011b)** — `ExplanationDTOSchema` exists in `@mm/types` but no SDK hook returns one; `packages/core/src/explain-format.ts` does not exist. `{/* TODO: ISSUE-0011b */}` marks the slot. Ships when `useSessionExplanations(sessionId)` SDK hook + helper are built.
+
+c) **Question Review stubbed (ISSUE-0011c)** — per-response answer state (choice selected, correct/incorrect) is not exposed in any v1 DTO at results time. `{/* TODO: ISSUE-0011c */}` marks the slot. Ships when `useSessionResponses(sessionId)` SDK hook is built.
+
+d) **Practice mastery delta stubbed (ISSUE-0011d)** — intelligence-svc Stage 28+ endpoint (`/intelligence/mastery-delta/{id}` or equivalent) not built. Practice mode shows "Available after more sessions" placeholder card. Ships when `useMasteryDelta(sessionId)` SDK hook is available.
+
+e) **Diagnostic proficiency map stubbed (ISSUE-0011e)** — `ProficiencyMapDTOSchema` exists but analytics-svc is not built. Diagnostic mode ships the band-row layout (Developing / Proficient / Advanced with empty `<progress>` bars) without real data. Ships when `useProficiencyMap(studentId, pathwayId)` SDK hook is available.
+
+**Quality gates at close:**
+
+- Lint ✅ (7/7 packages) · Typecheck ✅ (10/10 packages) · Tests ✅ (**383/383** unit + contract: 97 @mm/types + 27 @mm/sdk + **67 @mm/ui (was 63; +4 from FocusHeader: 1 axe + 3 functional)** + 110 @mm/engines + 24 @mm/content-svc + 30 @mm/assessment-svc + 28 @mm/intelligence-svc) · Build ✅ (7/7 packages — `/results/[id]` at **2.51 kB First Load JS**) · RLS / pgTAP / migration roundtrip n/a (frontend-only stage).
+
+**Tomorrow — first thing:**
+
+Stage 25 — Student Dashboard v1 (`/`). Last Phase 1 UI screen; closes the Phase 1 UI cluster. 1-day budget. Visual references: SCREEN_SPECS Screen 7 + "Dashboards" section, UI_CONTRACT, `docs/mockups/02-dashboard.html`, external `portal-codebase-2026-05-06/StudentHome.jsx` + `StudentDashboard.jsx` (visual reference only; never copy code in). v1 minimal: greeting + continue-last + quick-start tiles + mastery snapshot + recent sessions + engagement strip (display-only). `useListRecentSessions` (Q-22.1) gets its first consumer. No Weekly Plan widget (Stage 40). Pre-deploy gate (migrations 0012 + 0013 + RLS) remains pending local Docker run.
+
 ## Stage 23 — 2026-05-13
 
 **Planned (from DEV_PLAN.md Stage 23 + docs/prompts/2026-05-13_stage-23.md):** 3-day budget (Days 28-30 per DEV_PLAN; Day 29 onward per PROJECT_STATE — drift informational only). The single most critical v1 UI per DEV_PLAN.md:618 ("Stage 23 a11y gate fails exam engine" risk row). Deliverables: Exam Engine page at `/session/[id]/exam` with `FocusHeader` chrome + server-authoritative `Timer` (3 visual states with `aria-live` policy) + `QuestionMap` sidebar (240px, status-coloured grid, arrow-key operable) + autosave (`useCheckpoint` every 30s + on blur + on nav, idempotency-keyed per `checkpoint_number`) + offline queue (in-memory per ADR-0030) + version-conflict / lock-expired / session-abandoned / submit-confirm (with unanswered count) / exit-confirm modals + adaptive section-boundary banner (deferred per Q-23.4 / ISSUE-0010) + Playwright keyboard-only e2e + axe-core zero serious/critical (merge-blocker per UI_CONTRACT §7.1). All §2A resolutions baked in: Q-23.1..5 + ADR-0030 (in-memory queue, option B) filed in prep commit `2428231`.
