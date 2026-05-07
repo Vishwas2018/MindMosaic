@@ -9,6 +9,115 @@
 
 ## Resolved
 
+### Q-26.5 — CI migration dry-run: wire Supabase CLI action or keep placeholder?
+
+- Date raised: 2026-05-16 (Stage 26 §2A)
+- Asked of: self
+- Source: `.github/workflows/ci.yml` `migration-dryrun` job — `echo "TODO Stage 2
+  follow-up"` placeholder since Stage 2 close; PROJECT_STATE.md pre-deploy gate note.
+- Question: Wire the `supabase/setup-cli` action + `supabase db push --dry-run` step,
+  or leave the TODO placeholder for another session?
+- Why ambiguous: Requires `SUPABASE_ACCESS_TOKEN` + `SUPABASE_PROJECT_ID` GitHub Secrets
+  that may not yet be provisioned; wiring without secrets would cause CI to fail rather
+  than silently pass.
+- Blocking? no.
+- Code affected: `.github/workflows/ci.yml`.
+- Status: resolved
+- Resolution (2026-05-16): **Wire with graceful skip.** Use `supabase/setup-cli` +
+  `supabase db push --dry-run` pattern. Add a preflight check: if
+  `SUPABASE_ACCESS_TOKEN` secret is absent, print a warning and `exit 0` (job
+  skips, not fails). Consistent with the E2E job's graceful-skip pattern (Q-26.4).
+  Closes the Stage 2 `echo "TODO"` placeholder.
+
+### Q-26.4 — E2E CI job wiring: in scope for Stage 26?
+
+- Date raised: 2026-05-16 (Stage 26 §2A)
+- Asked of: product owner
+- Source: Q-19.9 resolution ("CI integration deferred to Stage 26"); PROJECT_STATE.md
+  ("5 E2E specs all `test.skip()`-guarded; CI integration is Stage 26 deliverable per
+  Q-19.9"); `apps/web/playwright/e2e/` — 5 specs.
+- Question: Wire the Playwright E2E CI job in Stage 26, with graceful skip when secrets
+  absent? Or carry forward?
+- Why ambiguous: Requires new CI job + `E2E_WEB_URL`/`E2E_BASE_URL`/`E2E_SUPABASE_ANON`
+  GitHub Secrets; specs remain `test.skip()`-guarded until a real backend is deployed.
+  No practical test coverage until secrets are provisioned, but the CI wiring itself is
+  a Stage 26 deliverable per Q-19.9.
+- Blocking? no.
+- Code affected: `.github/workflows/ci.yml`, `apps/web/playwright.config.ts`.
+- Status: resolved
+- Resolution (2026-05-16): **Include.** Add `e2e` job to `.github/workflows/ci.yml`.
+  Job runs `pnpm exec playwright test`; skips gracefully when `E2E_WEB_URL` is absent
+  (`if: env.E2E_WEB_URL != ''` guard at job level, or check in a preflight step).
+  Specs remain `test.skip()`-guarded in source — un-gating is a separate pass once
+  secrets are provisioned and a real backend is deployed.
+
+### Q-26.3 — ISSUE-0008 (error code reconciliation) scope for Stage 26?
+
+- Date raised: 2026-05-16 (Stage 26 §2A)
+- Asked of: product owner
+- Source: ISSUE-0008; `packages/types/src/shared.ts` `ErrorCodeSchema` (15 codes; no
+  `LOCK_CONFLICT`); `grep -nE "'CONFLICT'|'LOCK_CONFLICT'" supabase/functions/*/handlers.ts`
+  across all 5 dispatchers.
+- Question: Fix all 5 dispatchers in Stage 26, or just `@mm/types` schema + assessment-svc?
+- Why ambiguous: Full reconciliation across 5 dispatchers (auth-svc, users-svc, content-svc,
+  assessment-svc, intelligence-svc) may push past the 2-day budget; narrowing to the schema
+  change + most-used dispatcher leaves a clean ISSUE-0008 residual.
+- Blocking? no.
+- Code affected: `packages/types/src/shared.ts`, `supabase/functions/*/handlers.ts`.
+- Status: resolved
+- Resolution (2026-05-16): **Grep-first, then scope.** Run `grep -nE "'CONFLICT'|'LOCK_CONFLICT'"
+  across all 5 dispatcher `handlers.ts` files before touching anything. `@mm/types`
+  `ErrorCodeSchema` addition + assessment-svc reconciliation are confirmed in scope.
+  For other dispatchers: if the grep shows the same two bare strings (quick-fix pattern),
+  fix them all in one sweep; if any dispatcher needs deeper investigation, narrow
+  ISSUE-0008 to "remaining N dispatchers" and keep open. Implementation decides.
+
+### Q-26.2 — ISSUE-0007 (SDK X-Session-Lock plumbing) in scope for Stage 26?
+
+- Date raised: 2026-05-16 (Stage 26 §2A)
+- Asked of: product owner
+- Source: ISSUE-0007; ADR-0026 (lock-token rotation per respond);
+  `packages/sdk/src/client.ts` + `packages/sdk/src/hooks/session.ts`.
+- Question: Include ISSUE-0007 SDK `X-Session-Lock` header plumbing in Stage 26, or
+  defer to the pre-launch sweep?
+- Why ambiguous: SDK fix touches `MmClient.request` + `useRecordResponse` +
+  `useCheckpoint` + `useAbandon` + contract tests; expands scope beyond the DEV_PLAN
+  deliverables; correctness gap that E2E will surface the moment CI secrets are provisioned.
+- Blocking? no.
+- Code affected: `packages/sdk/src/client.ts`, `packages/sdk/src/hooks/session.ts`,
+  `packages/sdk/src/__tests__/client.test.ts` (+ new hook tests).
+- Status: resolved
+- Resolution (2026-05-16): **Include.** Extend `MmClient.request` with optional
+  `lockToken?: string` (writes `X-Session-Lock` header when set). Extend
+  `useRecordResponse`, `useCheckpoint`, `useAbandon` to track the `lock_token` from the
+  prior response in component state and pass it into the next mutation automatically.
+  Add SDK contract tests (~5 new tests). If a non-obvious design choice surfaces during
+  implementation, file **ADR-0031**; default = component-state storage, explicit rotation
+  in mutation return value.
+
+### Q-26.1 — Replay determinism script: pure-function or requires live DB?
+
+- Date raised: 2026-05-16 (Stage 26 §2A)
+- Asked of: self
+- Source: DEV_PLAN Stage 26 deliverables ("`scripts/test-scoring.ts` — replay 50
+  deterministic sessions and assert byte-identical `skill_mastery` rows");
+  ADR-0027 (replay-determinism discipline; existing
+  `packages/intelligence-svc/__tests__/contract.test.ts` replay test is pure-function).
+- Question: Does `scripts/test-scoring.ts` need a live DB to check `skill_mastery`
+  rows, or can it replay through `@mm/engines` + intelligence-svc helpers in-process?
+- Why ambiguous: DEV_PLAN says "assert byte-identical `skill_mastery` rows" — language
+  implying a DB round-trip; ADR-0027's existing test is pure-function with no DB.
+- Blocking? yes — determines whether the script can run in the sandbox.
+- Code affected: `scripts/test-scoring.ts` (new); `package.json` (`pnpm test:replay`).
+- Status: resolved
+- Resolution (2026-05-16): **Pure-function shape, mirroring ADR-0027.** Script runs via
+  `pnpm tsx scripts/test-scoring.ts` with a fixed seed; no DB or deployed environment
+  needed. Replays 50 sessions through `@mm/engines` pure functions + intelligence-svc
+  helpers in-process; checks that the computed `skill_mastery` output objects are
+  byte-identical across two runs with the same seed. Exit non-zero on any mismatch.
+  "Byte-identical `skill_mastery` rows" in DEV_PLAN refers to the in-memory computed
+  output structure, not a Postgres SELECT.
+
 ### Q-24.7 — FocusHeader lift: side-task or separate stage?
 
 - Date raised: 2026-05-14 (Stage 24 §2A)
