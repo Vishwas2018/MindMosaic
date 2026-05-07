@@ -228,13 +228,6 @@ services pick up the cache pattern at once.
 **Reproduction.** `grep -n "skill_edge" supabase/functions/intelligence-svc/handlers.ts`
 returns one match — the bypass site at the L3a entry.
 
-
-**Why not in Stage 20.** Stage 20 is the highest-risk Phase 1 stage (replay
-determinism). Hygiene cleanups don't belong in the same atomic commit. File
-as a separate small chore commit at next audit (Stage 24) or sooner.
-
-
-
 ## Resolved
 
 ### ISSUE-0008 — assessment-svc dispatcher emits `CONFLICT` / `LOCK_CONFLICT` codes not in `@mm/types` `ErrorCodeSchema`
@@ -243,10 +236,12 @@ as a separate small chore commit at next audit (Stage 24) or sooner.
 - Severity: medium
 - Reported: 2026-05-12 (Stage 22b)
 - Closed: 2026-05-16 (Stage 26)
+- Commit: `75984c6`
 - Resolution: Added `LOCK_CONFLICT` as 16th `ErrorCodeSchema` value. Replaced all 11 bare
   `'CONFLICT'` strings in `assessment-svc/handlers.ts` + `intelligence-svc/handlers.ts` with
   canonical codes (`ACTIVE_SESSION_EXISTS`, `VERSION_CONFLICT`, `SESSION_CONFLICT`). Updated
-  4 contract test assertions to match. All tests green.
+  4 contract test assertions to match. Scope note: `auth-svc`/`users-svc` don't exist in v1;
+  `content-svc` was already clean — only 2 files required changes. All tests green.
 
 ### ISSUE-0007 — SDK record/checkpoint/abandon hooks do not plumb `X-Session-Lock` header per ADR-0026
 
@@ -254,11 +249,13 @@ as a separate small chore commit at next audit (Stage 24) or sooner.
 - Severity: medium
 - Reported: 2026-05-12 (Stage 22b)
 - Closed: 2026-05-16 (Stage 26)
+- Commit: `75984c6`
 - Resolution: Added `lockToken` to `MmClient` public + private methods. Updated `useRecordResponse`
   (lockTokenRef + auto-rotation from response), `useCheckpoint` (lockTokenRef, no rotation).
   Added `useAbandon` hook. Exam page seeds lock_token via `useEffect` on `sessionState.data`.
   Added `AbandonSessionResponseSchema` to `@mm/types`. 5 new ADR-0026 header tests in
-  `client.test.ts`. All tests green.
+  `client.test.ts`. ADR-0031 NOT filed (mechanical fulfilment of ADR-0026; idiomatic React).
+  All tests green.
 
 ### ISSUE-0005 — `apps/web/.env.local.example` populated with real Supabase URL + anon JWT
 
@@ -266,6 +263,7 @@ as a separate small chore commit at next audit (Stage 24) or sooner.
 - Severity: medium
 - Reported: 2026-05-08 (Stage 19)
 - Closed: 2026-05-16 (Stage 26)
+- Commit: `75984c6`
 - Resolution: Restored `apps/web/.env.local.example` to placeholder values
   (`https://your-project.supabase.co` / `your-anon-key`). D5 of Stage 26.
 

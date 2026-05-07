@@ -6,7 +6,7 @@
 ## Position
 
 - Last completed stage: Stage 26 — Phase 1 audit / load-test / CI strip (2026-05-16)
-- Next stage: Stage 27 — (refer DEV_PLAN.md)
+- Next stage: Stage 27 — Phase 1 Exit Review
 - Days remaining (target 75): 42
 - Buffer days consumed in Phase 0 (Stages 1–14): 0 of 3
 - Phase 1 stages closed: 15–26 (12 stages). Phase 1 buffer at Stage 26 close: **+2 days banked** (unchanged from Stage 25 — Stage 26 closed within its 2-day budget).
@@ -39,7 +39,7 @@ pgTAP/RLS not re-run for Stage 26 — no schema changes. Pre-deploy gate from St
 | pnpm typecheck      | ✅ green (10 packages)                   | 2026-05-16 |
 | pnpm test           | ✅ green (399/399 unit + contract)       | 2026-05-16 |
 | pnpm test:replay    | ✅ green (58/58 assertions)              | 2026-05-16 |
-| pnpm build          | n/a (no app changes in Stage 26)         | 2026-05-15 |
+| pnpm build          | ✅ green (7/7 packages — exam/page.tsx change verified) | 2026-05-16 |
 | RLS coverage        | ✅ 53/53 tables enabled + tested         | 2026-05-03 |
 | pnpm audit          | unknown — TODO measure                   | n/a        |
 | pnpm test:migration | ⚠ NOT RUN for 0012 + 0013 (sandbox no Docker) | 2026-05-03 (last clean: 11 migrations) |

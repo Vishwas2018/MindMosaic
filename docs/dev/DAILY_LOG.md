@@ -8,7 +8,7 @@
 
 **Actually delivered:**
 
-- `feat(infra,sdk,types): Stage 26 — Phase 1 audit, load-test, CI strip` — single atomic commit (SHA TBD), **24 files changed** (approx).
+- `feat(infra,sdk,types): Stage 26 — Phase 1 audit, load-test, CI strip` — single atomic commit `75984c6`, **21 files changed, +810/−196**.
   - **D3** `turbo.json` — `"outputs": ["coverage/**"]` → `"outputs": []` for test task. Eliminates "no output files found" Turborepo warning.
   - **D5** `apps/web/.env.local.example` — restored to placeholder values (`https://your-project.supabase.co` / `your-anon-key`). Closes ISSUE-0005.
   - **D7** `packages/types/src/shared.ts` — `LOCK_CONFLICT` added as 16th `ErrorCodeSchema` value (was 15). Comment updated.
@@ -39,7 +39,9 @@
 
 **Decisions made (not in stage):**
 
-- No ADRs filed — all decisions were either implied by existing ADRs (ADR-0026 lock-token rotation, ADR-0027 replay determinism) or standard implementation choices.
+- **Q-26.1..5 all defaults held; no Q-26.6+ filed.** Q-26.1 = pure-function replay (no DB); Q-26.2 = ISSUE-0007 in scope; Q-26.3 = grep-first + narrowed to 2 files (auth-svc/users-svc don't exist in v1; content-svc clean); Q-26.4 = E2E CI job with graceful skip; Q-26.5 = migration dry-run wired. No new ambiguity surfaced during implementation.
+- **ADR-0031 watch disposition: NOT filed.** The SDK lock-token shape (lockTokenRef + useCallback + exam page seed effect) is mechanical fulfilment of ADR-0026. `useRef` + `useCallback([])` are idiomatic React for stable mutation-adjacent state; no non-obvious tradeoff a senior reviewer would challenge. Pattern is fully derivable from ADR-0026 + the React docs.
+- No other ADRs filed — all decisions were implied by existing ADRs or standard implementation choices.
 
 **Deviations logged:**
 
@@ -55,7 +57,7 @@
 
 **Quality gates at close:**
 
-- Lint ✅ (7/7 packages) · Typecheck ✅ (10/10 packages) · Tests ✅ (**399/399**: +5 new ADR-0026 header tests in @mm/sdk) · Build n/a (no app changes requiring rebuild) · `pnpm test:replay` ✅ (58/58 assertions) · RLS n/a (no schema changes).
+- Lint ✅ (7/7 packages) · Typecheck ✅ (10/10 packages) · Tests ✅ (**399/399**: 394 prior + 5 new ADR-0026 lock-token tests in @mm/sdk) · Build ✅ (7/7 packages — exam/page.tsx changed; rebuild confirmed clean) · `pnpm test:replay` ✅ (58/58 assertions) · RLS n/a (no schema changes).
 
 **Tomorrow — first thing:**
 
