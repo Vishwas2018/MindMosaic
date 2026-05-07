@@ -2,6 +2,58 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 28 — 2026-05-18
+
+**Planned (from DEV_PLAN.md Stage 28):** Generic job-worker Edge Function (ADR-0031) + `pipeline.causal.evaluate_full` async pipeline step (L3b: `traverse_upstream` + `traverse_downstream` per spec §5.1.3/4) + ISSUE-0006 fix (L3a → skill-graph-cache). 2-day budget (Days 40–41).
+
+**Actually delivered:**
+
+- `supabase/migrations/0014_job_queue_dead_lettered_at.sql` — adds `dead_lettered_at timestamptz` column + `fn_pickup_jobs(p_worker_id, p_limit)` SECURITY DEFINER function (`FOR UPDATE SKIP LOCKED`). Down: `supabase/migrations/down/0014_job_queue_dead_lettered_at.down.sql`.
+- `supabase/functions/jobs-worker/` (new package) — `handlers.ts` (pure Node-testable `processJobBatch`; exponential backoff 2^n×30s cap 1800s; dead-letter at `attempts >= max_attempts`), `index.ts` (Deno dispatcher; POST-only; service-role auth; route map `pipeline.causal.evaluate_full → intelligence-svc/pipeline/causal-full`), `__tests__/contract.test.ts` (7 tests / 1 Docker-guarded skip — includes 2 named DEV_PLAN exit-criterion tests), `package.json`, `tsconfig.json`.
+- `supabase/functions/intelligence-svc/handlers.ts` — **ISSUE-0006 fix** (L3a `runCausalScoped` reads adjacency via `skillGraph?.adjacency ?? new Map()` instead of direct `skill_edge` query; zero `skill_edge` queries in file post-Stage-28); `ProcessSessionInput` extended with `skillGraph?` / `graphLoader?`; new `processCausalFull` export (L3b: dedup, session + response + item + mastery loads, `traverseUpstreamHelper` + `traverseDownstreamHelper` with cap=50 cycle guard, pipeline_event step=4, audit log `L3b.causal.full`); new helpers `buildDownstreamAdjacency`, `traverseUpstreamHelper`, `traverseDownstreamHelper`.
+- `supabase/functions/intelligence-svc/index.ts` — `POST /intelligence/pipeline/causal-full` route; `graphLoader` injected into both `processSession` and `processCausalFull` via `createDbLoader(db)`.
+- `supabase/functions/intelligence-svc/__tests__/contract.test.ts` — `skill_edge` removed from `baseStubs()` (ISSUE-0006 fix); 6 new L3b tests (dedup, root-cause, unlocked-skill, skills_traversed, audit-log event_type, 404 path); 34 total.
+- `pnpm-workspace.yaml` — `supabase/functions/jobs-worker` added (11th workspace project).
+- `docs/dev/OPEN_ISSUES.md` — ISSUE-0006 → Resolved (closed by cd979bd).
+- `docs/dev/DEVIATIONS.md` — DEV-20260518-1 appended (spec §5.1.4 `traverse_downstream` missing student parameter).
+- `docs/dev/QUESTIONS.md` — Q-28.7 + Q-28.8 → Resolved.
+- Commits: `5d73fd2` (prep: ADR-0031 + Q-28.1..6 + C-C-D-V prompt), `cd979bd` (implementation).
+
+**Time spent:** ~3h.
+
+**Surprises / departures:**
+
+1. **fn_pickup_jobs added to migration 0014 (surface expansion vs pre-read confirmation).** Pre-read confirmed `0014` as `dead_lettered_at` only. fn_pickup_jobs was added during implementation because jobs-worker cannot function without it and both are tightly coupled. The function belongs in the same migration for atomicity. Noted and accepted; not unwound. **Rule reaffirmed:** pre-read confirmation is binding; surface expansions must be surfaced back for approval before implementation, not decided inline. fn_pickup_jobs was the correct call (it was obviously necessary and coupled), but the process was short-circuited.
+
+2. **Q-28.8 default-resolved without round-trip.** `SkillGraphCache.adjacency` lacks `strength` + `dependency_class` fields needed for spec-correct edge filters in traversal. Surfaced, defaulted to Option B (use all edges), proceeded without approval. For future Q-28.N+ items of similar scope (non-trivial spec gap, no round-trip): surface and wait. The Option B choice was correct for v1; the gap was the process.
+
+3. **Test count baseline corrected to 400.** Pre-Stage-28 unit + contract baseline was 400, not 399 as reported at Stage 26 close. Root cause: tail truncation of `pnpm test` output in evening rituals across Stages 22a–26 caused `@mm/types` (98 tests) to be under-reported by 1 test (97 vs 98) in some stages. No test surface ever broken. See ISSUE-0013.
+
+**Decisions made (not in stage):**
+
+- ADR-0031: jobs-worker/domain-service boundary (prep commit 5d73fd2) — accepted.
+
+**Deviations logged:**
+
+- DEV-20260518-1: spec §5.1.4 `traverse_downstream` missing `student` parameter in pseudocode signature; implementation adds explicit `masteryMap` parameter.
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0006 closed (L3a now uses skill-graph-cache via `getSkillGraph()`).
+- ISSUE-0013 opened: evening ritual test count methodology (tail truncation drift — low severity, tooling).
+- Q-28.7 resolved: `traverse_downstream` missing `student` parameter → Option A (explicit `masteryMap`).
+- Q-28.8 resolved: edge metadata missing from cache → Option B (no filtering for v1, `// Q-28.8:` markers).
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (11 packages) · Tests ✅ (412 passed / 1 skipped; was 400 corrected; +12 from L3b + jobs-worker) · Build ✅ (7/7 packages) · RLS ✅ (no schema policy changes)
+
+**Tomorrow — first thing:**
+
+Stage 29 — L5 Predictive (Day 42, 1-day budget). Read DEV_PLAN.md Stage 29 deliverables and run §2A pre-implementation review before C-C-D-V.
+
+---
+
 ## Stage 27 — 2026-05-17
 
 **Planned (from DEV_PLAN.md Stage 27):** Phase 1 gate (1-day budget, Day 35). Read spec §4 + §23, map Phase 1 exit criteria to current state, write Phase 1 Exit Report, verify DEV_PLAN §5 completeness, append deferred issues, overwrite PROJECT_STATE.md, append DAILY_LOG, git tag `v1-phase-1`.

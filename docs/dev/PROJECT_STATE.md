@@ -5,44 +5,46 @@
 
 ## Position
 
-- Last completed stage: Stage 27 — Phase 1 Exit Review (2026-05-17)
-- Next stage: Stage 28 — Job Worker + L3b Causal Full
-- Days remaining (target 75): 40
+- Last completed stage: Stage 28 — Job Worker + L3b Causal Full (2026-05-18)
+- Next stage: Stage 29 — L5 Predictive (Day 42, 1-day budget)
+- Days remaining (target 75): 38
 - Buffer days consumed in Phase 0 (Stages 1–14): 0 of 3
-- Phase 1 complete: Stages 15–27 (13 stages). Phase 1 buffer at close: **+2 days banked** (Stage 27 closed within same-day budget — review only, no code changes).
+- Phase 1 complete: Stages 15–27 (13 stages). Phase 1 buffer at close: **+2 days banked**.
+- Phase 2 in progress: Stage 28 shipped within 2-day budget. **+2 days net banked entering Stage 29** (no buffer impact from Stage 28).
 
 ## Test suite
 
-| Suite       | Status   | Count               | Last run   |
-| ----------- | -------- | ------------------- | ---------- |
-| Unit        | ✅ green  | 399/399             | 2026-05-16 |
-| Integration | n/a      | n/a                 | n/a        |
-| pgTAP       | ✅ green  | 451/451             | 2026-05-03 |
-| Contract    | ✅ green  | 82/82               | 2026-05-16 |
-| RLS         | ✅ green  | 451/451 (53 tables) | 2026-05-03 |
-| E2E         | ⚠ opt-in | 5 specs (gated)     | n/a        |
-| Replay      | ✅ green  | 58/58 assertions    | 2026-05-16 |
+| Suite       | Status   | Count                         | Last run   |
+| ----------- | -------- | ----------------------------- | ---------- |
+| Unit        | ✅ green  | 412 passed / 1 skipped        | 2026-05-18 |
+| Integration | n/a      | n/a                           | n/a        |
+| pgTAP       | ✅ green  | 451/451                       | 2026-05-03 |
+| Contract    | ✅ green  | 94/94                         | 2026-05-18 |
+| RLS         | ✅ green  | 451/451 (53 tables)           | 2026-05-03 |
+| E2E         | ⚠ opt-in | 5 specs (gated)               | n/a        |
+| Replay      | ✅ green  | 58/58 assertions              | 2026-05-16 |
 
-Unit + contract breakdown: 97 (@mm/types) + **32** (@mm/sdk: **18** client [+5 ADR-0026 lock-token tests] + 10 keys + 4 hooks) + 67 (@mm/ui) + 110 (@mm/engines) + 24 (@mm/content-svc) + 30 (@mm/assessment-svc) + 28 (@mm/intelligence-svc) + 11 (@mm/web) = **399 total** (unchanged from Stage 26).
+Unit + contract breakdown (full `pnpm -r run test` output — ISSUE-0013 fix applied from this stage):
+98 (@mm/types) + 32 (@mm/sdk) + 67 (@mm/ui) + 110 (@mm/engines) + 24 (content-svc) + 30 (assessment-svc) + 34 (intelligence-svc) + 6 (jobs-worker) + 11 (apps/web) = **412 passed, 1 skipped** (Docker-guarded Postgres integration test in jobs-worker).
 
-Contract count = 24 (content-svc) + 30 (assessment-svc) + 28 (intelligence-svc) = 82 (unchanged).
+Baseline note: pre-Stage-28 actual baseline was **400** (corrected from 399 reported at Stage 26 close — ISSUE-0013: tail truncation drift across Stage 22a–26 evenings). Stage 28 adds +12 (6 jobs-worker + 6 intelligence-svc L3b).
 
-Replay harness: `scripts/test-scoring.ts` — 50 LinearEngine sessions (5 patterns × 10 replays), 58 assertions, <1 s runtime. `pnpm test:replay`.
+Contract count = 24 (content-svc) + 30 (assessment-svc) + 34 (intelligence-svc) + 6 (jobs-worker) = **94** (was 82 at Stage 27 close).
 
-pgTAP/RLS not re-run for Stage 27 — no schema changes. Pre-deploy gate from Stages 19+20 still applies.
+pgTAP/RLS not re-run for Stage 28 — no RLS policy changes. Migration 0014 adds `dead_lettered_at` column + `fn_pickup_jobs` function (no new tables, no new policies). Pre-deploy gate from Stages 19+20 still applies.
 
 ## Quality gates
 
 | Gate                | Last status                                                     | Last run   |
 | ------------------- | --------------------------------------------------------------- | ---------- |
-| pnpm lint           | ✅ green (7 packages)                                           | 2026-05-16 |
-| pnpm typecheck      | ✅ green (10 packages)                                          | 2026-05-16 |
-| pnpm test           | ✅ green (399/399 unit + contract)                              | 2026-05-16 |
+| pnpm lint           | ✅ green (7 packages)                                           | 2026-05-18 |
+| pnpm typecheck      | ✅ green (11 packages — jobs-worker added)                      | 2026-05-18 |
+| pnpm test           | ✅ green (412 passed / 1 skipped — full output captured)        | 2026-05-18 |
 | pnpm test:replay    | ✅ green (58/58 assertions)                                     | 2026-05-16 |
-| pnpm build          | ✅ green (7/7 packages)                                         | 2026-05-16 |
+| pnpm build          | ✅ green (7/7 packages)                                         | 2026-05-18 |
 | RLS coverage        | ✅ 53/53 tables enabled + tested                                | 2026-05-03 |
 | pnpm audit          | unknown — TODO measure                                          | n/a        |
-| pnpm test:migration | ⚠ NOT RUN for 0012 + 0013 (sandbox no Docker)                  | 2026-05-03 (last clean: 11 migrations) |
+| pnpm test:migration | ⚠ NOT RUN for 0012 + 0013 + 0014 (sandbox no Docker)           | 2026-05-03 (last clean: 11 migrations) |
 
 ## Performance vs BUILD_CONTRACT §10 budgets
 
@@ -57,20 +59,24 @@ k6 load test (`k6/session-loop.js`) is ready for execution; nightly CI workflow 
 
 ## Open items
 
-- ADRs accepted: **30** (ADR-0001 through ADR-0030; no new ADRs in Stages 24–27)
+- ADRs accepted: **31** (ADR-0001 through ADR-0031; ADR-0031 filed in Stage 28 prep commit 5d73fd2)
 - ADRs proposed: 0
-- Issues critical / high / medium / low: **0/0/4/0**
-  - Medium (4): ISSUE-0006 (intelligence-svc L3a bypasses skill-graph cache), ISSUE-0009 (IndexedDB + SW shell-cache v1.1 upgrade — DEV_PLAN §5 P1.6), ISSUE-0010 (adaptive section-boundary banner + DTO field — DEV_PLAN §5 P1.7), ISSUE-0011 (deferred content blocks: Results screen 5 stubs (a–e) + Dashboard mastery snapshot (f) — DEV_PLAN §5 P2.10)
-  - **Resolved at Stage 26:** ISSUE-0005 (env hygiene), ISSUE-0007 (SDK X-Session-Lock), ISSUE-0008 (error-code reconciliation)
-  - **Resolved at Stage 25 audit:** ISSUE-0012 (commit-msg hook)
+- Issues critical / high / medium / low: **0/0/3/1**
+  - Medium (3): ISSUE-0009 (IndexedDB + SW shell-cache v1.1 upgrade — DEV_PLAN §5 P1.6), ISSUE-0010 (adaptive section-boundary banner + DTO field — DEV_PLAN §5 P1.7), ISSUE-0011 (deferred content blocks: Results screen 5 stubs (a–e) + Dashboard mastery snapshot (f) — DEV_PLAN §5 P2.10)
+  - Low (1): ISSUE-0013 (evening ritual test count methodology — tail truncation drift; fix applied from Stage 29)
+  - **Resolved at Stage 28:** ISSUE-0006 (L3a now uses skill-graph-cache via getSkillGraph())
+  - **Resolved at Stage 26:** ISSUE-0005, ISSUE-0007, ISSUE-0008
+  - **Resolved at Stage 25 audit:** ISSUE-0012
 - Open questions: 0
 - Open bugs: 0
-- Deviations logged: 4 (DEV-20260430-1 resolved Stage 15; DEV-20260503-2 ongoing v1.1; DEV-20260511-1 resolved Stage 22b; DEV-20260515-1 self-resolved Stage 25)
+- Deviations logged: 5 (DEV-20260430-1 resolved Stage 15; DEV-20260503-2 ongoing v1.1; DEV-20260511-1 resolved Stage 22b; DEV-20260515-1 self-resolved Stage 25; DEV-20260518-1 ongoing — spec §5.1.4 student parameter defect, post-launch spec amendment)
 
 ## Notes for next session
 
-Stage 28. Refer `DEV_PLAN.md` Stage 28 for deliverables (Days 40–41, 2-day budget): generic job worker + `pipeline.causal.evaluate_full` (L3b) async pipeline step.
+Stage 29 — L5 Predictive (Day 42, 1-day budget). Read DEV_PLAN.md Stage 29 for deliverables; run §2A pre-implementation review before C-C-D-V.
 
-Pre-deploy gate still pending: migrations 0012 + 0013 + RLS must be run locally before any deploy (sandbox lacks Docker).
+Pre-deploy gate still pending: migrations 0012 + 0013 + 0014 + RLS must be run locally before any deploy (sandbox lacks Docker).
 
 Phase 1 Exit Report at `docs/dev/phase-1-exit-report.md`. Git tag `v1-phase-1` created locally; **push pending approval** — run `git push origin v1-phase-1` when ready.
+
+Q-28.8 deferral: `SkillGraphCache.adjacency` lacks `strength` + `dependency_class` fields (Option B applied — all edges used without filtering). `// Q-28.8:` grep markers at two sites in `intelligence-svc/handlers.ts`. Address in v1.1 if content team adds enriching edges.

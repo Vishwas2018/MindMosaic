@@ -5,6 +5,20 @@
 
 ## Open
 
+### ISSUE-0013 — Evening ritual test count methodology (tail truncation drift)
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-18 (Stage 28 close)
+- Area: tooling / process
+- Tags: evening-ritual · test-count · methodology
+
+**Summary.** Test counts reported in `DAILY_LOG.md` and `PROJECT_STATE.md` through Phase 1 (Stages 22a–27) were captured via `tail -N` of `pnpm -r run test` output rather than the full run. This caused small drift in the running total: `@mm/types` (98 tests) was under-reported by 1 (as 97) in some evening captures, and `@mm/jobs-worker` was absent until Stage 28. Surfaced at Stage 28 close when full output revealed actual pre-Stage-28 baseline was **400 passed**, not 399 as reported at Stage 26 close.
+
+**No test surface was ever broken.** Counts were merely slightly under-reported in the evening ritual log and PROJECT_STATE.md. The cumulative drift was small (≤1 test per stage) and had no functional impact or audit-trail integrity issue beyond the running total.
+
+**Fix.** Capture full `pnpm -r run test` output at every evening ritual (not `tail`), or use the runner's own per-package summary line (`Tests  N passed`). Apply from Stage 29 onward.
+
 ### ISSUE-0011 — Results screen content blocks deferred pending DTO + service shipments
 
 - Status: open
