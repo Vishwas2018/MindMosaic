@@ -4,6 +4,7 @@
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
 ### DEV-20260515-1 — Stage 25 route target: DEV_PLAN says `(student)/page.tsx`; actual implementation at `(student)/dashboard/page.tsx`
+<!-- Resolved 2026-05-15, Stage 25, commit 975e815: dashboard/page.tsx implemented at the correct path; self-resolving. -->
 
 - Date: 2026-05-15
 - Stage: 25

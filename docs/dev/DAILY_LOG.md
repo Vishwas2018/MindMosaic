@@ -8,7 +8,7 @@
 
 **Actually delivered:**
 
-- `feat(web,tooling): Stage 25 — student dashboard v1` — **6 files changed** (4 new, 2 modified).
+- `feat(web,tooling): Stage 25 — student dashboard v1` — commit `975e815`, **8 files changed, +768/−73** (5 new + 3 docs modified).
   - **`apps/web/src/app/(student)/dashboard/page.tsx`** (rewritten, −18 / +433) — `'use client'` page. Three hooks: `useMe()`, `useListRecentSessions()`, `usePathways()`. Six sections in strict order per SCREEN_SPECS Screen 7. (1) **Greeting card**: `greetingText(displayName)` with Year-level sub-line. (2) **Continue/Start CTA**: if `sessions[0].submitted_at === null` → "Continue session" with mode label; if no sessions → "Start first session"; if sessions but none active → "Start new session". All three CTAs navigate to `/session-selection` or `sessionPagePath(activeSession)`. (3) **Quick-start pathway tiles**: entitled tiles show `Button variant="secondary"` → `/session-selection`; locked tiles grayed at `opacity-50` + `<Lock>` icon + `locked_reason` (or "Upgrade to access" fallback). (4) **Mastery snapshot**: `StatTile label="Skills touched" value={totalSkillsTouched(sessions)}` + "Full mastery data in a future release" micro-text (`// TODO: ISSUE-0011f`). No ProgressBar (Q-25.2 resolution). (5) **Recent sessions table**: last 5 submitted sessions in `Card padding="none"` table; mode badge, date (`en-AU` locale), duration, result (`score_band ?? raw_score%`); `submitted_at !== null` filter; click → `/results/{id}`. Empty state: `EmptyState`. (6) **Engagement strip**: `StatTile` "Sessions this week" (client-side `sessionsThisWeek(sessions)` filter); Streak tile = "—" + "Coming soon" micro-text (stub). Loading: per-section `animate-pulse` skeleton cards.
   - **`apps/web/src/lib/dashboard-utils.ts`** (new, +47) — 6 pure utility functions: `findActiveSession`, `sessionsThisWeek` (ISO week filter), `totalSkillsTouched`, `greetingText` (time-of-day), `sessionPagePath` (mode → route), `formatMode`. All testable without React.
   - **`apps/web/src/__tests__/dashboard-utils.test.ts`** (new, +76) — **11 unit tests** across 4 describe blocks: `findActiveSession` (3 tests), `sessionsThisWeek` (2 tests), `totalSkillsTouched` (2 tests), `greetingText` (4 tests). Uses `SessionSummaryDTOSchema.parse()` for branded `SessionId` correctness. First `apps/web` unit test file — runs via root vitest config (`passWithNoTests`; node environment; no RTL needed for pure functions).
@@ -45,6 +45,12 @@
 
 (f) **Dashboard mastery snapshot stubbed (ISSUE-0011f)** — intelligence-svc `/learner-profile` endpoint and all three intelligence SDK hooks (`useLearningDNA`, `useSkillProgress`, `useCausalMap`) are gated Stage 28+. Stage 25 shows `StatTile` "Skills touched: {N}" derived from `totalSkillsTouched(sessions)` (sum of `SessionSummaryDTO.skills_touched_count`) + "Full mastery data in a future release" micro-copy. `// TODO: ISSUE-0011f` marks the replacement slot.
 
+(g) **Mastery snapshot: `StatTile` only — no `ProgressBar` (Q-25.2 resolution)** — SCREEN_SPECS Screen 7 shows a ProgressBar-style element in the mastery snapshot tile. Q-25.2 resolved to skip ProgressBar entirely: a 0% bar with no data is actively misleading. Stage 25 renders `StatTile label="Skills touched" value={N}` only. ProgressBar ships when real mastery percentages from intelligence-svc are available (ISSUE-0011f, Stage 28+).
+
+(h) **Engagement strip streak: `"—"` stub + "Coming soon" micro-text (Q-25.3 resolution)** — UI_CONTRACT engagement strip specifies a current streak counter. No streak aggregation exists in v1 (`ListRecentSessionsResponse` does not carry streak data; no dedicated endpoint). Stage 25 renders a tile with value `"—"` and "Coming soon" sub-text. Ships when streak aggregation is added to the sessions list or a dedicated endpoint.
+
+(i) **`formatMode(session.mode)` used as `pathway_name` fallback in recent sessions table** — `SessionSummaryDTO.pathway_name` is `null` for all v1 sessions (assessment-svc does not populate this field). Stage 25 shows `formatMode(session.mode)` ("Exam", "Practice", "Diagnostic") where the pathway name column would normally appear. Will resolve naturally when assessment-svc populates `pathway_name`.
+
 **Quality gates at close:**
 
 - Lint ✅ (7/7 packages) · Typecheck ✅ (10/10 packages) · Tests ✅ (**394/394**: 97 @mm/types + 27 @mm/sdk + 67 @mm/ui + 110 @mm/engines + 24 @mm/content-svc + 30 @mm/assessment-svc + 28 @mm/intelligence-svc + **11 @mm/web [new]**) · Build ✅ (7/7 packages — `/dashboard` at **2.91 kB First Load JS**) · RLS / pgTAP / migration roundtrip n/a (frontend-only stage).
@@ -52,6 +58,41 @@
 **Tomorrow — first thing:**
 
 Stage 26 — Phase 1 audit / load-test / CI strip. First stage after Phase 1 UI cluster close. Refer DEV_PLAN.md Stage 26 for deliverables. Pre-deploy gate (migrations 0012 + 0013 + RLS) still pending local Docker run.
+
+---
+
+### Phase 1 UI cluster close — audit summary (2026-05-15)
+
+**Stages covered:** 15–25 (11 stages, 2026-05-04 → 2026-05-15, ~12 calendar days)
+
+**Scope shipped:**
+
+- Stage 15: `@mm/engines-client` + `LinearEngine` + `SkillEngine` + `DiagnosticEngine` + `AdaptiveEngine`
+- Stage 16: `@mm/intelligence-svc` L1 Foundation + contracts
+- Stage 17: `@mm/intelligence-svc` L2 Behaviour
+- Stage 18: `@mm/intelligence-svc` L3a Causal-scoped (sync path)
+- Stage 19: assessment-svc full CRUD (`createSession` → `abandonSession`) + RLS + contract tests
+- Stage 20: intelligence-svc replay-determinism + sync trigger (ADR-0027)
+- Stage 21: skill-graph cache hardening — in-flight dedup + stale-while-revalidate (ADR-0028)
+- Stage 22a: SDK service-prefix routing reconciliation (ADR-0029)
+- Stage 22b: Session Selection + Practice screens + Playwright e2e
+- Stage 23: Exam Engine + a11y gate + offline queue (ADR-0030)
+- Stage 24: Results screen (3 real modes + repair stub) + `FocusHeader` lift to `@mm/ui`
+- Stage 25: Student Dashboard v1 (this stage)
+
+**Buffer:** 9 days available at Phase 1 open; +2 net banked at close (Stage 22 split cost −1; Stages 17, 19, 23 each closed early, offsetting). Net: **+2 days banked into Phase 2**.
+
+**Test growth:** 244 → **394** unit + contract (+150 tests across engines, services, UI, SDK, and first `@mm/web` test file).
+
+**ADRs filed in Phase 1:** ADR-0023 (engine-state union, Stage 15) through ADR-0030 (offline queue, Stage 23) = **8 ADRs**.
+
+**Issues opened in Phase 1:** ISSUE-0005 (env hygiene), ISSUE-0006 (L3a cache bypass), ISSUE-0007 (X-Session-Lock header), ISSUE-0008 (error code mismatch), ISSUE-0009 (IndexedDB/SW deferral), ISSUE-0010 (section-boundary banner), ISSUE-0011 (Results + Dashboard stubs a–f), ISSUE-0012 (commit-msg hook). **ISSUE-0012 resolved at Stage 25 audit day; ISSUE-0005..0011 carry into Phase 2.**
+
+**Questions raised in Phase 1:** Q-19.1..12, Q-20.1..2, Q-21.1..3, Q-22.1..3, Q-23.1..5, Q-24.1..7, Q-25.1..4 = all resolved. **Open questions at Phase 1 close: 0.**
+
+**Deviations in Phase 1:** DEV-20260511-1 (Stage 22 split, resolved Stage 22b), DEV-20260515-1 (dashboard route, self-resolved Stage 25). DEV-20260503-2 (content recalibration stub) is pre-Phase-1, ongoing into v1.1.
+
+---
 
 ## Stage 24 — 2026-05-14
 

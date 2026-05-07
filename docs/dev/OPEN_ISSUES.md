@@ -377,7 +377,7 @@ as a separate small chore commit at next audit (Stage 24) or sooner.
   at `.githooks/commit-msg`. Hook scans the commit message file for `Co-Authored-By:` lines
   and exits 1 if found (BUILD_CONTRACT §11.2). Activated for this clone via
   `git config core.hooksPath .githooks`. Run once per fresh clone to re-activate.
-  Commit: Stage 25 implementation commit.
+  Commit: `975e815`.
 
 ### ISSUE-0004 — outbox_event 7-day cleanup not wired (arch §5.6)
 
