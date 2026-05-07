@@ -176,108 +176,6 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 # Returns: zero hits in source (only references in node_modules).
 ```
 
-### ISSUE-0008 — assessment-svc dispatcher emits `CONFLICT` / `LOCK_CONFLICT` codes not in `@mm/types` `ErrorCodeSchema`
-
-- Status: open
-- Severity: medium
-- Reported: 2026-05-12 (Stage 22b implementation)
-- Area: backend (assessment-svc) + types (`@mm/types`)
-- Tags: error-surface · pre-launch · types-discipline
-
-**Summary.** `supabase/functions/assessment-svc/handlers.ts`
-emits string codes `'CONFLICT'` and `'LOCK_CONFLICT'` for 409
-responses (e.g. one-active-session collision, version
-mismatch, stale lock token). Neither string is in
-`packages/types/src/shared.ts` `ErrorCodeSchema`, which lists
-the 15 v1 codes (`VALIDATION_ERROR`, `UNAUTHENTICATED`,
-`FEATURE_GATED`, `FORBIDDEN`, `NOT_FOUND`, `SESSION_CONFLICT`,
-`VERSION_CONFLICT`, `ACTIVE_SESSION_EXISTS`,
-`IDEMPOTENCY_IN_FLIGHT`, `GONE`, `IDEMPOTENCY_MISMATCH`,
-`UNPROCESSABLE`, `RATE_LIMITED`, `INTERNAL_ERROR`,
-`SERVICE_UNAVAILABLE`).
-
-**Effect.** SDK `MmClient.request` calls
-`APIErrorEnvelopeSchema.safeParse(body)` on every error
-response; when the envelope `code` field is not in the enum,
-`safeParse` fails and the SDK falls through to
-`throw new APIError('INTERNAL_ERROR', response.status, …)`.
-Pages branching on `err.code` would mishandle 409s; pages
-branching on `err.status === 409` work correctly. Stage 22b
-session-selection + practice pages use status-only branching
-as a defensive workaround.
-
-**Why not in Stage 22b.** Out of scope. Stage 22b is the
-visual-screens slice of DEV-20260511-1; pre-existing
-SDK↔dispatcher path reconciliation already happened at 22a
-per Q-22.2 / ADR-0029 (paths only, not error-code surface).
-Adding code-surface reconciliation would expand 22b beyond
-the day budget and re-touch every dispatcher.
-
-**Recommended fix (pre-launch sweep).**
-Two-part: (a) reconcile the dispatcher names to the
-authoritative `@mm/types` enum — `'CONFLICT'` →
-`'SESSION_CONFLICT'` for one-active-session,
-`'VERSION_CONFLICT'` for version mismatch; `'LOCK_CONFLICT'`
-needs a new enum value (`'LOCK_CONFLICT'` or
-`'SESSION_LOCKED'`) added to `ErrorCodeSchema` + a contract
-test asserting envelope round-trip. Affects:
-`packages/types/src/shared.ts` (+ tests), all 5 v1
-dispatchers (`auth-svc`, `users-svc`, `content-svc`,
-`assessment-svc`, `intelligence-svc`).
-
-**Reproduction.**
-```bash
-grep -nE "'CONFLICT'|'LOCK_CONFLICT'" supabase/functions/*/handlers.ts
-grep -nE "ErrorCodeSchema" packages/types/src/shared.ts
-```
-
-### ISSUE-0007 — SDK record/checkpoint/abandon hooks do not plumb `X-Session-Lock` header per ADR-0026
-
-- Status: open
-- Severity: medium
-- Reported: 2026-05-12 (Stage 22b implementation)
-- Area: frontend (`@mm/sdk`)
-- Tags: lock-token · sdk-discipline · pre-launch
-
-**Summary.** ADR-0026 (Stage 19) mandates that
-assessment-svc rotates `lock_token` on every successful
-`/respond` and that the client echoes the new token via the
-`X-Session-Lock` header on the next `/respond`,
-`/checkpoint`, or `/abandon`. The SDK's `useRecordResponse`,
-`useCheckpoint`, and `useAbandon` hooks
-(`packages/sdk/src/hooks/session.ts`) accept only the body
-fields (`RecordResponseRequest` / `CheckpointRequest`); they
-do not expose a way for callers to supply the rotated
-`lock_token` and `MmClient.request` does not set
-`X-Session-Lock` on any path.
-
-**Effect.** Real assessment-svc dispatcher returns
-`409 LOCK_CONFLICT` on the first `/respond` after `/create`
-because the SDK never sent the header. Pages can recover by
-refetching state and retrying (the Stage 22b Practice page
-treats any 409 as a "version-conflict" modal trigger), but
-this is a fallback, not a contract. Opt-in Playwright e2e
-will surface the gap against a real backend.
-
-**Why not in Stage 22b.** Out of scope. Stage 22b is the
-visual-screens slice; SDK plumbing changes belong in a
-follow-up touch-up stage or fold into Stage 26 e2e wiring.
-
-**Recommended fix.** Extend `MmClient.request` to accept an
-optional `lockToken?: string` and write
-`headers['X-Session-Lock'] = lockToken` when set. Extend the
-three session mutation hooks to track the latest
-`lock_token` (returned in `CreateSessionResponse` and
-`RecordResponseResponse`) in component state or a small
-ref-based registry, and pass it into the next mutation
-automatically. Add SDK contract tests asserting header
-presence + rotation across two consecutive `/respond` calls.
-
-**Reproduction.**
-```bash
-grep -n "X-Session-Lock\|lockToken\|lock_token" packages/sdk/src/client.ts packages/sdk/src/hooks/session.ts
-# Returns: zero matches.
-```
 
 ### ISSUE-0006 — intelligence-svc L3a bypasses skill-graph cache (architectural inconsistency vs arch §9.3)
 
@@ -330,34 +228,6 @@ services pick up the cache pattern at once.
 **Reproduction.** `grep -n "skill_edge" supabase/functions/intelligence-svc/handlers.ts`
 returns one match — the bypass site at the L3a entry.
 
-### ISSUE-0005 — `apps/web/.env.local.example` populated with real Supabase URL + anon JWT
-
-- Status: open
-- Severity: medium
-- Reported: 2026-05-08 (Stage 19 audit close)
-- Area: infra / dx
-- Tags: hygiene · footgun · secrets-policy
-
-**Summary.** `apps/web/.env.local.example` is unstaged-modified to contain a real
-project URL (`https://tohmshcpdhcdfsubvnok.supabase.co`) and a real anon JWT
-(`role=anon`, `iat=2026-04-29`, `exp=2036-04-26`). Anon keys are *intentionally*
-browser-exposed by Supabase's RLS-first model — this is **not a security
-incident** in the credentials-leak sense. It is a hygiene/footgun issue:
-
-1. `*.example` files are conventionally placeholders (`your-project.supabase.co`
-   / `your-anon-key`). The current state nudges every new clone toward a
-   single shared dev project.
-2. Any future rotation of the anon key (e.g. tenant-isolation issue, RLS
-   policy bug requiring revocation) must update this file too — easy to forget.
-3. If anyone later confuses "anon key looks safe to commit" with "service role
-   key looks safe to commit", the precedent is set in the wrong direction.
-
-**Reproduction.** `git diff apps/web/.env.local.example` on `main` post-Stage 19.
-
-**Recommended fix.** Either (a) restore placeholders and instruct local devs
-to copy → `.env.local`; or (b) keep populated but rename to `.env.dev.shared`
-+ add comment "anon key, RLS-protected, safe to commit; do NOT mirror this for
-service-role".
 
 **Why not in Stage 20.** Stage 20 is the highest-risk Phase 1 stage (replay
 determinism). Hygiene cleanups don't belong in the same atomic commit. File
@@ -366,6 +236,38 @@ as a separate small chore commit at next audit (Stage 24) or sooner.
 
 
 ## Resolved
+
+### ISSUE-0008 — assessment-svc dispatcher emits `CONFLICT` / `LOCK_CONFLICT` codes not in `@mm/types` `ErrorCodeSchema`
+
+- Status: resolved
+- Severity: medium
+- Reported: 2026-05-12 (Stage 22b)
+- Closed: 2026-05-16 (Stage 26)
+- Resolution: Added `LOCK_CONFLICT` as 16th `ErrorCodeSchema` value. Replaced all 11 bare
+  `'CONFLICT'` strings in `assessment-svc/handlers.ts` + `intelligence-svc/handlers.ts` with
+  canonical codes (`ACTIVE_SESSION_EXISTS`, `VERSION_CONFLICT`, `SESSION_CONFLICT`). Updated
+  4 contract test assertions to match. All tests green.
+
+### ISSUE-0007 — SDK record/checkpoint/abandon hooks do not plumb `X-Session-Lock` header per ADR-0026
+
+- Status: resolved
+- Severity: medium
+- Reported: 2026-05-12 (Stage 22b)
+- Closed: 2026-05-16 (Stage 26)
+- Resolution: Added `lockToken` to `MmClient` public + private methods. Updated `useRecordResponse`
+  (lockTokenRef + auto-rotation from response), `useCheckpoint` (lockTokenRef, no rotation).
+  Added `useAbandon` hook. Exam page seeds lock_token via `useEffect` on `sessionState.data`.
+  Added `AbandonSessionResponseSchema` to `@mm/types`. 5 new ADR-0026 header tests in
+  `client.test.ts`. All tests green.
+
+### ISSUE-0005 — `apps/web/.env.local.example` populated with real Supabase URL + anon JWT
+
+- Status: resolved
+- Severity: medium
+- Reported: 2026-05-08 (Stage 19)
+- Closed: 2026-05-16 (Stage 26)
+- Resolution: Restored `apps/web/.env.local.example` to placeholder values
+  (`https://your-project.supabase.co` / `your-anon-key`). D5 of Stage 26.
 
 ### ISSUE-0012 — `.git/hooks/pre-commit` absent; BUILD_CONTRACT §11.2 trailer prohibition unenforced
 

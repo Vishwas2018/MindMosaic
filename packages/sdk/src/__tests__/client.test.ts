@@ -73,6 +73,45 @@ describe('MmClient — headers', () => {
   });
 });
 
+// ─── ADR-0026: X-Session-Lock header ─────────────────────────────────────────
+
+describe('ADR-0026 — X-Session-Lock header', () => {
+  it('attaches X-Session-Lock on post() when lockToken provided', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse(true, 200, { ok: true })));
+    await makeClient().post('/test', EchoSchema, {}, undefined, undefined, 'lock-abc');
+    const headers = (vi.mocked(fetch).mock.calls[0]?.[1]?.headers) as Record<string, string>;
+    expect(headers['X-Session-Lock']).toBe('lock-abc');
+  });
+
+  it('omits X-Session-Lock on post() when lockToken not provided', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse(true, 200, { ok: true })));
+    await makeClient().post('/test', EchoSchema, {}, undefined, undefined, undefined);
+    const headers = (vi.mocked(fetch).mock.calls[0]?.[1]?.headers) as Record<string, string>;
+    expect(headers['X-Session-Lock']).toBeUndefined();
+  });
+
+  it('attaches X-Session-Lock on patch() when lockToken provided', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse(true, 200, { ok: true })));
+    await makeClient().patch('/test', EchoSchema, {}, undefined, undefined, 'lock-patch');
+    const headers = (vi.mocked(fetch).mock.calls[0]?.[1]?.headers) as Record<string, string>;
+    expect(headers['X-Session-Lock']).toBe('lock-patch');
+  });
+
+  it('attaches X-Session-Lock on delete() when lockToken provided', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse(true, 200, { ok: true })));
+    await makeClient().delete('/test', EchoSchema, undefined, undefined, 'lock-del');
+    const headers = (vi.mocked(fetch).mock.calls[0]?.[1]?.headers) as Record<string, string>;
+    expect(headers['X-Session-Lock']).toBe('lock-del');
+  });
+
+  it('omits X-Session-Lock on GET (get() has no lockToken parameter)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse(true, 200, { ok: true })));
+    await makeClient().get('/test', EchoSchema);
+    const headers = (vi.mocked(fetch).mock.calls[0]?.[1]?.headers) as Record<string, string>;
+    expect(headers['X-Session-Lock']).toBeUndefined();
+  });
+});
+
 // ─── X1: APIError class ───────────────────────────────────────────────────────
 
 describe('X1 — APIError', () => {

@@ -46,6 +46,8 @@ export class MmClient {
       body?: unknown;
       idempotencyKey?: string;
       traceId?: string;
+      /** ADR-0026: echo the current lock_token via X-Session-Lock on /respond, /checkpoint, /abandon. */
+      lockToken?: string;
     },
   ): Promise<SDKResponse<T>> {
     const traceId = options?.traceId ?? crypto.randomUUID();
@@ -63,6 +65,10 @@ export class MmClient {
 
     if (options?.idempotencyKey !== undefined) {
       headers['Idempotency-Key'] = options.idempotencyKey;
+    }
+
+    if (options?.lockToken !== undefined) {
+      headers['X-Session-Lock'] = options.lockToken;
     }
 
     // Network errors propagate as-is — no wrapping into APIError (X1)
@@ -103,8 +109,9 @@ export class MmClient {
     body: unknown,
     idempotencyKey?: string,
     traceId?: string,
+    lockToken?: string,
   ): Promise<SDKResponse<T>> {
-    return this.request('POST', path, schema, { body, idempotencyKey, traceId });
+    return this.request('POST', path, schema, { body, idempotencyKey, traceId, lockToken });
   }
 
   patch<T>(
@@ -113,8 +120,9 @@ export class MmClient {
     body: unknown,
     idempotencyKey?: string,
     traceId?: string,
+    lockToken?: string,
   ): Promise<SDKResponse<T>> {
-    return this.request('PATCH', path, schema, { body, idempotencyKey, traceId });
+    return this.request('PATCH', path, schema, { body, idempotencyKey, traceId, lockToken });
   }
 
   delete<T>(
@@ -122,7 +130,8 @@ export class MmClient {
     schema: Schema<T>,
     idempotencyKey?: string,
     traceId?: string,
+    lockToken?: string,
   ): Promise<SDKResponse<T>> {
-    return this.request('DELETE', path, schema, { idempotencyKey, traceId });
+    return this.request('DELETE', path, schema, { idempotencyKey, traceId, lockToken });
   }
 }

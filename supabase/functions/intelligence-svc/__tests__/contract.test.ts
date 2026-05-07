@@ -552,7 +552,7 @@ describe('intelligence-svc — processSession error paths', () => {
     const result = await processSession({ client, sessionId: SESSION_ID, traceId: 'trace-1' });
     if (result.ok) throw new Error('expected err');
     expect(result.status).toBe(409);
-    expect(result.code).toBe('CONFLICT');
+    expect(result.code).toBe('SESSION_CONFLICT');
   });
 
   it('returns 500 when engine_state_snapshot is malformed', async () => {

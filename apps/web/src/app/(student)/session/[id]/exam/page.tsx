@@ -167,9 +167,9 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   const toast = useToast()
 
   const sessionState = useSessionState(sessionId)
-  const recordResponse = useRecordResponse(sessionId)
+  const { updateLockToken: seedRespondLockToken, ...recordResponse } = useRecordResponse(sessionId)
   const submitSession = useSubmitSession(sessionId)
-  const checkpoint = useCheckpoint(sessionId)
+  const { updateLockToken: seedCheckpointLockToken, ...checkpoint } = useCheckpoint(sessionId)
 
   const [currentItem, setCurrentItem] = useState<ItemDTO | null>(null)
   const [version, setVersion] = useState<number>(0)
@@ -201,6 +201,15 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       setProgressTotal(data.progress.total)
     }
   }, [sessionState.data, currentItem, sessionId, router])
+
+  // ADR-0026: seed / re-seed lock_token whenever session state arrives or
+  // refreshes (version-conflict + lock-expired recovery paths).
+  useEffect(() => {
+    if (sessionState.data) {
+      seedRespondLockToken(sessionState.data.lock_token)
+      seedCheckpointLockToken(sessionState.data.lock_token)
+    }
+  }, [sessionState.data, seedRespondLockToken, seedCheckpointLockToken])
 
   // Move focus to the question heading on each transition.
   const currentItemId = currentItem?.item_id ?? null

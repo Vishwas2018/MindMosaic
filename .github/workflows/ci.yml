@@ -59,5 +59,55 @@ jobs:
           COUNT=$(ls supabase/seeds/*.sql 2>/dev/null | wc -l)
           echo "Found $COUNT seed files"
           [ "$COUNT" -ge 6 ] || (echo "Expected ≥6 seed files" && exit 1)
-      - name: Supabase migration dry-run (requires Supabase CLI + Docker in CI)
-        run: echo "TODO Stage 2 follow-up — wire supabase db push --dry-run with Supabase CLI action"
+      - name: Check for Supabase CLI + Docker availability
+        id: supabase-check
+        run: |
+          if command -v supabase &> /dev/null && docker info &> /dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Supabase CLI or Docker not available — skipping migration dry-run (pre-deploy gate not yet open)."
+          fi
+      - uses: supabase/setup-cli@v1
+        if: steps.supabase-check.outputs.available == 'true'
+        with:
+          version: latest
+      - name: Migration dry-run
+        if: steps.supabase-check.outputs.available == 'true'
+        run: supabase db push --dry-run --local
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        id: check
+        run: |
+          if [[ -z "${{ secrets.E2E_BASE_URL }}" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "E2E secrets not configured — skipping (pre-deploy gate not yet open)."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.skip == 'false'
+      - uses: pnpm/action-setup@v5
+        if: steps.check.outputs.skip == 'false'
+      - uses: actions/setup-node@v5
+        if: steps.check.outputs.skip == 'false'
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - name: Install dependencies
+        if: steps.check.outputs.skip == 'false'
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        if: steps.check.outputs.skip == 'false'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E tests
+        if: steps.check.outputs.skip == 'false'
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+        run: pnpm turbo run test --filter=@mm/e2e

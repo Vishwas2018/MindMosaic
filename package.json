@@ -15,6 +15,7 @@
     "test": "turbo run test",
     "test:rls": "npx supabase db reset --local && npx supabase test db supabase/tests/rls",
     "test:migration": "bash scripts/migration-roundtrip.sh",
+    "test:replay": "tsx scripts/test-scoring.ts",
     "validate:content": "tsx scripts/validate-content.ts",
     "set-tenant-tier": "tsx scripts/set-tenant-tier.ts",
     "seed": "supabase db reset --local",

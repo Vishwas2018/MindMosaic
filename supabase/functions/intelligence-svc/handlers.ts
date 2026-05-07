@@ -225,7 +225,7 @@ export async function processSession(
   const session = sessionRes.data as SessionRow;
 
   if (session.status !== 'submitted') {
-    return err(409, 'CONFLICT', `Session is not submitted (current: ${session.status})`);
+    return err(409, 'SESSION_CONFLICT', `Session is not submitted (current: ${session.status})`);
   }
 
   const stateParse = EngineStateSchema.safeParse(session.engine_state_snapshot);

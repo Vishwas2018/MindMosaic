@@ -181,7 +181,8 @@ export const AchievementTierSchema = z.enum(['bronze', 'silver', 'gold', 'platin
 export type AchievementTier = z.infer<typeof AchievementTierSchema>;
 
 // ─── Error Envelope ───────────────────────────────────────────────────────────
-// Arch §1.5 error code vocabulary (exhaustive — 15 codes).
+// Arch §1.5 error code vocabulary (16 codes; LOCK_CONFLICT added Stage 26 per
+// ISSUE-0008 — assessment-svc emits this on X-Session-Lock header mismatch).
 
 export const ErrorCodeSchema = z.enum([
   'VALIDATION_ERROR',
@@ -192,6 +193,7 @@ export const ErrorCodeSchema = z.enum([
   'SESSION_CONFLICT',
   'VERSION_CONFLICT',
   'ACTIVE_SESSION_EXISTS',
+  'LOCK_CONFLICT',
   'IDEMPOTENCY_IN_FLIGHT',
   'GONE',
   'IDEMPOTENCY_MISMATCH',

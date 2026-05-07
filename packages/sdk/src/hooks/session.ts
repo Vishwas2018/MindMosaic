@@ -1,7 +1,8 @@
 // hooks/session.ts → assessment-svc (per ADR-0029)
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
+  AbandonSessionResponseSchema,
   CreateSessionResponseSchema,
   RecordResponseResponseSchema,
   SubmitSessionResponseSchema,
@@ -70,13 +71,16 @@ export function useListRecentSessions() {
   });
 }
 
-/** X3: idempotencyKey per-mount. Not retry-safe without stable key. */
+/** X3: idempotencyKey per-mount. Not retry-safe without stable key.
+ *  ADR-0026: lock_token echoed via X-Session-Lock; rotates on each successful /respond.
+ *  Call updateLockToken(token) after session create/resume to seed the initial token. */
 export function useRecordResponse(sessionId: string, options?: { idempotencyKey?: string }) {
   const client = useMmClient();
   const qc = useQueryClient();
   const autoKey = useRef<string>(crypto.randomUUID());
   const idempotencyKey = options?.idempotencyKey ?? autoKey.current;
-  return useMutation({
+  const lockTokenRef = useRef<string | null>(null);
+  const mutation = useMutation({
     mutationFn: (request: RecordResponseRequest) =>
       client
         .post(
@@ -84,12 +88,21 @@ export function useRecordResponse(sessionId: string, options?: { idempotencyKey?
           RecordResponseResponseSchema,
           request,
           idempotencyKey,
+          undefined,
+          lockTokenRef.current ?? undefined,
         )
-        .then((r) => r.data),
+        .then((r) => {
+          lockTokenRef.current = r.data.lock_token;
+          return r.data;
+        }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: mmKeys.sessions.state(sessionId) });
     },
   });
+  const updateLockToken = useCallback((token: string) => {
+    lockTokenRef.current = token;
+  }, []);
+  return { ...mutation, updateLockToken };
 }
 
 /** X3: idempotencyKey per-mount. Not retry-safe without stable key. */
@@ -114,12 +127,14 @@ export function useSubmitSession(sessionId: string, options?: { idempotencyKey?:
   });
 }
 
-/** X3: idempotencyKey per-mount. Not retry-safe without stable key. */
+/** X3: idempotencyKey per-mount. Not retry-safe without stable key.
+ *  ADR-0026: lock_token echoed via X-Session-Lock. No rotation (response is void). */
 export function useCheckpoint(sessionId: string, options?: { idempotencyKey?: string }) {
   const client = useMmClient();
   const autoKey = useRef<string>(crypto.randomUUID());
   const idempotencyKey = options?.idempotencyKey ?? autoKey.current;
-  return useMutation({
+  const lockTokenRef = useRef<string | null>(null);
+  const mutation = useMutation({
     mutationFn: (request: CheckpointRequest) =>
       client
         .post(
@@ -127,7 +142,43 @@ export function useCheckpoint(sessionId: string, options?: { idempotencyKey?: st
           CheckpointAckSchema,
           request,
           idempotencyKey,
+          undefined,
+          lockTokenRef.current ?? undefined,
         )
         .then((r) => r.data),
   });
+  const updateLockToken = useCallback((token: string) => {
+    lockTokenRef.current = token;
+  }, []);
+  return { ...mutation, updateLockToken };
+}
+
+/** ADR-0026: POST /sessions/{id}/abandon with X-Session-Lock header.
+ *  Call updateLockToken(token) after session create/resume to seed the initial token. */
+export function useAbandon(sessionId: string, options?: { idempotencyKey?: string }) {
+  const client = useMmClient();
+  const qc = useQueryClient();
+  const autoKey = useRef<string>(crypto.randomUUID());
+  const idempotencyKey = options?.idempotencyKey ?? autoKey.current;
+  const lockTokenRef = useRef<string | null>(null);
+  const mutation = useMutation({
+    mutationFn: () =>
+      client
+        .post(
+          `/assessment-svc/sessions/${sessionId}/abandon`,
+          AbandonSessionResponseSchema,
+          {},
+          idempotencyKey,
+          undefined,
+          lockTokenRef.current ?? undefined,
+        )
+        .then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: mmKeys.sessions.byId(sessionId) });
+    },
+  });
+  const updateLockToken = useCallback((token: string) => {
+    lockTokenRef.current = token;
+  }, []);
+  return { ...mutation, updateLockToken };
 }

@@ -280,7 +280,7 @@ export async function createSession(
   });
   if (insertRes.error !== null) {
     if (insertRes.error.code === '23505') {
-      return err(409, 'CONFLICT', 'Student already has an active session', {
+      return err(409, 'ACTIVE_SESSION_EXISTS', 'Student already has an active session', {
         constraint: 'one_active_session',
       });
     }
@@ -393,14 +393,14 @@ export async function respondToSession(
 
   // 3. State machine: must be active
   if (row.status !== 'active') {
-    return err(409, 'CONFLICT', `Session is not active (current: ${row.status})`, {
+    return err(409, 'SESSION_CONFLICT', `Session is not active (current: ${row.status})`, {
       current_state: row.status,
     });
   }
 
   // 4. Optimistic lock check (handled by RPC, but check version locally for clarity)
   if (row.version !== body.expected_version) {
-    return err(409, 'CONFLICT', 'Version conflict — refresh state and retry', {
+    return err(409, 'VERSION_CONFLICT', 'Version conflict — refresh state and retry', {
       expected_version: body.expected_version,
       actual_version: row.version,
     });
@@ -460,7 +460,7 @@ export async function respondToSession(
   });
   if (rpcRes.error !== null) {
     if (rpcRes.error.code === 'P0001') {
-      return err(409, 'CONFLICT', 'Version conflict — refresh state and retry');
+      return err(409, 'VERSION_CONFLICT', 'Version conflict — refresh state and retry');
     }
     return err(500, 'INTERNAL_ERROR', rpcRes.error.message);
   }
@@ -554,7 +554,7 @@ export async function submitSession(
 
   if (row.student_id !== studentId) return err(404, 'NOT_FOUND', 'Session not owned by caller');
   if (row.status !== 'active') {
-    return err(409, 'CONFLICT', `Session is not active (current: ${row.status})`, {
+    return err(409, 'SESSION_CONFLICT', `Session is not active (current: ${row.status})`, {
       current_state: row.status,
     });
   }
@@ -714,7 +714,7 @@ export async function checkpointSession(
     return err(409, 'LOCK_CONFLICT', 'X-Session-Lock header missing or stale');
   }
   if (row.status !== 'active') {
-    return err(409, 'CONFLICT', `Session is not active (current: ${row.status})`, {
+    return err(409, 'SESSION_CONFLICT', `Session is not active (current: ${row.status})`, {
       current_state: row.status,
     });
   }
@@ -763,7 +763,7 @@ export async function resumeSession(
 
   if (row.student_id !== studentId) return err(404, 'NOT_FOUND', 'Session not owned by caller');
   if (row.status !== 'interrupted' && row.status !== 'active') {
-    return err(409, 'CONFLICT', `Session is not resumable (current: ${row.status})`, {
+    return err(409, 'SESSION_CONFLICT', `Session is not resumable (current: ${row.status})`, {
       current_state: row.status,
     });
   }
@@ -776,7 +776,7 @@ export async function resumeSession(
   const engine = pickEngine(row.engine_type);
   const next = engine.getNextItem(state);
   if (isTerminationSignal(next)) {
-    return err(409, 'CONFLICT', 'Session has no remaining items');
+    return err(409, 'SESSION_CONFLICT', 'Session has no remaining items');
   }
 
   const newLockToken = eff.uuid();
@@ -841,7 +841,7 @@ export async function abandonSession(
     return err(409, 'LOCK_CONFLICT', 'X-Session-Lock header missing or stale');
   }
   if (row.status !== 'active' && row.status !== 'interrupted') {
-    return err(409, 'CONFLICT', `Session cannot be abandoned (current: ${row.status})`, {
+    return err(409, 'SESSION_CONFLICT', `Session cannot be abandoned (current: ${row.status})`, {
       current_state: row.status,
     });
   }

@@ -2,6 +2,67 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 26 — 2026-05-16
+
+**Planned (from DEV_PLAN.md Stage 26 + docs/prompts/2026-05-16_stage-26.md):** 2-day budget (Day 34–35). Phase 1 audit / load-test / CI strip. 8 deliverables: D1 k6 load test + nightly workflow, D2 pure-function replay harness (ADR-0027), D3 turbo.json outputs fix, D4 migration dry-run CI job, D5 .env.local.example restore, D6 SDK X-Session-Lock plumbing (ISSUE-0007), D7 error-code reconciliation (ISSUE-0008), D8 E2E CI job.
+
+**Actually delivered:**
+
+- `feat(infra,sdk,types): Stage 26 — Phase 1 audit, load-test, CI strip` — single atomic commit (SHA TBD), **24 files changed** (approx).
+  - **D3** `turbo.json` — `"outputs": ["coverage/**"]` → `"outputs": []` for test task. Eliminates "no output files found" Turborepo warning.
+  - **D5** `apps/web/.env.local.example` — restored to placeholder values (`https://your-project.supabase.co` / `your-anon-key`). Closes ISSUE-0005.
+  - **D7** `packages/types/src/shared.ts` — `LOCK_CONFLICT` added as 16th `ErrorCodeSchema` value (was 15). Comment updated.
+  - **D7** `packages/types/src/session.ts` — `AbandonSessionResponseSchema` + `AbandonSessionResponse` type added.
+  - **D7** `supabase/functions/assessment-svc/handlers.ts` — 8 `'CONFLICT'` strings replaced with canonical codes: `ACTIVE_SESSION_EXISTS` (one-active-session), `SESSION_CONFLICT` (state-machine violations ×6), `VERSION_CONFLICT` (version mismatch ×2). `LOCK_CONFLICT` occurrences (lines 391, 714, 841) left unchanged — now valid in schema.
+  - **D7** `supabase/functions/intelligence-svc/handlers.ts` — 1 `'CONFLICT'` → `'SESSION_CONFLICT'` (session not submitted).
+  - **D7** `supabase/functions/assessment-svc/__tests__/contract.test.ts` — 3 assertions updated: `'CONFLICT'` → `'ACTIVE_SESSION_EXISTS'`, `'VERSION_CONFLICT'`, `'SESSION_CONFLICT'`. `'LOCK_CONFLICT'` assertions unchanged.
+  - **D7** `supabase/functions/intelligence-svc/__tests__/contract.test.ts` — 1 assertion: `'CONFLICT'` → `'SESSION_CONFLICT'`.
+  - **D6** `packages/sdk/src/client.ts` — `lockToken?: string` added to `request()` private options + `post()`/`patch()`/`delete()` public signatures. `X-Session-Lock` header written when set.
+  - **D6** `packages/sdk/src/hooks/session.ts` — `useRecordResponse` gains `lockTokenRef` (auto-rotates from `RecordResponseResponse.lock_token`) + `updateLockToken()` (stable `useCallback`). `useCheckpoint` gains `lockTokenRef` + `updateLockToken()` (no rotation — void response). New `useAbandon` hook added (POST `/sessions/{id}/abandon`, lock-token aware). `AbandonSessionResponseSchema` + `useCallback` imported.
+  - **D6** `apps/web/src/app/(student)/session/[id]/exam/page.tsx` — `useRecordResponse` and `useCheckpoint` destructured to expose `seedRespondLockToken` / `seedCheckpointLockToken`. New `useEffect` seeds lock_token from `sessionState.data.lock_token` on initial load and re-seed on refetch (recovery paths). Closes ISSUE-0007.
+  - **D6** `packages/sdk/src/__tests__/client.test.ts` — 5 new "ADR-0026 — X-Session-Lock header" tests (post/patch/delete with lockToken, post without, GET omits). Client test count: 13 → 18.
+  - **D2** `scripts/test-scoring.ts` — ADR-0027 replay harness: 50 LinearEngine sessions (5 patterns × 10 replays), 58 assertions, all pass. Uses `scoreWithConfig()` for band-aware scoring. Fixed seed (no `Date.now()`/`Math.random()` in engine bodies). `pnpm test:replay` runs in <1s.
+  - **D2** `package.json` — `"test:replay": "tsx scripts/test-scoring.ts"` added.
+  - **D1** `k6/session-loop.js` — 500 VU ramp load test (create → respond ×N → submit), custom metrics for CREATE/RESPOND/SUBMIT latency, p95 thresholds per BUILD_CONTRACT §10, lock-token threading via `X-Session-Lock` header.
+  - **D1** `k6/README.md` — usage + threshold table.
+  - **D1** `.github/workflows/load-test.yml` — nightly (02:00 UTC) k6 run; graceful skip when `LOAD_TEST_BASE_URL` / `LOAD_TEST_TOKEN` secrets absent.
+  - **D4** `.github/workflows/ci.yml` — migration dry-run job now conditionally runs `supabase db push --dry-run --local` when Supabase CLI + Docker are available; graceful skip otherwise.
+  - **D8** `.github/workflows/ci.yml` — E2E job added; graceful skip when `E2E_BASE_URL` secret absent; runs `pnpm turbo run test --filter=@mm/e2e` when present. Closes Q-19.9 obligation.
+
+**Time spent:** ~4h (2 sessions across the 2-day budget).
+
+**Surprises / departures:**
+
+- `auth-svc` and `users-svc` dispatcher files don't exist in v1 (per grepping during D7 audit). ISSUE-0008 scope narrowed to 2 files (assessment-svc + intelligence-svc) rather than 5. Noted in OPEN_ISSUES resolution.
+- `LinearEngine.score()` uses identity formula by default; `scoreWithConfig()` applies the configured `scaled_score_formula` + bands. D2 script uses `scoreWithConfig()`.
+- D6 `lockToken` parameter added as 6th positional arg to `post()`/`patch()`/`delete()` (after `traceId`) — preserves backwards compatibility for all existing callers, which don't need the 6th arg.
+
+**Decisions made (not in stage):**
+
+- No ADRs filed — all decisions were either implied by existing ADRs (ADR-0026 lock-token rotation, ADR-0027 replay determinism) or standard implementation choices.
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- **ISSUE-0005** resolved (D5) — .env.local.example restored.
+- **ISSUE-0007** resolved (D6) — SDK X-Session-Lock plumbed.
+- **ISSUE-0008** resolved (D7) — error-code surface reconciled (ISSUE-0008 scope note: `auth-svc`/`users-svc` don't exist in v1; `content-svc` was clean).
+- ISSUE-0006, ISSUE-0009, ISSUE-0010, ISSUE-0011 remain open (v1.1 targets).
+- No new questions raised.
+
+**Quality gates at close:**
+
+- Lint ✅ (7/7 packages) · Typecheck ✅ (10/10 packages) · Tests ✅ (**399/399**: +5 new ADR-0026 header tests in @mm/sdk) · Build n/a (no app changes requiring rebuild) · `pnpm test:replay` ✅ (58/58 assertions) · RLS n/a (no schema changes).
+
+**Tomorrow — first thing:**
+
+Stage 27 — next DEV_PLAN.md stage. Refer `docs/dev/PROJECT_STATE.md` for current position.
+
+---
+
 ## Stage 25 — 2026-05-15
 
 **Planned (from DEV_PLAN.md Stage 25 + docs/prompts/2026-05-15_stage-25.md):** 1-day budget (Day 33). Student Dashboard v1 at `/dashboard` — last Phase 1 UI screen, closes the Phase 1 UI cluster. Six sections per SCREEN_SPECS Screen 7: greeting card, continue-last / start-first CTA, quick-start pathway tiles, mastery snapshot (stub — intelligence-svc Stage 28+), recent sessions table, engagement strip (stub streak). First consumer of `useListRecentSessions` (Q-22.1). Side-task: ISSUE-0012 `commit-msg` hook if budget allows. Audit day at close (every 5 stages — last audit was Stage 19/20).

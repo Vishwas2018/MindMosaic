@@ -119,6 +119,12 @@ export const SessionSummaryDTOSchema = z.object({
 });
 export type SessionSummaryDTO = z.infer<typeof SessionSummaryDTOSchema>;
 
+export const AbandonSessionResponseSchema = z.object({
+  session_id: SessionIdSchema,
+  status: z.literal('abandoned'),
+});
+export type AbandonSessionResponse = z.infer<typeof AbandonSessionResponseSchema>;
+
 export const CheckpointRequestSchema = z.object({
   checkpoint_number: z.number().int(),
   current_question_index: z.number().int(),

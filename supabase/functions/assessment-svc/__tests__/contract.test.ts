@@ -300,7 +300,7 @@ describe('assessment-svc — createSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.status).toBe(409);
-      expect(result.code).toBe('CONFLICT');
+      expect(result.code).toBe('ACTIVE_SESSION_EXISTS');
     }
   });
 
@@ -419,7 +419,7 @@ describe('assessment-svc — respondToSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.status).toBe(409);
-      expect(result.code).toBe('CONFLICT');
+      expect(result.code).toBe('VERSION_CONFLICT');
     }
   });
 
@@ -502,7 +502,7 @@ describe('assessment-svc — submitSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.status).toBe(409);
-      expect(result.code).toBe('CONFLICT');
+      expect(result.code).toBe('SESSION_CONFLICT');
     }
   });
 
