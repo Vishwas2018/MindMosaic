@@ -1,0 +1,9 @@
+#!/bin/sh
+# BUILD_CONTRACT §11.2 — prohibit Co-Authored-By and similar AI-attribution
+# trailers in commit messages. Run `git config core.hooksPath .githooks`
+# once per clone to activate.
+if grep -qiE '^Co-Authored-By:' "$1"; then
+  echo "ERROR: AI-attribution trailer detected in commit message." >&2
+  echo "  Remove the Co-Authored-By line per BUILD_CONTRACT §11.2." >&2
+  exit 1
+fi

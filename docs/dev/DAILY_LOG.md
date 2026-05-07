@@ -2,6 +2,57 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 25 — 2026-05-15
+
+**Planned (from DEV_PLAN.md Stage 25 + docs/prompts/2026-05-15_stage-25.md):** 1-day budget (Day 33). Student Dashboard v1 at `/dashboard` — last Phase 1 UI screen, closes the Phase 1 UI cluster. Six sections per SCREEN_SPECS Screen 7: greeting card, continue-last / start-first CTA, quick-start pathway tiles, mastery snapshot (stub — intelligence-svc Stage 28+), recent sessions table, engagement strip (stub streak). First consumer of `useListRecentSessions` (Q-22.1). Side-task: ISSUE-0012 `commit-msg` hook if budget allows. Audit day at close (every 5 stages — last audit was Stage 19/20).
+
+**Actually delivered:**
+
+- `feat(web,tooling): Stage 25 — student dashboard v1` — **6 files changed** (4 new, 2 modified).
+  - **`apps/web/src/app/(student)/dashboard/page.tsx`** (rewritten, −18 / +433) — `'use client'` page. Three hooks: `useMe()`, `useListRecentSessions()`, `usePathways()`. Six sections in strict order per SCREEN_SPECS Screen 7. (1) **Greeting card**: `greetingText(displayName)` with Year-level sub-line. (2) **Continue/Start CTA**: if `sessions[0].submitted_at === null` → "Continue session" with mode label; if no sessions → "Start first session"; if sessions but none active → "Start new session". All three CTAs navigate to `/session-selection` or `sessionPagePath(activeSession)`. (3) **Quick-start pathway tiles**: entitled tiles show `Button variant="secondary"` → `/session-selection`; locked tiles grayed at `opacity-50` + `<Lock>` icon + `locked_reason` (or "Upgrade to access" fallback). (4) **Mastery snapshot**: `StatTile label="Skills touched" value={totalSkillsTouched(sessions)}` + "Full mastery data in a future release" micro-text (`// TODO: ISSUE-0011f`). No ProgressBar (Q-25.2 resolution). (5) **Recent sessions table**: last 5 submitted sessions in `Card padding="none"` table; mode badge, date (`en-AU` locale), duration, result (`score_band ?? raw_score%`); `submitted_at !== null` filter; click → `/results/{id}`. Empty state: `EmptyState`. (6) **Engagement strip**: `StatTile` "Sessions this week" (client-side `sessionsThisWeek(sessions)` filter); Streak tile = "—" + "Coming soon" micro-text (stub). Loading: per-section `animate-pulse` skeleton cards.
+  - **`apps/web/src/lib/dashboard-utils.ts`** (new, +47) — 6 pure utility functions: `findActiveSession`, `sessionsThisWeek` (ISO week filter), `totalSkillsTouched`, `greetingText` (time-of-day), `sessionPagePath` (mode → route), `formatMode`. All testable without React.
+  - **`apps/web/src/__tests__/dashboard-utils.test.ts`** (new, +76) — **11 unit tests** across 4 describe blocks: `findActiveSession` (3 tests), `sessionsThisWeek` (2 tests), `totalSkillsTouched` (2 tests), `greetingText` (4 tests). Uses `SessionSummaryDTOSchema.parse()` for branded `SessionId` correctness. First `apps/web` unit test file — runs via root vitest config (`passWithNoTests`; node environment; no RTL needed for pure functions).
+  - **`apps/web/playwright/e2e/dashboard-flow.spec.ts`** (new, +74) — `test.skip()`-guarded happy path: signup → inject token → `/dashboard` → assert greeting h1 + "Start first session" CTA + four section headings + mastery stub copy + streak "Coming soon". Gated on `E2E_WEB_URL` + `E2E_BASE_URL` + `E2E_SUPABASE_ANON`. CI integration deferred to Stage 26 per Q-19.9.
+  - **`.githooks/commit-msg`** (new, +9) — **Side-task ISSUE-0012 SHIPPED.** `commit-msg` hook enforcing BUILD_CONTRACT §11.2: rejects any commit message containing `Co-Authored-By:` (case-insensitive). Tracked in `.githooks/` directory; activated via `git config core.hooksPath .githooks` (run once per clone). Verified active: `git config --get core.hooksPath` returns `.githooks`.
+
+**Mojibake audit (pre-commit):** Seven non-ASCII character classes in `dashboard/page.tsx` and `dashboard-utils.ts` — `e2 80 94` (U+2014 em-dash `—`, display placeholder for missing values; consistent with results/[id]/page.tsx pattern), `e2 94 80` (U+2500 box-drawing horizontal `─`, section-separator comments), `e2 86 92` (U+2192 rightwards arrow `→`, JSDoc comment). All decode clean; no double-encoding sequences; no mojibake.
+
+**Time spent:** ~2h (single session — dashboard + utils + tests in ~1.5h; hook + evening ritual ~0.5h).
+
+**Surprises / departures:**
+
+- `apps/web` had `"test": "vitest run --passWithNoTests"` already configured but no test files. First test file added without new devDeps (vitest at workspace root; pure-function tests need no RTL). Turborepo warns "no output files found for task @mm/web#test" (expects coverage files per turbo.json outputs). Harmless — no coverage configured. Will address in Stage 26 CI setup.
+- ISSUE-0012 hook is `commit-msg` (not `pre-commit`) — scans the message file directly, which is more reliable than scanning staged content per the ISSUE's own suggested fix.
+- `SessionSummaryDTOSchema.parse()` needed in test helper due to branded `SessionId` type — `string` not assignable to `string & { readonly _SessionId: never }`. Schema parse is the right fix; no type-casting required.
+
+**Decisions made (not in stage):**
+
+- Pure utility functions extracted to `apps/web/src/lib/dashboard-utils.ts` rather than inlined in the page — enables unit testing without React Testing Library; consistent with how `apps/web/src/lib/auth/` helpers are structured.
+- No new ADRs filed — all decisions were implied by Q-25.1..4 resolutions or existing patterns.
+
+**Deviations logged:**
+
+- DEV-20260515-1 (filed in prep commit `20272d0`) — route target `(student)/page.tsx` vs `dashboard/page.tsx`. Self-resolving; Stage 25 ships at correct path.
+
+**Issues opened / closed / questions raised:**
+
+- **ISSUE-0012** resolved (Stage 25 audit day) — `.githooks/commit-msg` hook shipped.
+- **ISSUE-0011(f)** (stub: Dashboard mastery snapshot) — filed in prep commit, stub shipped in implementation.
+- ISSUE-0005..0011 all reviewed at audit day; ISSUE-0005..0011 remain open (no new fixes this stage).
+- Q-25.1..4 all resolved (prep commit `20272d0`). No Q-25.5+ raised.
+
+**UI-DIVERGENCE entries (per UI_CONTRACT §1.1 close requirement):**
+
+(f) **Dashboard mastery snapshot stubbed (ISSUE-0011f)** — intelligence-svc `/learner-profile` endpoint and all three intelligence SDK hooks (`useLearningDNA`, `useSkillProgress`, `useCausalMap`) are gated Stage 28+. Stage 25 shows `StatTile` "Skills touched: {N}" derived from `totalSkillsTouched(sessions)` (sum of `SessionSummaryDTO.skills_touched_count`) + "Full mastery data in a future release" micro-copy. `// TODO: ISSUE-0011f` marks the replacement slot.
+
+**Quality gates at close:**
+
+- Lint ✅ (7/7 packages) · Typecheck ✅ (10/10 packages) · Tests ✅ (**394/394**: 97 @mm/types + 27 @mm/sdk + 67 @mm/ui + 110 @mm/engines + 24 @mm/content-svc + 30 @mm/assessment-svc + 28 @mm/intelligence-svc + **11 @mm/web [new]**) · Build ✅ (7/7 packages — `/dashboard` at **2.91 kB First Load JS**) · RLS / pgTAP / migration roundtrip n/a (frontend-only stage).
+
+**Tomorrow — first thing:**
+
+Stage 26 — Phase 1 audit / load-test / CI strip. First stage after Phase 1 UI cluster close. Refer DEV_PLAN.md Stage 26 for deliverables. Pre-deploy gate (migrations 0012 + 0013 + RLS) still pending local Docker run.
+
 ## Stage 24 — 2026-05-14
 
 **Planned (from DEV_PLAN.md Stage 24 + docs/prompts/2026-05-14_stage-24.md):** 1-day budget (Day 32). Results screen at `/results/[id]` — three real mode variants (scored, practice, diagnostic) + repair stub. Hero ring (120px SVG, `stroke-dashoffset` animation, UI_CONTRACT §9.1 copy thresholds), print-safe styles, Playwright e2e. Five SCREEN_SPECS §11 content blocks (topic breakdown, performance insights, question review, mastery delta, diagnostic proficiency map) pre-resolved as stubs via ISSUE-0011 (filed in prep commit `ad73aad`). Side-task per Q-24.7: lift `FocusHeader` to `@mm/ui` if budget allows.
