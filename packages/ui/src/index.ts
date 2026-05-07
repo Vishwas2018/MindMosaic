@@ -43,6 +43,8 @@ export {
   TableCell,
 } from './Table/Table.js';
 export type { TableProps } from './Table/Table.js';
+export { QuestionMap } from './QuestionMap/QuestionMap.js';
+export type { QuestionMapProps, QuestionMapItem, QuestionStatus } from './QuestionMap/QuestionMap.js';
 
 // Forms
 export { Button } from './Button/Button.js';
