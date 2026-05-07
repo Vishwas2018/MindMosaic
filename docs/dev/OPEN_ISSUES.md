@@ -5,6 +5,53 @@
 
 ## Open
 
+### ISSUE-0011 — Results screen content blocks deferred pending DTO + service shipments
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-14 (Stage 24 §2A)
+- Area: frontend (apps/web) + types (@mm/types) + backend (assessment-svc, intelligence-svc, analytics-svc)
+- Tags: results-screen · dto-discipline · v1.1
+
+**Summary.** SCREEN_SPECS §11 specifies five content blocks for the Results screen
+(`/results/[id]`) that cannot be built in Stage 24 because their data sources are
+not yet available in v1 DTOs or service layers:
+
+(a) **Topic breakdown** — requires per-topic correct/incorrect counts in
+`SessionSummaryDTO`; current shape carries only `raw_score` and `skills_touched_count`
+with no topic-level breakdown.
+
+(b) **Performance insights** — requires an `ExplanationDTO` SDK hook and the
+`packages/core/src/explain-format.ts` helper (file does not exist; `packages/core/src/index.ts`
+is empty). intelligence-svc has `ExplanationDTOSchema` at `packages/types/src/intelligence.ts:80`
+but no v1 endpoint returns one via the SDK.
+
+(c) **Question review block** — requires `useContentItem` hook + per-response answer state
+(which choice was selected, whether correct) accessible from the Results page.
+Assessment-svc returns per-response data within the session, but no DTO surface currently
+exposes the full response list at results time.
+
+(d) **Practice mastery delta card** — requires intelligence-svc Stages 28+ endpoints
+(`/intelligence/mastery-delta/{session_id}` or equivalent) and a corresponding SDK hook.
+Not available in v1.
+
+(e) **Diagnostic proficiency map** — requires analytics-svc proficiency data
+(`ProficiencyMapDTOSchema` exists in `packages/types/src/proficiency.ts:9` but no
+analytics-svc endpoint or SDK hook is built in v1).
+
+**Effect.** Stage 24 ships stubs for all five blocks: a `{/* TODO: ISSUE-0011x */}` placeholder
+comment in each slot, hidden via `{false && ...}` guard so the page renders cleanly without
+the block. The hero ring (scored mode), a "Skill progress" placeholder card (practice mode),
+and proficiency band labels (diagnostic mode) ship per the Q-24.6 resolution using
+`SessionSummaryDTO.raw_score`.
+
+**Recommended fix (post-Stage 28 / v1.1).**
+(a) Extend `SessionSummaryDTO` with `topic_breakdown: { topic_id: string; correct: number; total: number }[]`.
+(b) Add `useSessionExplanations(sessionId)` SDK hook; build `packages/core/src/explain-format.ts` helper.
+(c) Add `useSessionResponses(sessionId)` SDK hook returning per-response state.
+(d) Add `useMasteryDelta(sessionId)` SDK hook once intelligence-svc v2 ships (Stage 28+).
+(e) Add `useProficiencyMap(studentId, pathwayId)` SDK hook once analytics-svc ships.
+
 ### ISSUE-0010 — adaptive section-boundary banner pending server-authoritative `current_testlet_id` in `SessionStateDTO` + `RecordResponseResponse`
 
 - Status: open

@@ -9,6 +9,125 @@
 
 ## Resolved
 
+### Q-24.7 — FocusHeader lift: side-task or separate stage?
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: docs/dev/DAILY_LOG.md Stage 23 close — UI-DIVERGENCE entry (e): "FocusHeader not
+  lifted to @mm/ui (was a pre-23 side-task candidate; not enough budget after a11y sweep)".
+  PROJECT_STATE.md Stage 24 notes: "Side-task candidate: lift FocusHeader to @mm/ui and adopt
+  it in the Practice page."
+- Question: Include FocusHeader lift as a side-task in Stage 24, or carry forward?
+- Why ambiguous: Side-task is opportunistic; Stage 24 has a 1-day budget with a 3-mode Results
+  screen and print styles. Budget pressure may not allow it.
+- Blocking? no.
+- Code affected: `apps/web/src/components/exam/FocusHeader.tsx` →
+  `packages/ui/src/FocusHeader/FocusHeader.tsx`;
+  `apps/web/src/app/(student)/session/[id]/practice/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Include as side-task IF budget allows**. Clears UI-DIVERGENCE (e)
+  from Stage 23 close. If anything risks the main Results screen scope (hero ring, 3-mode
+  variants, print styles, e2e spec), skip and carry forward to Stage 25 audit day as a
+  low-priority chore.
+
+### Q-24.6 — `raw_score` as 0–100 percentage
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: `packages/types/src/session.ts` `SessionSummaryDTOSchema`; UI_CONTRACT §9.1 hero ring
+  copy thresholds (≥80% "Well done", 60–79% "Good effort", <60% "Keep practising"); SCREEN_SPECS
+  §11 "score %" display.
+- Question: Is `SessionSummaryDTO.raw_score` a 0–100 percentage or a raw item count (e.g. 14/20)?
+  Hero ring label and copy thresholds require a percentage.
+- Why ambiguous: Schema names it `raw_score` (implies count) but SCREEN_SPECS §11 shows `%`
+  display without a separate `total_items` denominator field in the DTO.
+- Blocking? yes — affects hero ring label + copy + ring `stroke-dashoffset` calculation.
+- Code affected: `apps/web/src/app/(student)/results/[id]/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Treat `raw_score` as a 0–100 integer percentage**. Hero ring
+  renders `{raw_score}%`; `stroke-dashoffset` = `circumference * (1 - raw_score / 100)`.
+  Copy thresholds: ≥80 → "Well done", 60–79 → "Good effort", <60 → "Keep practising"
+  (UI_CONTRACT §9.1). No separate `total_items` denominator in Stage 24.
+
+### Q-24.5 — Diagnostic proficiency map data source
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS §11 (diagnostic variant: "proficiency map — horizontal bars with
+  confidence-interval shading; no score; status bands Developing/Proficient/Advanced");
+  `packages/types/src/proficiency.ts:9` `ProficiencyMapDTOSchema` (exists, no SDK hook,
+  no analytics-svc endpoint in v1).
+- Question: Render the diagnostic proficiency map in Stage 24 or stub it?
+- Why ambiguous: DTO type exists but analytics-svc is not built until Stage 28+.
+- Blocking? no.
+- Code affected: `apps/web/src/app/(student)/results/[id]/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Defer via stub**. ISSUE-0011(e) filed. Stage 24 diagnostic
+  variant shows skill-band label rows (Developing / Proficient / Advanced) as static
+  placeholder structure — layout ships; real data waits for analytics-svc.
+
+### Q-24.4 — Practice mastery delta data source
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS §11 (practice variant: "mastery delta card"); PROJECT_STATE.md Stage 24
+  notes ("mastery delta card"); intelligence-svc Stage 28+ `/intelligence/mastery-delta/{id}`
+  (not yet built).
+- Question: Show a real mastery delta in Stage 24 or stub it?
+- Why ambiguous: SDK hook + endpoint not available until Stage 28.
+- Blocking? no.
+- Code affected: `apps/web/src/app/(student)/results/[id]/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Defer via stub**. ISSUE-0011(d) filed. Practice variant renders
+  a "Skill progress" card with "Available after more sessions" placeholder copy.
+
+### Q-24.3 — Question review block data source
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS §11 (question summary block in practice variant); no
+  `useSessionResponses` SDK hook; assessment-svc per-response state not exposed at
+  results time in v1 DTO surface.
+- Question: Render question review in Stage 24 or stub it?
+- Why ambiguous: Data exists server-side but no DTO or SDK hook surfaces it at results time.
+- Blocking? no.
+- Code affected: `apps/web/src/app/(student)/results/[id]/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Defer via stub**. ISSUE-0011(c) filed. Question review block
+  is omitted in Stage 24; a `{/* TODO: ISSUE-0011c */}` comment marks the slot.
+
+### Q-24.2 — Performance insights data source
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS §11 (scored variant: "performance insights" block);
+  `packages/types/src/intelligence.ts:80` `ExplanationDTOSchema` (exists);
+  `packages/core/src/index.ts` is empty — `explain-format.ts` does not exist;
+  no SDK hook returns `ExplanationDTO` in v1.
+- Question: Render performance insights in Stage 24 or stub it?
+- Why ambiguous: Type exists but neither the helper file nor the SDK hook is built.
+- Blocking? no.
+- Code affected: `apps/web/src/app/(student)/results/[id]/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Defer via stub**. ISSUE-0011(b) filed. Performance insights
+  block is omitted in Stage 24; a `{/* TODO: ISSUE-0011b */}` comment marks the slot.
+
+### Q-24.1 — Topic breakdown data source
+
+- Date raised: 2026-05-14 (Stage 24 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS §11 (scored variant: "topic breakdown"); UI_CONTRACT §5.2 ("topic
+  breakdown" listed under scored mode); `SessionSummaryDTOSchema` in
+  `packages/types/src/session.ts` — no per-topic breakdown field.
+- Question: Render topic breakdown in Stage 24 or stub it?
+- Why ambiguous: SCREEN_SPECS §11 lists it as part of the scored Results screen but the
+  DTO carries no topic-level data.
+- Blocking? no.
+- Code affected: `apps/web/src/app/(student)/results/[id]/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-14): **Defer via stub**. ISSUE-0011(a) filed. Topic breakdown block
+  is omitted in Stage 24; a `{/* TODO: ISSUE-0011a */}` comment marks the slot.
+
 ### Q-23.5 — Timer-expiry auto-submit semantics
 
 - Date raised: 2026-05-13 (Stage 23 §2A)
