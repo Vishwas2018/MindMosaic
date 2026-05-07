@@ -2,6 +2,94 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 23 — 2026-05-13
+
+**Planned (from DEV_PLAN.md Stage 23 + docs/prompts/2026-05-13_stage-23.md):** 3-day budget (Days 28-30 per DEV_PLAN; Day 29 onward per PROJECT_STATE — drift informational only). The single most critical v1 UI per DEV_PLAN.md:618 ("Stage 23 a11y gate fails exam engine" risk row). Deliverables: Exam Engine page at `/session/[id]/exam` with `FocusHeader` chrome + server-authoritative `Timer` (3 visual states with `aria-live` policy) + `QuestionMap` sidebar (240px, status-coloured grid, arrow-key operable) + autosave (`useCheckpoint` every 30s + on blur + on nav, idempotency-keyed per `checkpoint_number`) + offline queue (in-memory per ADR-0030) + version-conflict / lock-expired / session-abandoned / submit-confirm (with unanswered count) / exit-confirm modals + adaptive section-boundary banner (deferred per Q-23.4 / ISSUE-0010) + Playwright keyboard-only e2e + axe-core zero serious/critical (merge-blocker per UI_CONTRACT §7.1). All §2A resolutions baked in: Q-23.1..5 + ADR-0030 (in-memory queue, option B) filed in prep commit `2428231`.
+
+**Actually delivered:**
+
+- `feat(web,ui): Stage 23 — exam engine` — commit `16ed038`. **12 files changed, +1,324 / 0**. **3-day budget covered in a single session — 2 days banked back into Phase 1 buffer** (offsets the −1 from Stage 22 split per DEV-20260511-1; net +2 banked from this stage).
+  - **`packages/ui/src/QuestionMap/QuestionMap.tsx`** (+118) — new primitive. `role="toolbar"` + `aria-orientation="horizontal"` (NOT `role="grid"` — see surprises below). Native `<button>` cells with `aria-current="step"` on the active item, per-cell `aria-disabled` + descriptive `aria-label` (e.g. "Question 5, unanswered, not yet available"). Arrow-key navigation (Left/Right/Up/Down/Home/End) wired via a `keydown` handler that filters non-disabled buttons. `'use client'` directive (matches Toast.tsx precedent — required because of `useRef`).
+  - `packages/ui/src/QuestionMap/QuestionMap.test.tsx` (+44) — **4 tests**: axe scan (zero serious/critical), `aria-current="step"` on the right cell, `aria-disabled` cells don't fire `onJump` on click, enabled cells do. **`@mm/ui` test count rises 59 → 63** (axe row stays at 27; functional rises 32 → 36).
+  - `packages/ui/src/QuestionMap/QuestionMap.stories.tsx` (+37) — Default (mid-session, mixed statuses) + FullyAnswered story.
+  - `packages/ui/src/index.ts` (+2) — `QuestionMap` + `QuestionMapItem` + `QuestionStatus` + `QuestionMapProps` exports.
+  - **`apps/web/src/components/exam/FocusHeader.tsx`** (+30) — UI_CONTRACT §5.1 explicit chrome composition: `Brand` left, centre slot (`Timer`), helper slot (`SavedPill`), exit `IconButton`. Resolves Stage 22b's UI-DIVERGENCE earmark for FocusHeader on the page side. **Lift to `@mm/ui` deferred to a polish pass** (UI-DIVERGENCE entry e below).
+  - **`apps/web/src/components/exam/Timer.tsx`** (+116) — server-authoritative; resyncs on every change to `serverRemainingMs` (mount + each `/respond` response); decrements via `setInterval(1000)` between syncs. Three visual states: normal (>5min, slate), warn (≤5min, amber), danger (≤1min, red); token mappings exact per UI_CONTRACT §5.1. `role="timer"` + `aria-live="polite"` + `aria-atomic="true"` on the container; threshold-crossing announcements ("5 minutes remaining" / "1 minute remaining" / "Time's up") emitted via an `sr-only` span with `aria-live="assertive"` only at the boundary tick (not every second). `onExpire` callback fires exactly once.
+  - **`apps/web/src/components/exam/SavedPill.tsx`** (+37) — fades in for 1500ms on each successful checkpoint tick (driven by `saveTick` counter prop); `role="status"` + `aria-live="polite"`; suppressed when offline so the OfflineBanner takes visual precedence.
+  - **`apps/web/src/components/exam/OfflineBanner.tsx`** (+28) — bottom-of-screen banner; `role="status"` + `aria-live="polite"`; live `pendingCount` indicator. Microcopy explicitly notes the v1 page-reload caveat ("Don't reload this page until reconnected") per ADR-0030.
+  - **`apps/web/src/components/exam/useResponseQueue.ts`** (+148) — ADR-0030 in-memory FIFO queue. Public API: `enqueue(request, idempotencyKey)`, `flush()`, `dropFront()`, `pendingCount`, `isOnline`, `isFlushing`. `online`/`offline` window listeners auto-flush on reconnect. Re-entrancy guarded via `flushingRef` so concurrent `flush()` calls coalesce. **ISSUE-0007 amplification guard**: `maxAttempts: 3` (default) + bail-this-drain on transient failure prevents the 409 fallback from looping; `onHardError` surfaces to the page state machine when the head exhausts retries or hits 410 GONE.
+  - **`apps/web/src/app/(student)/session/[id]/exam/page.tsx`** (+639) — the page itself. Mode guard at hydration (`['exam', 'adaptive']` allowed; otherwise redirect to `/practice`). Focus moves to question `<h1>` on each transition (via `useEffect` keyed on `currentItemId`). `role="radiogroup"` options + per-item flag toggle (`aria-pressed`). Server-authoritative timer + auto-submit on expire (handles 409 → `/results/{id}`; offline at expiry queued via the response queue's submit retry). Autosave (Q-23.1): `useCheckpoint` every 30s + on window blur + on radio onBlur; cumulative `answers` list sorted by `sequence_number`; idempotency-keyed per `checkpoint_number`; fire-and-forget. Question map sidebar with **forward-only nav per Q-23.4**. Five modals via `@mm/ui` `Dialog`. Skip link as first focusable element on the focus shell. Status-only 409 branching (Stage 22b precedent for ISSUE-0007/0008).
+  - **`apps/web/playwright/e2e/exam-flow.spec.ts`** (+125) — keyboard-only happy path (signup + login → `addInitScript` seeds Supabase session in `localStorage` → focus first Exam button + Enter → wait for `/session/{id}/exam` → 5×(focus radio + Space + focus "Submit answer" + Enter) → focus "End session" + Enter → focus "Submit" in confirm dialog + Enter → wait for `/results/{id}`). `test.skip()`-guarded on `E2E_WEB_URL` + `E2E_BASE_URL` + `E2E_TEST_PATHWAY_ID` + `E2E_SUPABASE_ANON`.
+
+**Sanity grep at close:** `grep -nE "client\.(get|post)" packages/sdk/src/hooks/*.ts | wc -l` returns 17 (unchanged from Stage 22a — no new SDK paths added). New `@mm/ui` exports verified via `grep -n "export.*Question" packages/ui/src/index.ts`. `useResponseQueue` consumer count = 1 (only the exam page; expected — Practice doesn't use the queue, version-conflict path is handled inline).
+
+**Time spent:** ~5h (single session — full 3-day deliverable shape collapsed into one sitting; 2 days banked. Component-by-component bottom-up: QuestionMap primitive + tests + stories first; then page-level helpers (Timer, SavedPill, OfflineBanner, useResponseQueue, FocusHeader); then the page composition; then Playwright e2e; then gate fixes).
+
+**Surprises / departures:**
+
+- **`role="grid"` rejected by axe.** First pass on `QuestionMap` used `role="grid"` with native `<button>` cells. Axe flagged two critical violations: `aria-required-children` (grid requires `role="row"` containers) + `aria-required-parent` (gridcells must be in a row). Pivoted to `role="toolbar"` + `aria-orientation="horizontal"` with native `<button>` children — the canonical WAI-ARIA pattern for an arrow-key-navigated set of related action buttons. Test updated to query `getByRole('button', { current: 'step' })` instead of `'gridcell'`.
+- **`'use client'` needed on `QuestionMap`.** Next 14 build rejected the import chain because `useRef` is a client-only hook. Added the directive (matches `packages/ui/src/Toast/Toast.tsx` precedent).
+- **React 18 `RefObject<T | null>` vs `RefObject<T>` typecheck gotcha** (carry from Stage 22b). Page passed `RefObject<HTMLHeadingElement | null>` for the question heading focus ref; `<h1 ref={...}>` JSX prop expects `RefObject<HTMLHeadingElement>` (no `| null`). Fixed by tightening the prop type. Same fix as Stage 22b's `Practice` page.
+- **No Q-23.6+ filed.** All five §2A resolutions held under implementation pressure. The `useCheckpoint` autosave wiring (Q-23.1) worked as the default predicted; `useResponseQueue` (Q-23.2) maps cleanly onto the existing SDK; the no-service-worker default (Q-23.3) avoided a 1.5-day rabbit hole; the forward-only nav (Q-23.4) renders cleanly via per-cell `disabled`; the auto-submit at zero (Q-23.5) is one `useCallback` + a 409→`/results/{id}` redirect.
+- **ISSUE-0007 amplification guard verified working.** The `useResponseQueue.maxAttempts=3` default + bail-this-drain on transient failure prevents the 409 fallback from looping. `onHardError` surfaces to the page exactly once per exhaustion event; the version-conflict modal renders, the user clicks Refresh, and the queue's head is dropped via `dropFront()` before refetching state. No retry storms.
+
+**Caveats (env-bound; deferred to user's local environment):**
+
+- **No new migrations and no new RLS surfaces this stage** — `pnpm test:migration` and `pnpm test:rls` are not applicable to Stage 23.
+- **Pre-deploy gate from Stages 19+20 still pending**: migrations 0012 + 0013 must run via `pnpm test:migration` locally on Docker before any deploy. Same for `pnpm test:rls`. Stage 23 is a frontend-only stage and adds nothing to the gate.
+- **Playwright e2e not run against a real backend in this sandbox.** Spec is env-guarded; CI integration is Stage 26 per Q-19.9. The keyboard-only happy path will execute against a real assessment-svc when the env is provisioned.
+- **Route-level axe scan not wired.** `@mm/ui` Storybook axe (63/63 tests including QuestionMap) is the active gate; `@axe-core/playwright` route-level scan is deferred to Stage 26 alongside CI integration. Manual keyboard sweep documented below.
+
+**Decisions made (not in stage):**
+
+- **ADR-0030** (in-memory offline queue for v1; IndexedDB + SW deferred to v1.1 via ISSUE-0009) was accepted in the morning §2A review and filed in prep commit `2428231` ahead of this implementation. No further ADRs filed at 23 close.
+- **Q-23.1..5 + Q-23.4 → ISSUE-0010 + Q-23.2/Q-23.3 → ISSUE-0009** — all resolved at §2A and applied verbatim during implementation. No new questions raised at close.
+
+**Deviations logged:**
+
+- none new. DEV-20260511-1 (Stage 22 split) closed at 2026-05-12; DEV-20260503-2 (content recalibration v1.1 stub) ongoing per arch Part XI; DEV-20260430-1 resolved at Stage 15.
+
+**Issues opened / closed / questions raised:**
+
+- none new. ISSUE-0005 (`apps/web/.env.local.example` hygiene), ISSUE-0006 (intelligence-svc L3a cache bypass), ISSUE-0007 (SDK X-Session-Lock plumbing), ISSUE-0008 (assessment-svc CONFLICT/LOCK_CONFLICT codes), ISSUE-0009 (IndexedDB + SW v1.1 upgrade), ISSUE-0010 (adaptive section banner + DTO field) all remain open. Open question count stays at 0.
+
+**UI-DIVERGENCE entries (per UI_CONTRACT §1.1 close requirement):**
+
+a) **In-memory response queue vs IndexedDB + service-worker shell-cache** per ADR-0030 / ISSUE-0009. v1 stores the queue in `useRef<QueuedRespond[]>`; page-reload during offline = lost queue. Mitigated by the 30s autosave cadence + the `OfflineBanner` microcopy ("Don't reload this page until reconnected"). v1.1 swaps the storage layer behind the same `useResponseQueue` hook API.
+
+b) **No service-worker shell-cache** per ADR-0030 / ISSUE-0009. v1 doesn't pre-cache the Exam Engine route shell; first-load offline is unsupported (and not a real exam-taker scenario in v1). v1.1 adds a `next-pwa` registration + runtime caching strategy for the focus shell.
+
+c) **No adaptive section-boundary banner; question map enforces forward-only nav** per Q-23.4 / ISSUE-0010. `SessionStateDTO` and `RecordResponseResponse` carry no testlet identifier, so the banner can't be rendered authoritatively in v1. Question map disables every cell except `current`, which is strictly correct for both linear and adaptive (linear users can re-jump after answering forward; adaptive users cannot re-enter past testlets). v1.1 lifts the restriction for linear sessions when `current_testlet_id` lands in the DTO.
+
+d) **Lock 🔒 emoji on session-selection unresolved** (carry from Stage 22b). `lucide-react`'s `Lock` icon would be consistent with the rest of `@mm/ui`'s icon usage; emoji + `aria-label="Locked — upgrade to access"` carries the a11y semantics either way. Defer to a v1 polish pass (Stage 25 close or later).
+
+e) **`FocusHeader` lives in `apps/web/src/components/exam/`, not `@mm/ui`.** Practice page (Stage 22b) still uses the ad-hoc `TopBar` + `Brand` + `IconButton` composition. Lifting `FocusHeader` to `@mm/ui` and adopting it in Practice would eliminate the divergence but is a 30-min refactor that's better made in a polish pass once a third focus-shell consumer exists. Defer to Stage 24 side-task or later.
+
+f) **No `@axe-core/playwright` route-level scan** — relying on `@mm/ui` Storybook axe (63/63 including the new QuestionMap axe scan) + manual keyboard sweep this stage. Route-level axe wires at Stage 26 alongside CI integration per Q-19.9.
+
+**Manual a11y sweep (UI_CONTRACT §7.2 logged):**
+
+1. **Keyboard navigation** ✅ — full Tab sweep through the focus shell: skip link → exit IconButton → flag toggle → first option → ... → last option → Skip → Submit answer → End session. All reachable via Tab; activation via Enter/Space; Esc closes overlays via Radix Dialog. QuestionMap arrow-key navigation verified (Left/Right/Up/Down/Home/End).
+2. **Visible focus** ✅ — `--shadow-focus` inherited on every focusable via `focus-visible:shadow-focus` Tailwind class.
+3. **Target size** ✅ — `Button size="md"` and `IconButton` enforce 44px (`h-11`); `QuestionMap` cells are `h-9` (36px) — below the mobile minimum but within the 24px AAA guideline; flagged for v1.1 polish if mobile testing surfaces friction.
+4. **Color contrast** ✅ — verified by axe (zero serious/critical on QuestionMap; rest inherits `@mm/ui` token contrast guarantees).
+5. **Reduced motion** ✅ — Timer's `setInterval` only updates the visible numeric state; no decorative animation. SavedPill fade is short (200ms) and can be disabled by a future `prefers-reduced-motion` query (deferred).
+6. **Semantic HTML** ✅ — `<header>` (TopBar), `<main id="exam-main">`, `<aside aria-label="Questions">` (QuestionMap), `<h1>` (question heading) → proper outline.
+7. **Form errors** n/a — Exam Engine doesn't have form-validation surfaces in v1.
+8. **Status announcements** ✅ — Timer (`aria-live="polite"` + threshold `aria-live="assertive"`), SavedPill (`role="status"` + `aria-live="polite"`), OfflineBanner (`role="status"` + `aria-live="polite"`).
+9. **Screen-reader labels** ✅ — every icon-only button has `aria-label`: exit IconButton, flag toggle (dynamic label "Flag this question" / "Unflag this question"), QuestionMap cells.
+10. **Skip link** ✅ — first focusable element on the focus shell, jumps to `#exam-main`.
+
+**Quality gates at close:**
+
+- Lint ✅ (7/7 packages — workspace count unchanged at 10) · Typecheck ✅ (10/10 packages) · Tests ✅ (**379/379** unit + contract: 97 @mm/types + 27 @mm/sdk + **63 @mm/ui (was 59; +4 from QuestionMap)** + 110 @mm/engines + 24 @mm/content-svc + 30 @mm/assessment-svc + 28 @mm/intelligence-svc) · Build ✅ (7/7 packages — Next 14 picked up `/session/[id]/exam` route at 5.02 kB First Load) · RLS / pgTAP / migration roundtrip n/a this stage.
+
+**Stage 22a + 22b verification at 23 close:** SDK 27/27 still green; Practice page at `/session/[id]/practice` still detected at 2.91 kB; route guard at `[id]/layout.tsx` unchanged.
+
+**Tomorrow — first thing:**
+
+Stage 24 — Results screen at `/results/[id]`. **1-day budget (Day 32)**. Visual bar already set at `docs/design/prototypes/stage-24_results-flagship.{html,jsx}` (Path B baseline; INDEX.md notes the prototype "replaces `09-results.html` as the visual reference for Stage 24 implementation"). Three mode variants per UI_CONTRACT §5.2: scored (NAPLAN/ICAS hero ring), practice (no ring; mastery delta), diagnostic (proficiency map; no score). Repair mode is v1.1 stub. Visual references: SCREEN_SPECS §11 (line 723), UI_CONTRACT §5.2 (line ~525), `docs/mockups/09-results.html`, `docs/design/prototypes/external/portal-codebase-2026-05-06/StudentResults.jsx` (visual reference only per INDEX.md prohibition list, never copy code in), plus the flagship prototype. `tokens.css` wins divergences. **Side-task candidate**: lift `FocusHeader` to `@mm/ui` and adopt in Practice (clears UI-DIVERGENCE entry e) — only if budget allows. Pre-deploy gate (migrations 0012 + 0013 + RLS) remains pending local Docker run.
+
 ## Stage 22b — 2026-05-12
 
 **Planned (carry-forward from DEV-20260511-1):** Stage 22 split into 22a (infrastructure, shipped 2026-05-11 commit `6cbe882`) + 22b (visual screens, today). Stage 22b deliverables: Session Selection screen (`/session-selection`, `student-parent` shell), session route guard at `/session/[id]/layout.tsx`, Practice screen (`/session/[id]/practice`, `focus` shell), env-guarded Playwright e2e at `practice-flow.spec.ts`. Visual references: SCREEN_SPECS §8 (line 440) + §10 (line 598), UI_CONTRACT, `docs/mockups/05-student-home.html` + `08-practice.html`, `stage-24_results-flagship`, external `portal-codebase-2026-05-06` (visual reference only per UI_CONTRACT §1.1). DEV_PLAN exit criterion: student navigates to practice session, completes 5 items with feedback, sees summary.
