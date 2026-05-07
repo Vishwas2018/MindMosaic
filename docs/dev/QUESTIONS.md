@@ -1015,6 +1015,89 @@
   version bump. Down migration restores the Stage 4 10-arg signature. pgTAP
   roundtrip extends to 12/12.
 
+### Q-25.4 — Locked pathway tiles: show grayed or hide
+
+- Date raised: 2026-05-15 (Stage 25 §2A)
+- Asked of: self
+- Source: `packages/types/src/content.ts` `PathwayDTOSchema` (`entitled: boolean`,
+  `locked_reason: string | null`); SCREEN_SPECS §7 + UI_CONTRACT (no explicit
+  locked-tile rule for Dashboard).
+- Question: Render locked pathways as grayed tiles (with lock icon + `locked_reason`)
+  or omit them entirely from the Dashboard quick-start grid?
+- Why ambiguous: SCREEN_SPECS §8 (Session Selection) hides locked pathways behind a
+  "Locked" section heading, but Screen 7 (Dashboard) is silent on the treatment.
+- Blocking? yes — affects tile layout and empty-state logic.
+- Assumed answer if proceeding: Show grayed tile with lock icon.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-15): **Show grayed tile with lock icon + `locked_reason` text
+  (or "Upgrade to access" fallback if `locked_reason` is null)**. Consistent with
+  NAPLAN entitlement model: students should see what pathways exist and why they are
+  locked, not have options silently hidden.
+
+### Q-25.3 — Engagement strip streak source
+
+- Date raised: 2026-05-15 (Stage 25 §2A)
+- Asked of: self
+- Source: SCREEN_SPECS §7 engagement strip ("streak + sessions-this-week");
+  no streak DTO in v1; `SessionSummaryDTO` carries `submitted_at` which can
+  be used for sessions-this-week.
+- Question: Render engagement strip with real data, stub "—", or omit entirely?
+- Why ambiguous: No streak DTO or server endpoint in v1; client-side computation
+  for sessions-this-week is feasible but streak is not.
+- Blocking? no.
+- Assumed answer if proceeding: Option A (render strip with stub streak).
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-15): **Option A — render engagement strip**. Streak displayed
+  as "—" with "Coming soon" micro-text. Sessions-this-week computed client-side from
+  `useListRecentSessions` result (filter `submitted_at` within current ISO calendar
+  week). Strip renders in all states including empty-sessions.
+
+### Q-25.2 — Mastery snapshot data source
+
+- Date raised: 2026-05-15 (Stage 25 §2A)
+- Asked of: self
+- Source: DEV_PLAN.md Stage 25 deliverables ("mastery snapshot from
+  `/intelligence/learner-profile`"); `packages/sdk/src/hooks/intelligence.ts`
+  (`useLearningDNA`, `useSkillProgress`, `useCausalMap` all gated Stage 28+);
+  `SessionSummaryDTO.skills_touched_count` (available in v1).
+- Question: Pure stub (zero data) or aggregate `skills_touched_count` from
+  `useListRecentSessions` as a "skills touched" count? And should a ProgressBar
+  at 0% ship alongside the stat?
+- Why ambiguous: Intelligence hooks are Stage 28+; `skills_touched_count` provides
+  a truthful count but is not a mastery percentage. A 0% bar is visually misleading.
+- Blocking? yes — affects component design.
+- Assumed answer if proceeding: Option B (aggregate) + no ProgressBar.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-15): **Option B — `StatTile` showing summed `skills_touched_count`
+  across all `SessionSummaryDTO` entries, labelled "Skills touched". No ProgressBar
+  (0% bar is visually misleading per §2A resolution). Add "Full mastery data in a
+  future release" micro-text beneath the stat. File ISSUE-0011(f) to track the
+  upgrade path.** Stat is truthful and non-zero after one session; stub copy sets
+  expectations without implying regression.
+
+### Q-25.1 — Stage 25 route target: `(student)/page.tsx` vs `dashboard/page.tsx`
+
+- Date raised: 2026-05-15 (Stage 25 §2A)
+- Asked of: self
+- Source: DEV_PLAN.md Stage 25 deliverables
+  (`apps/web/src/app/(student)/page.tsx`); existing
+  `apps/web/src/lib/auth/role-home.ts` (`student → '/dashboard'`);
+  `apps/web/src/middleware.ts` redirects to `getRoleHome('student')`.
+- Question: Build Stage 25 at `(student)/page.tsx` (as DEV_PLAN states) or
+  replace `(student)/dashboard/page.tsx` (which middleware actually routes to)?
+- Why ambiguous: DEV_PLAN file path conflicts with the load-bearing routing layer.
+- Blocking? yes — wrong file = unreachable page.
+- Assumed answer if proceeding: Replace `dashboard/page.tsx`.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`.
+- Status: resolved
+- Resolution (2026-05-15): **Replace `apps/web/src/app/(student)/dashboard/page.tsx`**.
+  Middleware routes students to `/dashboard`; a root-level `(student)/page.tsx`
+  would be unreachable. DEV_PLAN route was authored pre-crystallisation of the
+  middleware + role-home layer. Deviation logged as **DEV-20260515-1**.
+
 ### Q-0001 — shadcn/ui integration approach for packages/ui
 
 - Date raised: 2026-05-03 (Stage 13)

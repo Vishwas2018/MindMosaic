@@ -3,6 +3,35 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260515-1 — Stage 25 route target: DEV_PLAN says `(student)/page.tsx`; actual implementation at `(student)/dashboard/page.tsx`
+
+- Date: 2026-05-15
+- Stage: 25
+- Type: substitution
+- What the stage said: DEV_PLAN.md Stage 25 deliverables list
+  `apps/web/src/app/(student)/page.tsx` as the target file.
+- What I actually did: Replaced
+  `apps/web/src/app/(student)/dashboard/page.tsx` (the existing
+  EmptyState stub) instead of creating a root-level `page.tsx`.
+- Why: `apps/web/src/lib/auth/role-home.ts` maps `student →
+  '/dashboard'`; `apps/web/src/middleware.ts` redirects
+  authenticated students to `getRoleHome('student')` =
+  `/dashboard`. A root-level `(student)/page.tsx` would be
+  unreachable — middleware would never route there. The stub at
+  `dashboard/page.tsx` is the load-bearing entry point. DEV_PLAN
+  route was authored pre-crystallisation of the middleware + role-
+  home routing layer. CLAUDE.md anti-pattern rule prohibits
+  editing DEV_PLAN.md mid-build.
+- Impact on later stages: None. All dashboard references in
+  DEV_PLAN Stages 26–40 use `/dashboard` path language; only the
+  file path on the Stage 25 deliverable line was wrong. The
+  correct file is now implemented at the correct path.
+- Linked: Q-25.1 (resolved 2026-05-15),
+  `apps/web/src/lib/auth/role-home.ts`,
+  `apps/web/src/middleware.ts`
+- Resolved by: Stage 25 (this deviation is self-resolving — the
+  correct file is implemented)
+
 ### DEV-20260511-1 — Stage 22 splits into 22a (infrastructure) + 22b (screens)
 <!-- Resolved 2026-05-12: Stage 22b shipped commit b1dafe6 (Session Selection
 + Practice screens + route guard + Playwright e2e); -1 buffer day spent net

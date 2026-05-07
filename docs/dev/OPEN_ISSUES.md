@@ -68,6 +68,12 @@ Not available in v1.
 (`ProficiencyMapDTOSchema` exists in `packages/types/src/proficiency.ts:9` but no
 analytics-svc endpoint or SDK hook is built in v1).
 
+(f) **Student Dashboard mastery snapshot** — needs intelligence-svc
+`/learner-profile` endpoint (Stage 28+). All three intelligence SDK hooks
+(`useLearningDNA`, `useSkillProgress`, `useCausalMap`) are gated Stage 28+.
+Stage 25 ships a `StatTile` with aggregated `skills_touched_count` from
+`SessionSummaryDTO[]` + "Full mastery data in a future release" micro-copy.
+
 **Effect.** Stage 24 ships stubs for all five blocks: a `{/* TODO: ISSUE-0011x */}` placeholder
 comment in each slot, hidden via `{false && ...}` guard so the page renders cleanly without
 the block. The hero ring (scored mode), a "Skill progress" placeholder card (practice mode),
@@ -80,6 +86,9 @@ and proficiency band labels (diagnostic mode) ship per the Q-24.6 resolution usi
 (c) Add `useSessionResponses(sessionId)` SDK hook returning per-response state.
 (d) Add `useMasteryDelta(sessionId)` SDK hook once intelligence-svc v2 ships (Stage 28+).
 (e) Add `useProficiencyMap(studentId, pathwayId)` SDK hook once analytics-svc ships.
+(f) Add `useLearnerProfile(studentId)` SDK hook + intelligence-svc `/learner-profile`
+endpoint once intelligence-svc v2 ships (Stage 28+); replace Dashboard `StatTile`
+stub with real mastery bars.
 
 ### ISSUE-0010 — adaptive section-boundary banner pending server-authoritative `current_testlet_id` in `SessionStateDTO` + `RecordResponseResponse`
 
