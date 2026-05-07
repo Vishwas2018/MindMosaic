@@ -9,6 +9,32 @@
 
 ## Resolved
 
+### Q-28.8 — SkillGraphCache.adjacency lacks strength / dependency_class metadata for spec-required edge filters
+
+- Date raised: 2026-05-18 (Stage 28)
+- Asked of: self
+- Source: spec §5.1.3 (strength ≥ 0.4 upstream filter) + §5.1.4 (dependency_class == required downstream filter); arch §5.2 (SkillGraphCache adjacency schema)
+- Question: SkillGraphCache.adjacency stores only `from_node_id`/`to_node_id` (per skill-graph-cache.ts SkillEdge type). Spec §5.1.3 requires filtering edges with strength ≥ 0.4; §5.1.4 requires filtering by dependency_class == required. Neither field is available in the cache. Options: (A) Extend SkillGraphCache to carry `strength` + `dependency_class` per edge; (B) Use all edges without filtering for v1; (C) Add a separate high-strength-only adjacency map.
+- Why ambiguous: SkillEdge type was designed for Stage 18 (graph caching) before L3b spec traversal filters were considered. The cache schema matches the DB `from_node_id`/`to_node_id` select in `createDbLoader.loadGraphData` but does not include edge metadata.
+- Blocking? No — v1 NAPLAN/ICAS seed content contains only `required` and `supportive` edges; no `enriching` edges (strength < 0.4) exist in the seed data.
+- Assumed answer: **Option B** — use all edges without filtering for v1. Grep markers `// Q-28.8:` annotate the two deferral sites in `traverseUpstreamHelper` and `traverseDownstreamHelper`. Address in v1.1 if content team adds enriching edges.
+- Code affected: `supabase/functions/intelligence-svc/handlers.ts` (traverseUpstreamHelper, traverseDownstreamHelper)
+- Status: resolved
+- Resolution: Option B accepted 2026-05-18. All cached edges used without strength/dependency_class filtering. V1 seed content has no enriching edges — no functional difference from Option A for launch content. `// Q-28.8:` grep markers at both filter bypass sites.
+
+### Q-28.7 — spec §5.1.4 traverse_downstream signature missing student parameter
+
+- Date raised: 2026-05-18 (Stage 28)
+- Asked of: self
+- Source: spec §5.1.4 (`traverse_downstream(skill, visited)` pseudocode)
+- Question: Spec §5.1.4 defines `traverse_downstream(skill, visited)` but the body calls `mastery(student, prereq_id)`. `student` is not in the signature. Without it the unmastered-prereq check in the body is unimplementable. Options: (A) Add explicit `studentId` / `masteryMap` parameter; (B) Close over a module-scope `currentStudent` — not acceptable for replay determinism; (C) Omit the mastery check and unlock all downstream unconditionally.
+- Why ambiguous: Spec pseudocode is internally inconsistent — parameter list and body disagree.
+- Blocking? No — choice was made to proceed with Option A.
+- Assumed answer: **Option A** — add explicit `masteryMap: Map<string, number>` parameter to `traverseDownstreamHelper` (and matching parameter to `traverseUpstreamHelper` for symmetry). This is the only implementation that preserves replay determinism (ADR-0027) and matches spec intent.
+- Code affected: `supabase/functions/intelligence-svc/handlers.ts` (traverseUpstreamHelper, traverseDownstreamHelper, processCausalFull)
+- Status: resolved
+- Resolution: Option A implemented 2026-05-18. Filed as DEV-20260518-1. Spec amendment (adding `student` to §5.1.4 signature) deferred post-launch.
+
 ### Q-28.6 — L3b traversal depth and cycle-detection contract
 
 - Date raised: 2026-05-18 (Stage 28 §2A)

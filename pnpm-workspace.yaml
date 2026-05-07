@@ -4,3 +4,4 @@ packages:
   - "supabase/functions/content-svc"
   - "supabase/functions/assessment-svc"
   - "supabase/functions/intelligence-svc"
+  - "supabase/functions/jobs-worker"

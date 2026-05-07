@@ -1,19 +1,26 @@
 /**
- * intelligence-svc contract tests — Stage 20.
+ * intelligence-svc contract tests — Stage 28.
  *
  * Vitest in Node. The Deno dispatcher (`index.ts`) is NOT exercised here —
- * we test the pure `processSession` handler with a mocked Supabase-like
- * client. Two named tests map to DEV_PLAN exit criteria for Stage 20:
+ * we test the pure handler functions with a mocked Supabase-like client.
  *
+ * Named exit criteria (DEV_PLAN Stage 20 + Stage 28):
  *   - 'replay determinism: byte-identical UPSERT payloads across two runs
  *      (DEV_PLAN exit criterion)'
  *   - 'audit-log dedup short-circuits re-processing (Q-20.7)'
  *
- * Coverage targets ≥ 18 tests across:
+ * Stage 28 additions:
+ *   - ISSUE-0006 fix: skill_edge removed from baseStubs() — L3a now reads
+ *     via skillGraph (empty adjacency when skillGraph=null / undefined).
+ *   - processCausalFull L3b suite: dedup, traversal, audit log, error paths.
+ *
+ * Coverage:
  *   L1 foundation (4)      — mastery delta, velocity, confidence, streak
  *   L2 behaviour  (5)      — guess_probability, behaviour_signal insert,
  *                            year-level defaults, fatigue, blend formula
  *   L3a causal    (3)      — depth-1 walk, misconception detection, no-walk
+ *   L3b causal    (6)      — dedup, root-cause, unlocked-skill, audit log,
+ *                            skills_traversed count, session-not-found
  *   Replay determinism (1) — byte-identical UPSERT payloads × 2 runs
  *   Dedup        (1)       — already_processed short-circuit
  *   Year defaults (2)      — Y3 vs Y8
@@ -21,7 +28,8 @@
  *   Helpers       (≥ 2)    — canonicalize / walkPrereqsDepth1 / blendBehaviour
  */
 import { describe, expect, it, vi } from 'vitest';
-import { processSession, type DbClient } from '../handlers.ts';
+import { processSession, processCausalFull, type DbClient } from '../handlers.ts';
+import type { SkillGraphCache } from '../../_shared/skill-graph-cache.ts';
 import {
   ALGORITHM_VERSION,
   blendBehaviour,
@@ -190,15 +198,24 @@ function buildItemsStub(): QueryStub {
   };
 }
 
-function buildEdgesStub(): QueryStub {
-  return {
-    data: [
-      // SKILL_A depends on (has prereq) SKILL_B
-      { from_node_id: SKILL_B, to_node_id: SKILL_A },
-    ],
-    error: null,
-  };
-}
+// MOCK_GRAPH mirrors buildEdgesStub edge: SKILL_B is prereq of SKILL_A.
+// Used by L3b tests; L3a tests pass skillGraph=undefined (empty adjacency —
+// ISSUE-0006 fix: skill_edge no longer queried directly by intelligence-svc).
+const MOCK_GRAPH: SkillGraphCache = {
+  watermark: 'test-watermark',
+  loaded_at: 0,
+  version: { id: 'test-version', version: '1.0', published_at: '2026-01-01T00:00:00Z' },
+  nodes: new Map([
+    [SKILL_A, { id: SKILL_A, slug: 'skill-a', name: 'Skill A', parent_id: null }],
+    [SKILL_B, { id: SKILL_B, slug: 'skill-b', name: 'Skill B', parent_id: null }],
+    [SKILL_C, { id: SKILL_C, slug: 'skill-c', name: 'Skill C', parent_id: null }],
+  ]),
+  adjacency: new Map([
+    [SKILL_A, [SKILL_B]], // SKILL_A has prereq SKILL_B
+    [SKILL_B, []],
+    [SKILL_C, []],
+  ]),
+};
 
 function buildItemVersionsStub(withMisconception = true): QueryStub {
   return {
@@ -317,7 +334,8 @@ function baseStubs(): Stubs {
     pipeline_event: [EMPTY_OK, EMPTY_OK, EMPTY_OK, EMPTY_OK, EMPTY_OK, EMPTY_OK], // 3 inserts + 3 updates
     learning_event: EMPTY_OK,
     behaviour_profile: [EMPTY_OK, EMPTY_OK], // read maybeSingle + upsert
-    skill_edge: buildEdgesStub(),
+    // skill_edge intentionally absent — ISSUE-0006 fix: L3a reads via
+    // skillGraph (empty adjacency when not provided) not direct DB query.
     item_version: buildItemVersionsStub(),
     student_misconception: EMPTY_OK,
   };
@@ -563,5 +581,101 @@ describe('intelligence-svc — processSession error paths', () => {
     if (result.ok) throw new Error('expected err');
     expect(result.status).toBe(500);
     expect(result.code).toBe('INTERNAL_ERROR');
+  });
+});
+
+// ─── L3b processCausalFull tests ─────────────────────────────────────────────
+
+function buildCausalFullStubs(
+  masteryData: Array<{ skill_id: string; mastery_level: number }> = [],
+): Stubs {
+  return {
+    intelligence_audit_log: [EMPTY_LIST, EMPTY_OK], // dedup check + audit insert
+    session_record: buildSessionStub(),
+    session_response: buildResponses(),
+    item: buildItemsStub(),
+    skill_mastery: { data: masteryData, error: null },
+    pipeline_event: [EMPTY_OK, EMPTY_OK], // step-4 insert + step-4 update
+  };
+}
+
+describe('intelligence-svc — processCausalFull L3b', () => {
+  it('already_processed on dedup hit', async () => {
+    const stubs = buildCausalFullStubs();
+    stubs['intelligence_audit_log'] = { data: [{ id: 'prior-l3b' }], error: null };
+    const client = buildClient(stubs);
+    const result = await processCausalFull({
+      client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: null,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data.status).toBe('already_processed');
+    expect(result.data.causal_full).toBeNull();
+  });
+
+  it('unmastered prereq identified as root cause', async () => {
+    const client = buildClient(buildCausalFullStubs());
+    const result = await processCausalFull({
+      client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: MOCK_GRAPH,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const cf = result.data.causal_full!;
+    // SKILL_A has prereq SKILL_B (unmastered) → SKILL_B is root cause
+    // SKILL_B and SKILL_C have no prereqs → themselves are root causes
+    expect(cf.root_causes).toContain(SKILL_B);
+    expect(cf.root_causes).toContain(SKILL_C);
+    // determinism: output sorted ASC
+    expect(cf.root_causes).toEqual([...cf.root_causes].sort());
+  });
+
+  it('mastered prereq unlocks downstream skill', async () => {
+    // SKILL_B mastered → SKILL_A's only prereq is met → SKILL_A unlocked
+    const client = buildClient(
+      buildCausalFullStubs([{ skill_id: SKILL_B, mastery_level: 0.9 }]),
+    );
+    const result = await processCausalFull({
+      client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: MOCK_GRAPH,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const cf = result.data.causal_full!;
+    expect(cf.unlocked_skills).toContain(SKILL_A);
+    expect(cf.unlocked_skills).toEqual([...cf.unlocked_skills].sort());
+  });
+
+  it('reports correct skills_traversed count', async () => {
+    const client = buildClient(buildCausalFullStubs());
+    const result = await processCausalFull({
+      client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: MOCK_GRAPH,
+    });
+    if (!result.ok) throw new Error('expected ok');
+    // 3 responses → items 1 (SKILL_A), 2 (SKILL_B), 3 (SKILL_A + SKILL_C) → 3 distinct
+    expect(result.data.causal_full!.skills_traversed).toBe(3);
+  });
+
+  it('writes L3b audit log row with event_type=L3b.causal.full', async () => {
+    const client = buildClient(buildCausalFullStubs());
+    await processCausalFull({
+      client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: MOCK_GRAPH,
+    });
+    const inserts = client.calls.filter(c => c.op === 'insert' && c.table === 'intelligence_audit_log');
+    expect(inserts).toHaveLength(1);
+    const row = inserts[0]!.args as { event_type: string; algorithm_version: string };
+    expect(row.event_type).toBe('L3b.causal.full');
+    expect(row.algorithm_version).toBe(ALGORITHM_VERSION);
+  });
+
+  it('returns 404 when session not found', async () => {
+    const stubs = buildCausalFullStubs();
+    stubs['session_record'] = { data: null, error: null };
+    const client = buildClient(stubs);
+    const result = await processCausalFull({
+      client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: null,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected err');
+    expect(result.status).toBe(404);
+    expect(result.code).toBe('NOT_FOUND');
   });
 });

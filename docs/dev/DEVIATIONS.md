@@ -109,3 +109,25 @@ of 22a infrastructure work (already debited at 22a evening). -->
 - Impact on later stages: Stage 15 must create `packages/engines-client` per its deliverables list (already specified there — no plan change needed).
 - Linked: ADR-0001 (`docs/dev/decisions/0001-engines-client-deferred.md`), ADR-0022 (engines as pure-function namespaces). Note: DEV_PLAN.md references a legacy ID "DEV-20260426-1" for this same decision from a prior attempt — this entry (DEV-20260430-1) supersedes it with today's date. Do NOT edit DEV_PLAN.md.
 - Resolved by: Stage 15 (commit `14cd96b`, 2026-05-04). `packages/engines-client` shipped with peer dep `@mm/engines: workspace:*`, Bundler module resolution, and a verbatim re-export of every export from `@mm/engines`. Smoke check at `apps/web/src/lib/engines.ts` (type-only import) compiles via `apps/web` typecheck and is included in the apps/web Next build.
+
+### DEV-20260518-1 — spec §5.1.4 traverse_downstream missing student parameter
+
+- Date: 2026-05-18
+- Stage: 28
+- Type: substitution
+- What the stage said: Implement `traverse_downstream` per spec §5.1.4 pseudocode signature
+  `traverse_downstream(skill, visited)`.
+- What I actually did: Added an explicit `masteryMap: Map<string, number>` parameter to
+  `traverseDownstreamHelper` (and `masteryMap` to `traverseUpstreamHelper` for symmetry).
+  The spec §5.1.4 body references `mastery(student, prereq)` but `student` is absent from
+  the signature — the pseudocode is internally inconsistent. Without the student parameter
+  the prereq-mastery check cannot be performed. Filed as Q-28.7 (resolved).
+- Why: Spec defect — `traverse_downstream(skill, visited)` pseudocode signature calls
+  `mastery(student, prereq_id)` in the body without `student` in scope. Function would be
+  unimplementable as-written. Implementation passes `masteryMap` (equivalent to "student
+  mastery context") as an explicit parameter — the correct and only sensible reading.
+- Impact on later stages: None. No external contract exposes the traversal signature;
+  it is internal to `processCausalFull`. Spec amendment to add `student` parameter
+  deferred post-launch (product owner action).
+- Linked: Q-28.7, commit (Stage 28 implementation commit)
+- Resolved by: Stage 28 (implementation in `traverseUpstreamHelper` + `traverseDownstreamHelper`)

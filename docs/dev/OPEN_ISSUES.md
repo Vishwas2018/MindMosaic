@@ -177,58 +177,26 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 ```
 
 
+## Resolved
+
 ### ISSUE-0006 — intelligence-svc L3a bypasses skill-graph cache (architectural inconsistency vs arch §9.3)
 
-- Status: open
+- Status: resolved
 - Severity: medium
 - Reported: 2026-05-09 (Stage 21 §2A)
+- Closed: 2026-05-18 (Stage 28)
 - Area: backend (intelligence-svc)
 - Tags: architectural-consistency · cache · pre-launch
 
-**Summary.** `supabase/functions/intelligence-svc/handlers.ts` (Stage 20)
-runs L3a's depth-1 prereq walk by querying `skill_edge` directly:
-
-```ts
-const edgesRes = await client
-  .from('skill_edge')
-  .select('from_node_id, to_node_id')
-  .in('to_node_id', touchedSkills);
-```
-
-Per arch §9.3 (Cache Strategy table), the Active skill graph cache —
-`supabase/functions/_shared/skill-graph-cache.ts` — is **the read path** for
-skill-graph data inside Edge Functions (1h TTL, watermark-invalidated on
-graph publish). intelligence-svc L3a is the only consumer in v1 that reads
-graph data without going through the cache. content-svc already uses the
-cache; orchestration-svc and analytics-svc are not yet built.
-
-**Impact.** Not breaking. Functional correctness is unaffected (the direct
-query returns the same rows the cache would). Cost: one extra DB round-trip
-per `/intelligence/process-session/{id}` call — acceptable inside the 3 s
-sync SLA, measurable but small at Stage 26 load test. The real concern is
-**architectural consistency**: arch §9.3 names the cache as the single
-read path; having one service bypass it is a footgun for future changes
-(graph version migrations, tenant-scoped variants, replay-determinism
-tightening).
-
-**Why not in Stage 21.** Q-21.1 = NO per scope discipline. Stage 21's
-brief is *cache hardening* (in-flight dedup + stale-while-revalidate per
-ADR-0028), not *cache adoption*. Pulling in a new caller would
-double-scope the stage, expand the test surface beyond the 1-day budget,
-and risk replay-determinism regressions in Stage 20's named exit-criterion
-test (the cache's iteration order + module-scope state would need to be
-proven byte-stable across runs).
-
-**Recommended fix.** Either (a) a small dedicated pre-launch stage that
-migrates intelligence-svc L3a to read via `getSkillGraph()` + adds a
-follow-up replay-determinism test, or (b) fold into Stage 28 (jobs-worker)
-when the orchestration-svc + analytics-svc readers are built so all three
-services pick up the cache pattern at once.
-
-**Reproduction.** `grep -n "skill_edge" supabase/functions/intelligence-svc/handlers.ts`
-returns one match — the bypass site at the L3a entry.
-
-## Resolved
+**Resolution (Stage 28).** `runCausalScoped` in `intelligence-svc/handlers.ts`
+now reads graph data via `skillGraph?.adjacency ?? new Map()` (injected by
+`processSession` from the skill-graph-cache) instead of a direct `skill_edge`
+query. `ProcessSessionInput` accepts `skillGraph?: SkillGraphCache | null`
+(test path) or `graphLoader?: SkillGraphCacheLoader` (production path). The
+`index.ts` dispatcher creates the loader via `createDbLoader(db)` and injects
+it. After this fix there are zero direct `skill_edge` queries in
+`intelligence-svc/handlers.ts`. Verified by `grep -n "skill_edge"
+supabase/functions/intelligence-svc/handlers.ts` → no matches.
 
 ### ISSUE-0008 — assessment-svc dispatcher emits `CONFLICT` / `LOCK_CONFLICT` codes not in `@mm/types` `ErrorCodeSchema`
 

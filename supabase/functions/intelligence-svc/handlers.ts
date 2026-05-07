@@ -1,34 +1,46 @@
 /**
- * intelligence-svc handlers — Stage 20.
+ * intelligence-svc handlers — Stage 28.
  *
- * Pure-function handler returning a tagged HandlerResult<T>. The Deno
- * dispatcher (`index.ts`) wires URL imports + HTTP plumbing; this file is
- * Vitest-testable in Node with a mocked Supabase-like client.
+ * Stage 28 changes vs Stage 20:
+ *   - ISSUE-0006 fix: L3a now reads skill graph via getSkillGraph() (ADR-0028)
+ *     instead of querying skill_edge directly. ProcessSessionInput accepts an
+ *     optional skillGraph (for tests) or graphLoader (for production); if
+ *     neither is provided the handler uses an empty adjacency (no prereqs).
+ *   - processCausalFull added: L3b full traversal (traverse_upstream +
+ *     traverse_downstream) per spec §5.1.3/4 (Q-28.6, Q-28.7). Called by
+ *     jobs-worker via POST /intelligence/pipeline/causal-full (ADR-0031).
  *
- * Pipeline (Spec §7.2 sync portion — must complete before submit response):
- *   0. Audit-log dedup (Q-20.7) — short-circuit if (session_id,
- *      algorithm_version, event_type='session.processed') already exists.
- *   1. L1 Foundation — per-skill mastery / velocity / streak; UPSERT
- *      skill_mastery + learning_velocity; INSERT pipeline_event(step=1).
- *   2. L2 Behaviour — per-response guess_probability / fatigue / cog load;
- *      INSERT learning_event(event_type='behaviour_signal') per response;
- *      UPSERT behaviour_profile (defaults blend, year-level keyed);
+ * Pipeline (Spec §7.2 sync portion — L1+L2+L3a, must complete inline):
+ *   0. Audit-log dedup (Q-20.7).
+ *   1. L1 Foundation — mastery / velocity / streak; UPSERT skill_mastery +
+ *      learning_velocity; INSERT pipeline_event(step=1).
+ *   2. L2 Behaviour — guess_probability / fatigue / cog load; INSERT
+ *      learning_event(behaviour_signal); UPSERT behaviour_profile;
  *      INSERT pipeline_event(step=2).
- *   3. L3a Causal-scoped — depth-1 prereq walk over touched skills;
- *      misconception lookup via item_version.distractor_rationale;
- *      UPSERT student_misconception; INSERT pipeline_event(step=3).
- *   4. Audit log — per-layer + summary INSERT into intelligence_audit_log.
+ *   3. L3a Causal-scoped — depth-1 prereq walk via skill-graph-cache;
+ *      misconception lookup; UPSERT student_misconception;
+ *      INSERT pipeline_event(step=3).
+ *   4. Audit log summary row.
+ *
+ * Async pipeline (jobs-worker → this handler):
+ *   3b. L3b Causal-full — traverse_upstream + traverse_downstream per
+ *       spec §5.1.3/4; pipeline_event(step=4); audit log.
+ *
+ * Q-28.8 note: spec §5.1.3 requires strength >= 0.4 edge filter; §5.1.4
+ * requires dependency_class == required filter. The SkillGraphCache adjacency
+ * currently stores all edges without these metadata fields. For v1, all cached
+ * edges are used without filtering (Option B per Q-28.8 surface). V1 seed
+ * content contains only required/supportive edges (no enriching). Grep for
+ * 'Q-28.8' to find the deferral sites.
  *
  * Replay determinism (Q-20.4 / ADR-0027):
  *   - All aggregates ORDER BY skill_id ASC, response_id ASC.
  *   - canonicalize() on every audit-log input_snapshot.
- *   - No Math.random; no Date.now() as algorithm input. Effects.now / .uuid
- *     are write-only metadata, NOT formula inputs.
- *   - Idempotent (UPSERT + audit-log dedup). Stage 28's worker re-pickup is a
- *     no-op against the dedup row.
+ *   - No Math.random; no Date.now() as algorithm input.
+ *   - L3b traversal: output sorted skill_id ASC for determinism.
  *
- * Spec refs: §7.2, §7.4.2, §8.1, §9.2, §9.3, §9.5, §9.6, §10.2; arch §4.5,
- * §5.2; ADR-0027.
+ * Spec refs: §5.1.3, §5.1.4, §7.2, §7.4.2, §8.1, §9.2, §9.3, §9.5, §9.6,
+ * §10.2; arch §4.5, §5.2; ADR-0027, ADR-0028, ADR-0031.
  */
 
 import { EngineStateSchema, type EngineState } from '@mm/engines';
@@ -46,8 +58,13 @@ import {
   yearLevelDefaults,
   type BehaviourDefaults,
 } from '../_shared/intelligence-helpers.ts';
+import {
+  getSkillGraph,
+  type SkillGraphCache,
+  type SkillGraphCacheLoader,
+} from '../_shared/skill-graph-cache.ts';
 
-// ─── Tagged result envelope (mirrors assessment-svc) ────────────────────────
+// ─── Tagged result envelope ──────────────────────────────────────────────────
 
 export type HandlerResult<T> =
   | { ok: true; data: T; status: number }
@@ -65,7 +82,7 @@ const err = (
   return out;
 };
 
-// ─── Effects (replay-deterministic — write-only metadata) ───────────────────
+// ─── Effects ────────────────────────────────────────────────────────────────
 
 export interface Effects {
   now: () => string;
@@ -80,7 +97,7 @@ export const DEFAULT_EFFECTS: Effects = {
   perfNow: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
 };
 
-// ─── DbClient surface (structurally compatible with mock-supabase.ts) ───────
+// ─── DbClient surface ────────────────────────────────────────────────────────
 
 export interface DbClient {
   from(table: string): DbBuilder;
@@ -102,7 +119,7 @@ export type DbBuilder = {
   single: () => Promise<{ data: unknown | null; error: { message: string; code?: string } | null }>;
 } & PromiseLike<{ data: unknown[] | null; error: { message: string; code?: string } | null }>;
 
-// ─── Row shapes (subset of session_record / response / item etc.) ───────────
+// ─── Row shapes ──────────────────────────────────────────────────────────────
 
 interface SessionRow {
   id: string;
@@ -115,7 +132,7 @@ interface SessionRow {
 }
 
 interface ResponseRow {
-  id: string;                // response_id (PK)
+  id: string;
   session_id: string;
   item_id: string;
   is_correct: boolean | null;
@@ -160,13 +177,17 @@ interface BehaviourProfileRow {
   computed_at: string | null;
 }
 
-// ─── Public response shape ──────────────────────────────────────────────────
+// ─── L3b traversal constants ─────────────────────────────────────────────────
+
+const MASTERY_THRESHOLD = 0.8;
+const TRAVERSAL_CAP = 50;
+
+// ─── processSession public types ─────────────────────────────────────────────
 
 export interface ProcessSessionResponse {
   status: 'processed' | 'already_processed';
   session_id: string;
   algorithm_version: string;
-  /** Wall-clock processing time in ms; null if dedup short-circuit. */
   processing_time_ms: number | null;
   layers: {
     foundation: { skills_touched: number; mastery_upserts: number } | null;
@@ -175,15 +196,47 @@ export interface ProcessSessionResponse {
   };
 }
 
-// ─── processSession (the only public handler) ───────────────────────────────
-
 export interface ProcessSessionInput {
   client: DbClient;
   sessionId: string;
-  /** trace_id flowing in from assessment-svc via x-mm-trace-id (Q-20.14). */
   traceId: string;
   effects?: Partial<Effects>;
+  /**
+   * Pre-built skill graph for testing (bypasses getSkillGraph cache call).
+   * Pass `null` to use empty adjacency (no prereq walks).
+   */
+  skillGraph?: SkillGraphCache | null;
+  /**
+   * Cache loader for production path. If neither skillGraph nor graphLoader
+   * is provided, an empty adjacency is used (no prereq walks).
+   */
+  graphLoader?: SkillGraphCacheLoader;
 }
+
+// ─── processCausalFull public types ──────────────────────────────────────────
+
+export interface ProcessCausalFullResponse {
+  status: 'processed' | 'already_processed';
+  session_id: string;
+  algorithm_version: string;
+  processing_time_ms: number | null;
+  causal_full: {
+    skills_traversed: number;
+    root_causes: string[];
+    unlocked_skills: string[];
+  } | null;
+}
+
+export interface ProcessCausalFullInput {
+  client: DbClient;
+  sessionId: string;
+  traceId: string;
+  effects?: Partial<Effects>;
+  skillGraph?: SkillGraphCache | null;
+  graphLoader?: SkillGraphCacheLoader;
+}
+
+// ─── processSession ──────────────────────────────────────────────────────────
 
 export async function processSession(
   input: ProcessSessionInput,
@@ -251,48 +304,37 @@ export async function processSession(
   if (responsesRes.error !== null) return err(500, 'INTERNAL_ERROR', responsesRes.error.message);
   const responses = (responsesRes.data ?? []) as ResponseRow[];
 
+  // Resolve skill graph for L3a (ISSUE-0006 fix + ADR-0028).
+  const skillGraph: SkillGraphCache | null =
+    input.skillGraph !== undefined
+      ? input.skillGraph
+      : input.graphLoader !== undefined
+        ? await getSkillGraph(input.graphLoader, eff.perfNow(), traceId)
+        : null;
+
   // ── 2. L1 Foundation ─────────────────────────────────────────────────────
   await insertPipelineEvent(client, sessionId, session.student_id, 1, 'foundation.update', 'processing', eff);
-  const l1 = await runFoundation({
-    client,
-    session,
-    profile,
-    responses,
-    state,
-    eff,
-    traceId,
-  });
+  const l1 = await runFoundation({ client, session, profile, responses, state, eff, traceId });
   await markPipelineEventCompleted(client, sessionId, 1, 'foundation.update', l1.error, eff);
   if (l1.error !== null) return err(500, 'INTERNAL_ERROR', `L1 foundation failed: ${l1.error}`);
 
   // ── 3. L2 Behaviour ──────────────────────────────────────────────────────
   await insertPipelineEvent(client, sessionId, session.student_id, 2, 'behaviour.analyse', 'processing', eff);
-  const l2 = await runBehaviour({
-    client,
-    session,
-    profile,
-    responses,
-    state,
-    eff,
-    traceId,
-  });
+  const l2 = await runBehaviour({ client, session, profile, responses, state, eff, traceId });
   await markPipelineEventCompleted(client, sessionId, 2, 'behaviour.analyse', l2.error, eff);
   if (l2.error !== null) return err(500, 'INTERNAL_ERROR', `L2 behaviour failed: ${l2.error}`);
 
   // ── 4. L3a Causal-scoped ─────────────────────────────────────────────────
   await insertPipelineEvent(client, sessionId, session.student_id, 3, 'causal.evaluate_scoped', 'processing', eff);
   const l3a = await runCausalScoped({
-    client,
-    session,
-    responses,
+    client, session, responses,
     touchedSkills: l1.touchedSkills,
-    eff,
-    traceId,
+    eff, traceId, skillGraph,
   });
   await markPipelineEventCompleted(client, sessionId, 3, 'causal.evaluate_scoped', l3a.error, eff);
   if (l3a.error !== null) return err(500, 'INTERNAL_ERROR', `L3a causal failed: ${l3a.error}`);
 
-  // ── 5. Audit log summary row (the dedup key on re-pickup) ────────────────
+  // ── 5. Audit log summary ─────────────────────────────────────────────────
   const processingTimeMs = Math.round(eff.perfNow() - t0);
   const summaryInput = canonicalize({
     session_id: sessionId,
@@ -331,6 +373,264 @@ export async function processSession(
       causal: { prereqs_walked: l3a.prereqsWalked, misconceptions_upserted: l3a.misconceptionsUpserted },
     },
   });
+}
+
+// ─── processCausalFull (L3b async) ───────────────────────────────────────────
+
+export async function processCausalFull(
+  input: ProcessCausalFullInput,
+): Promise<HandlerResult<ProcessCausalFullResponse>> {
+  const eff = { ...DEFAULT_EFFECTS, ...input.effects };
+  const { client, sessionId, traceId } = input;
+  const t0 = eff.perfNow();
+
+  // 0. Dedup (same pattern as processSession, separate event_type).
+  const dedupRes = await client
+    .from('intelligence_audit_log')
+    .select('id')
+    .eq('event_type', 'L3b.causal.full')
+    .eq('algorithm_version', ALGORITHM_VERSION)
+    .eq('input_snapshot->>session_id', sessionId)
+    .limit(1);
+  if (dedupRes.error !== null) {
+    return err(500, 'INTERNAL_ERROR', `L3b dedup lookup failed: ${dedupRes.error.message}`);
+  }
+  const existing = (dedupRes.data ?? []) as { id: string }[];
+  if (existing.length > 0) {
+    return ok<ProcessCausalFullResponse>({
+      status: 'already_processed',
+      session_id: sessionId,
+      algorithm_version: ALGORITHM_VERSION,
+      processing_time_ms: null,
+      causal_full: null,
+    });
+  }
+
+  // 1. Load session.
+  const sessionRes = await client
+    .from('session_record')
+    .select('id, student_id, tenant_id, status')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (sessionRes.error !== null) return err(500, 'INTERNAL_ERROR', sessionRes.error.message);
+  if (sessionRes.data === null) return err(404, 'NOT_FOUND', `Session '${sessionId}' not found`);
+  const session = sessionRes.data as Pick<SessionRow, 'id' | 'student_id' | 'tenant_id' | 'status'>;
+
+  // 2. Load responses → items → touched skills (mirrors L1).
+  const responsesRes = await client
+    .from('session_response')
+    .select('item_id, sequence_number')
+    .eq('session_id', sessionId)
+    .order('sequence_number', { ascending: true });
+  if (responsesRes.error !== null) return err(500, 'INTERNAL_ERROR', responsesRes.error.message);
+  const responseRows = (responsesRes.data ?? []) as { item_id: string; sequence_number: number }[];
+
+  const itemIds = [...new Set(responseRows.map(r => r.item_id))].sort();
+  let touchedSkills: string[] = [];
+  if (itemIds.length > 0) {
+    const itemsRes = await client.from('item').select('id, skill_ids').in('id', itemIds);
+    if (itemsRes.error !== null) return err(500, 'INTERNAL_ERROR', itemsRes.error.message);
+    const skillSet = new Set<string>();
+    for (const row of (itemsRes.data ?? []) as ItemRow[]) {
+      for (const s of row.skill_ids) skillSet.add(s);
+    }
+    touchedSkills = [...skillSet].sort();
+  }
+
+  // 3. Load skill mastery for this student (all skills → threshold checks).
+  const masteryRes = await client
+    .from('skill_mastery')
+    .select('skill_id, mastery_level')
+    .eq('student_id', session.student_id);
+  if (masteryRes.error !== null) return err(500, 'INTERNAL_ERROR', masteryRes.error.message);
+  const masteryMap = new Map<string, number>(
+    ((masteryRes.data ?? []) as { skill_id: string; mastery_level: number }[]).map(r => [
+      r.skill_id,
+      r.mastery_level,
+    ]),
+  );
+
+  // 4. Skill graph (same resolution pattern as processSession).
+  const skillGraph: SkillGraphCache | null =
+    input.skillGraph !== undefined
+      ? input.skillGraph
+      : input.graphLoader !== undefined
+        ? await getSkillGraph(input.graphLoader, eff.perfNow(), traceId)
+        : null;
+  const adjacency = skillGraph?.adjacency ?? new Map<string, string[]>();
+  const downstreamAdj = buildDownstreamAdjacency(adjacency);
+
+  // 5. L3b traversal over touched skills.
+  await insertPipelineEvent(client, sessionId, session.student_id, 4, 'causal.evaluate_full', 'processing', eff);
+
+  const rootCausesSet = new Set<string>();
+  const unlockedSet = new Set<string>();
+
+  for (const skillId of touchedSkills) {
+    const upstream = traverseUpstreamHelper(skillId, new Set(), adjacency, masteryMap);
+    for (const rc of upstream) rootCausesSet.add(rc);
+
+    const downstream = traverseDownstreamHelper(skillId, new Set(), downstreamAdj, adjacency, masteryMap);
+    for (const u of downstream) unlockedSet.add(u);
+  }
+
+  const rootCauses = [...rootCausesSet].sort();
+  const unlockedSkills = [...unlockedSet].sort();
+
+  await markPipelineEventCompleted(client, sessionId, 4, 'causal.evaluate_full', null, eff);
+
+  // 6. Audit log.
+  const processingTimeMs = Math.round(eff.perfNow() - t0);
+  const auditInput = canonicalize({
+    session_id: sessionId,
+    student_id: session.student_id,
+    skills_traversed: touchedSkills.length,
+  });
+  const auditOutput = canonicalize({
+    root_causes: rootCauses,
+    unlocked_skills: unlockedSkills,
+    processing_time_ms: processingTimeMs,
+  });
+  const auditIns = await client.from('intelligence_audit_log').insert({
+    student_id: session.student_id,
+    tenant_id: session.tenant_id,
+    event_type: 'L3b.causal.full',
+    layer: 'causal',
+    algorithm_version: ALGORITHM_VERSION,
+    trace_id: traceId,
+    input_snapshot: JSON.parse(auditInput),
+    output: JSON.parse(auditOutput),
+  });
+  if (auditIns.error !== null) {
+    return err(500, 'INTERNAL_ERROR', `L3b audit-log insert failed: ${auditIns.error.message}`);
+  }
+
+  return ok<ProcessCausalFullResponse>({
+    status: 'processed',
+    session_id: sessionId,
+    algorithm_version: ALGORITHM_VERSION,
+    processing_time_ms: processingTimeMs,
+    causal_full: {
+      skills_traversed: touchedSkills.length,
+      root_causes: rootCauses,
+      unlocked_skills: unlockedSkills,
+    },
+  });
+}
+
+// ─── L3b traversal helpers ───────────────────────────────────────────────────
+
+/**
+ * Build reverse adjacency (skill → dependents) from the forward adjacency
+ * (skill → prerequisites). Used by traverse_downstream (spec §5.1.4).
+ */
+function buildDownstreamAdjacency(adjacency: Map<string, string[]>): Map<string, string[]> {
+  const down = new Map<string, string[]>();
+  for (const [skillId, prereqs] of adjacency) {
+    if (!down.has(skillId)) down.set(skillId, []);
+    for (const prereqId of prereqs) {
+      const list = down.get(prereqId) ?? [];
+      if (!list.includes(skillId)) list.push(skillId);
+      down.set(prereqId, list);
+    }
+  }
+  return down;
+}
+
+/**
+ * Recursive upstream traversal per spec §5.1.3.
+ *
+ * Q-28.8: spec requires strength >= 0.4 filter on edges. Using all cached
+ * edges without filtering (Option B). V1 NAPLAN/ICAS content has no enriching
+ * edges. Address in v1.1 if content team adds enriching edges.
+ *
+ * Cap: TRAVERSAL_CAP (50) nodes visited per starting call. On cap: log
+ * structured warn, return partial set (never throw — Q-28.6).
+ */
+function traverseUpstreamHelper(
+  skillId: string,
+  visited: Set<string>,
+  adjacency: Map<string, string[]>,
+  masteryMap: Map<string, number>,
+): string[] {
+  if (visited.has(skillId)) return [];
+  if (visited.size >= TRAVERSAL_CAP) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        event: 'skill_graph_cycle_cap_hit',
+        skill_id: skillId,
+        direction: 'upstream',
+        visited_count: visited.size,
+      }),
+    );
+    return [];
+  }
+  visited.add(skillId);
+
+  // Q-28.8: no strength filter — see module docstring.
+  const prereqs = [...(adjacency.get(skillId) ?? [])].sort();
+  const unmasteredPrereqs = prereqs.filter(
+    pid => (masteryMap.get(pid) ?? 0) < MASTERY_THRESHOLD,
+  );
+
+  if (unmasteredPrereqs.length === 0) {
+    return [skillId];
+  }
+
+  const rootCauses = new Set<string>();
+  for (const pid of unmasteredPrereqs) {
+    for (const rc of traverseUpstreamHelper(pid, visited, adjacency, masteryMap)) {
+      rootCauses.add(rc);
+    }
+  }
+  return [...rootCauses].sort();
+}
+
+/**
+ * Recursive downstream traversal per spec §5.1.4 + Q-28.7 fix
+ * (explicit studentId parameter added).
+ *
+ * Q-28.8: spec requires dependency_class == required filter on edges.
+ * Using all edges without filtering. See module docstring.
+ */
+function traverseDownstreamHelper(
+  skillId: string,
+  visited: Set<string>,
+  downstreamAdj: Map<string, string[]>,
+  adjacency: Map<string, string[]>,
+  masteryMap: Map<string, number>,
+): string[] {
+  if (visited.has(skillId)) return [];
+  if (visited.size >= TRAVERSAL_CAP) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        event: 'skill_graph_cycle_cap_hit',
+        skill_id: skillId,
+        direction: 'downstream',
+        visited_count: visited.size,
+      }),
+    );
+    return [];
+  }
+  visited.add(skillId);
+
+  const dependents = [...(downstreamAdj.get(skillId) ?? [])].sort();
+  const unlocked: string[] = [];
+
+  for (const depId of dependents) {
+    // Q-28.8: spec filters dependency_class == required; using all edges.
+    const allPrereqs = adjacency.get(depId) ?? [];
+    const allMet = allPrereqs.every(pid => (masteryMap.get(pid) ?? 0) >= MASTERY_THRESHOLD);
+    if (allMet) {
+      unlocked.push(depId);
+      for (const u of traverseDownstreamHelper(depId, visited, downstreamAdj, adjacency, masteryMap)) {
+        if (!unlocked.includes(u)) unlocked.push(u);
+      }
+    }
+  }
+  return unlocked.sort();
 }
 
 // ─── Pipeline-event lifecycle helpers ───────────────────────────────────────
@@ -396,19 +696,14 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
   if (responses.length === 0) {
     return { touchedSkills: [], upsertCount: 0, error: null };
   }
-  // Resolve item → skill_ids[] from `item` table for every response item.
   const itemIds = [...new Set(responses.map(r => r.item_id))].sort();
-  const itemsRes = await client
-    .from('item')
-    .select('id, skill_ids')
-    .in('id', itemIds);
+  const itemsRes = await client.from('item').select('id, skill_ids').in('id', itemIds);
   if (itemsRes.error !== null) {
     return { touchedSkills: [], upsertCount: 0, error: itemsRes.error.message };
   }
   const itemRows = (itemsRes.data ?? []) as ItemRow[];
   const itemSkills = new Map<string, string[]>(itemRows.map(r => [r.id, r.skill_ids]));
 
-  // Group responses by skill_id (deterministic order).
   const perSkill = new Map<string, ResponseRow[]>();
   for (const resp of responses) {
     const skills = itemSkills.get(resp.item_id) ?? [];
@@ -420,7 +715,6 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
   }
   const touchedSkills = [...perSkill.keys()].sort();
 
-  // Read existing skill_mastery rows to compute deltas (mastery_before).
   const existingRes = await client
     .from('skill_mastery')
     .select('student_id, skill_id, tenant_id, mastery_level, confidence, total_attempts, correct_attempts, streak_current, streak_best')
@@ -433,11 +727,9 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
     ((existingRes.data ?? []) as MasteryRow[]).map(r => [r.skill_id, r]),
   );
 
-  // Compute per-skill mastery via §8.1 formula.
   const upserts: MasteryRow[] = [];
   for (const skillId of touchedSkills) {
     const rows = perSkill.get(skillId) ?? [];
-    // Sort by sequence_number for recency-weighted accuracy.
     rows.sort((a, b) => a.sequence_number - b.sequence_number);
     const attempts = rows.map(r => ({
       is_correct: r.is_correct,
@@ -446,31 +738,22 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
     }));
     const recent = recencyWeightedAccuracy(attempts);
     const correct = rows.filter(r => r.is_correct === true).length;
-    // Difficulty-adjusted score: average of (is_correct ? difficulty : 0); rewards
-    // correct-on-hard. Bounded [0, 1] by caller-side clamp in masteryFormula.
-    const diffAdjusted = rows.length === 0
-      ? 0
-      : rows.reduce((acc, r) => acc + (r.is_correct === true ? r.difficulty : 0), 0) / rows.length;
-    // Consistency: 1 - variance of correctness (lower variance = higher consistency).
+    const diffAdjusted =
+      rows.length === 0
+        ? 0
+        : rows.reduce((acc, r) => acc + (r.is_correct === true ? r.difficulty : 0), 0) / rows.length;
     const correctnessSeries: number[] = rows.map(r => (r.is_correct === true ? 1 : 0));
     const seriesLen = Math.max(1, correctnessSeries.length);
     const mean = correctnessSeries.reduce((a: number, b: number) => a + b, 0) / seriesLen;
-    const variance = correctnessSeries.reduce((a: number, b: number) => a + (b - mean) ** 2, 0) / seriesLen;
-    const consistency = Math.max(0, 1 - variance * 4); // *4 scales [0,0.25] variance to [0,1].
-    // Behaviour penalty: applied at L2 stage; here use 0 (Q-20.13 input snapshot
-    // is per-skill aggregates only — penalty is metadata, not a formula input).
+    const variance =
+      correctnessSeries.reduce((a: number, b: number) => a + (b - mean) ** 2, 0) / seriesLen;
+    const consistency = Math.max(0, 1 - variance * 4);
     const behaviour_penalty = 0;
-    const computed = masteryFormula({
-      recent_accuracy: recent,
-      difficulty_adjusted: diffAdjusted,
-      consistency,
-      behaviour_penalty,
-    });
+    const computed = masteryFormula({ recent_accuracy: recent, difficulty_adjusted: diffAdjusted, consistency, behaviour_penalty });
 
     const prior = existing.get(skillId);
     const totalAttempts = (prior?.total_attempts ?? 0) + rows.length;
     const correctAttempts = (prior?.correct_attempts ?? 0) + correct;
-    // Streaks: count from end of session_response sequence backwards.
     let streakCurrent = prior?.streak_current ?? 0;
     let streakBest = prior?.streak_best ?? 0;
     for (const r of rows) {
@@ -481,7 +764,7 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
         streakCurrent = 0;
       }
     }
-    const confidence = Math.min(1, totalAttempts / 30); // simple §8.4 stat-confidence
+    const confidence = Math.min(1, totalAttempts / 30);
     upserts.push({
       student_id: session.student_id,
       skill_id: skillId,
@@ -495,18 +778,11 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
     });
   }
 
-  // Bulk upsert. Order is sorted-by-skill_id for determinism.
-  const upsertRes = await client.from('skill_mastery').upsert(upserts, {
-    onConflict: 'student_id,skill_id',
-  });
+  const upsertRes = await client.from('skill_mastery').upsert(upserts, { onConflict: 'student_id,skill_id' });
   if (upsertRes.error !== null) {
     return { touchedSkills, upsertCount: 0, error: upsertRes.error.message };
   }
 
-  // Velocity: a 14-day window read of prior mastery_level → slope. v1 MVP uses
-  // simple (current - prior_avg) / days. For Stage 20 the velocity table is
-  // recomputed but the slope reduces to "current - 0" on first session — that
-  // is acceptable per §8.2 ("recomputed after each session touching the skill").
   const velocityRows = upserts.map(u => ({
     student_id: u.student_id,
     skill_id: u.skill_id,
@@ -515,27 +791,16 @@ async function runFoundation(args: L1Args): Promise<L1Result> {
     window_days: 14,
     computed_at: args.eff.now(),
   }));
-  const velRes = await client.from('learning_velocity').upsert(velocityRows, {
-    onConflict: 'student_id,skill_id',
-  });
+  const velRes = await client.from('learning_velocity').upsert(velocityRows, { onConflict: 'student_id,skill_id' });
   if (velRes.error !== null) {
     return { touchedSkills, upsertCount: upserts.length, error: velRes.error.message };
   }
 
-  // Per-layer audit log row. Per-skill aggregates only (Q-20.13).
   const auditInput = canonicalize({
-    skills: sortBySkillId(upserts.map(u => ({
-      skill_id: u.skill_id,
-      attempts: u.total_attempts,
-      correct: u.correct_attempts,
-    }))),
+    skills: sortBySkillId(upserts.map(u => ({ skill_id: u.skill_id, attempts: u.total_attempts, correct: u.correct_attempts }))),
   });
   const auditOutput = canonicalize({
-    skills: sortBySkillId(upserts.map(u => ({
-      skill_id: u.skill_id,
-      mastery_level: u.mastery_level,
-      confidence: u.confidence,
-    }))),
+    skills: sortBySkillId(upserts.map(u => ({ skill_id: u.skill_id, mastery_level: u.mastery_level, confidence: u.confidence }))),
   });
   await client.from('intelligence_audit_log').insert({
     student_id: session.student_id,
@@ -575,12 +840,8 @@ async function runBehaviour(args: L2Args): Promise<L2Result> {
     return { signalsWritten: 0, profileBlended: false, error: null };
   }
 
-  // §9.5 expected_time_per_item_ms — pull from EngineState if available, else
-  // 30s default (matches FrameworkConfig default in @mm/engines).
   const expectedTimeMs = engineExpectedTime(args.state);
 
-  // Compute per-response signals + insert as new learning_event rows
-  // (Q-20.12=A — preserves immutability of learning_event).
   const signalRows = responses.map(r => {
     const tel = r.telemetry ?? { time_to_answer_ms: 0, answer_changes: 0 };
     const guess = guessProbability({
@@ -606,11 +867,10 @@ async function runBehaviour(args: L2Args): Promise<L2Result> {
     return { signalsWritten: 0, profileBlended: false, error: evIns.error.message };
   }
 
-  // Aggregate session-level fatigue + cognitive load + persistence-ish proxy.
   const baseline = avg(responses.slice(0, 5).map(r => (r.is_correct === true ? 1 : 0)));
   const recent = avg(responses.slice(-5).map(r => (r.is_correct === true ? 1 : 0)));
   const totalDurationMs = responses.reduce((a, r) => a + (r.telemetry?.time_to_answer_ms ?? 0), 0);
-  const fatigueThresholdMs = (yearLevelDefaults(profile.year_level).avg_fatigue_onset_minutes) * 60_000;
+  const fatigueThresholdMs = yearLevelDefaults(profile.year_level).avg_fatigue_onset_minutes * 60_000;
   const avgEarly = avg(responses.slice(0, 5).map(r => r.telemetry?.time_to_answer_ms ?? 0));
   const avgRecent = avg(responses.slice(-5).map(r => r.telemetry?.time_to_answer_ms ?? 0));
   const fatigue = fatigueScore({
@@ -633,7 +893,6 @@ async function runBehaviour(args: L2Args): Promise<L2Result> {
   });
   const avgGuess = avg(signalRows.map(r => (r.metadata.guess_probability as number)));
 
-  // Read existing behaviour_profile (data_points + computed_at) for §9.6 blend.
   const bpRes = await client
     .from('behaviour_profile')
     .select('student_id, data_points, computed_at')
@@ -642,13 +901,13 @@ async function runBehaviour(args: L2Args): Promise<L2Result> {
   if (bpRes.error !== null) {
     return { signalsWritten: signalRows.length, profileBlended: false, error: bpRes.error.message };
   }
-  const prior = (bpRes.data as BehaviourProfileRow | null);
+  const prior = bpRes.data as BehaviourProfileRow | null;
   const newDataPoints = (prior?.data_points ?? 0) + 1;
 
   const computed: BehaviourDefaults = {
     avg_guess_rate: avgGuess,
     avg_fatigue_onset_minutes: minutesFromMs(fatigueThresholdMs),
-    persistence_score: clamp01(1 - cogLoad), // proxy: low load → high persistence
+    persistence_score: clamp01(1 - cogLoad),
     avg_cognitive_load_comfort: clamp01(1 - cogLoad),
     time_pressure_sensitivity: clamp01(fatigue),
     session_length_sweet_spot: minutesFromMs(fatigueThresholdMs),
@@ -672,11 +931,7 @@ async function runBehaviour(args: L2Args): Promise<L2Result> {
     return { signalsWritten: signalRows.length, profileBlended: false, error: upRes.error.message };
   }
 
-  const auditInput = canonicalize({
-    session_id: session.id,
-    response_count: responses.length,
-    year_level: profile.year_level,
-  });
+  const auditInput = canonicalize({ session_id: session.id, response_count: responses.length, year_level: profile.year_level });
   const auditOutput = canonicalize({
     avg_guess_rate: blended.avg_guess_rate,
     fatigue_onset_minutes: blended.avg_fatigue_onset_minutes,
@@ -706,6 +961,8 @@ interface L3aArgs {
   touchedSkills: string[];
   eff: Effects;
   traceId: string;
+  /** ADR-0028 / ISSUE-0006 fix: graph loaded by processSession. Null = empty adjacency. */
+  skillGraph: SkillGraphCache | null;
 }
 
 interface L3aResult {
@@ -715,36 +972,24 @@ interface L3aResult {
 }
 
 async function runCausalScoped(args: L3aArgs): Promise<L3aResult> {
-  const { client, session, responses, touchedSkills, eff, traceId } = args;
+  const { client, session, responses, touchedSkills, eff, traceId, skillGraph } = args;
 
-  // Walk depth-1 prereqs over touched skills. We pull edges scoped to the
-  // active graph version — Stage 20 doesn't depend on the cache module here
-  // (the cache lives in skill-graph-cache.ts and is wired by index.ts in
-  // production; tests pass adjacency directly via a pre-loaded DB).
-  // For the handler, query skill_edge directly.
-  let adjacency = new Map<string, string[]>();
-  if (touchedSkills.length > 0) {
-    const edgesRes = await client
-      .from('skill_edge')
-      .select('from_node_id, to_node_id')
-      .in('to_node_id', touchedSkills);
-    if (edgesRes.error !== null) {
-      return { prereqsWalked: 0, misconceptionsUpserted: 0, error: edgesRes.error.message };
-    }
-    const edges = (edgesRes.data ?? []) as { from_node_id: string; to_node_id: string }[];
-    for (const e of edges) {
-      const list = adjacency.get(e.to_node_id) ?? [];
-      list.push(e.from_node_id);
-      adjacency.set(e.to_node_id, list);
-    }
-  }
+  // ADR-0028 (ISSUE-0006 fix): use skill-graph-cache adjacency instead of a
+  // direct skill_edge query. After Stage 28 there must be zero direct
+  // skill_edge queries in this file (exit criterion grep check).
+  const adjacency = skillGraph?.adjacency ?? new Map<string, string[]>();
   const walked = walkPrereqsDepth1(touchedSkills, adjacency);
 
-  // Misconception detection: for each incorrect response, look up
-  // distractor_rationale[choice_id]?.misconception_id.
   const incorrectResponses = responses.filter(r => r.is_correct === false);
   const incorrectItemIds = [...new Set(incorrectResponses.map(r => r.item_id))].sort();
-  const misconceptionUpserts: { student_id: string; tenant_id: string; misconception_id: string; confidence: number; status: 'suspected'; evidence: Record<string, unknown> }[] = [];
+  const misconceptionUpserts: {
+    student_id: string;
+    tenant_id: string;
+    misconception_id: string;
+    confidence: number;
+    status: 'suspected';
+    evidence: Record<string, unknown>;
+  }[] = [];
 
   if (incorrectItemIds.length > 0) {
     const ivRes = await client
@@ -761,8 +1006,6 @@ async function runCausalScoped(args: L3aArgs): Promise<L3aResult> {
     for (const r of incorrectResponses) {
       const iv = versions.get(r.item_id);
       if (iv === undefined || iv.distractor_rationale === null) continue;
-      // Q-20.11 shape: { [choice_id]: { misconception_id } }
-      // Choice id lives in response_data.choice_id (item-type contract).
       const choiceId = (r.response_data['choice_id'] ?? r.response_data['selected_id']) as string | undefined;
       if (typeof choiceId !== 'string') continue;
       const entry = iv.distractor_rationale[choiceId];
@@ -771,7 +1014,7 @@ async function runCausalScoped(args: L3aArgs): Promise<L3aResult> {
         student_id: session.student_id,
         tenant_id: session.tenant_id,
         misconception_id: entry.misconception_id,
-        confidence: 0.6, // initial detection confidence; v1.1 may refine.
+        confidence: 0.6,
         status: 'suspected',
         evidence: { session_id: session.id, response_id: r.id, item_id: r.item_id },
       });
@@ -806,11 +1049,7 @@ async function runCausalScoped(args: L3aArgs): Promise<L3aResult> {
     output: JSON.parse(auditOutput),
   });
 
-  return {
-    prereqsWalked: walked.length,
-    misconceptionsUpserted: misconceptionUpserts.length,
-    error: null,
-  };
+  return { prereqsWalked: walked.length, misconceptionsUpserted: misconceptionUpserts.length, error: null };
 }
 
 // ─── Local utilities ────────────────────────────────────────────────────────
@@ -834,7 +1073,7 @@ function countConsecutiveIncorrectRunsOf3Plus(responses: ResponseRow[]): number 
   for (const r of responses) {
     if (r.is_correct === false) {
       streak += 1;
-      if (streak === 3) runs += 1; // count each 3+ run once
+      if (streak === 3) runs += 1;
     } else {
       streak = 0;
     }
@@ -843,8 +1082,6 @@ function countConsecutiveIncorrectRunsOf3Plus(responses: ResponseRow[]): number 
 }
 
 function engineExpectedTime(state: EngineState): number {
-  // SkillEngineState has explicit expected_time_per_item_ms; other engines
-  // fall back to the FrameworkConfig default of 30s.
   if (state.engine_type === 'skill') return state.expected_time_per_item_ms;
   return 30_000;
 }

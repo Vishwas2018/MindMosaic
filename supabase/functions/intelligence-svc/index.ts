@@ -1,15 +1,13 @@
 /// <reference lib="deno.ns" />
 /**
- * intelligence-svc — Stage 20.
+ * intelligence-svc — Stage 28.
  *
- * Single endpoint:
+ * Endpoints:
  *   POST /intelligence/process-session/{id}   [service-role only]
- *
- * Called inline from assessment-svc /sessions/{id}/submit (Q-20.1, ADR-0027)
- * within a 4s timeout window. The handler runs Spec §7.2 sync portion
- * (L1 + L2 + L3a) and returns 200 with a deterministic payload. On
- * audit-log dedup hit (Q-20.7) returns 200 `already_processed` —
- * Stage 28's worker re-pickup is therefore a no-op.
+ *     Sync L1 + L2 + L3a — called inline from assessment-svc /sessions/{id}/submit
+ *     (Q-20.1, ADR-0027) within a 4s timeout window.
+ *   POST /intelligence/pipeline/causal-full    [service-role only]
+ *     Async L3b — dispatched by jobs-worker (ADR-0031).
  *
  * Service env:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -18,7 +16,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getTraceId } from '../_shared/trace-id.ts';
 import { jsonOk, jsonError } from '../_shared/error-envelope.ts';
 import { log } from '../_shared/logger.ts';
-import { processSession, type DbClient as HandlerDbClient } from './handlers.ts';
+import {
+  processSession,
+  processCausalFull,
+  type DbClient as HandlerDbClient,
+} from './handlers.ts';
+import {
+  createDbLoader,
+  type DbClient as SkillGraphDbClient,
+} from '../_shared/skill-graph-cache.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -59,10 +65,33 @@ Deno.serve(async (req: Request) => {
       const sessionId = processMatch[1]!;
       const db = serviceClient();
       const client = db as unknown as HandlerDbClient;
+      const graphLoader = createDbLoader(db as unknown as SkillGraphDbClient);
       const result = await processSession({
         client,
         sessionId,
         traceId,
+        graphLoader,
+      });
+      status = result.status;
+      if (result.ok) return jsonOk(result.data, traceId, result.status);
+      return jsonError(result.code, result.message, traceId, result.status);
+    }
+
+    if (method === 'POST' && path === '/intelligence/pipeline/causal-full') {
+      const body = await req.json() as { session_id?: unknown };
+      const sessionId = body.session_id;
+      if (typeof sessionId !== 'string' || sessionId.trim() === '') {
+        status = 400;
+        return jsonError('BAD_REQUEST', 'session_id required', traceId, 400);
+      }
+      const db = serviceClient();
+      const client = db as unknown as HandlerDbClient;
+      const graphLoader = createDbLoader(db as unknown as SkillGraphDbClient);
+      const result = await processCausalFull({
+        client,
+        sessionId,
+        traceId,
+        graphLoader,
       });
       status = result.status;
       if (result.ok) return jsonOk(result.data, traceId, result.status);
