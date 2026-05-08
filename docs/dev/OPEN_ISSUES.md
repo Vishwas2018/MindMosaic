@@ -214,6 +214,17 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 
 **Recommended fix (v1.1).** Introduce `student_prediction_cache (student_id, pathway_slug, tenant_id, value jsonb, computed_at timestamptz, PRIMARY KEY (student_id, pathway_slug))` with appropriate RLS (student SELECT own rows; teacher/admin SELECT any). Migrate Stage 29 prediction writes to this table. Add a sweeper cron to prune rows older than 7 days.
 
+### ISSUE-0016 — async_pipeline_event table for L5/L7/L9 observability parity (post ADR-0032)
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-19 (Stage 29)
+- Area: backend (intelligence-svc, migration)
+- Tags: observability · pipeline · v1.1
+
+**Summary.** `pipeline_event.session_id` is `NOT NULL` (migration 0006), blocking writes from L5/L7/L9 pipeline steps which operate at student+pathway scope (no session). ADR-0032 resolves this for Stage 29 by skipping `pipeline_event` for L5 and using `intelligence_audit_log` exclusively. Step 5 is absent from `pipeline_event` coverage; monitoring queries tracking pipeline step enumeration will miss L5 progress.
+
+**Recommended fix (v1.1).** Introduce a dedicated `async_pipeline_event` table without a session_id FK: `async_pipeline_event (id uuid PK, student_id, pathway_slug, step, step_name, status, started_at, completed_at, error, created_at)`. L5/L7/L9 write to this table; L1/L2/L3a/L3b continue writing to `pipeline_event`. Linked: ADR-0032, Q-29.4.
 
 ## Resolved
 

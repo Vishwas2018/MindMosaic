@@ -9,6 +9,18 @@
 
 ## Resolved
 
+### Q-29.4 — pipeline_event step=5 writability for L5 (no session_id)
+
+- Date raised: 2026-05-19 (Stage 29 pre-implementation)
+- Asked of: self
+- Source: Stage 29 C-C-D-V, Verification step 7 ("pipeline step=5 written"); migration 0006 `pipeline_event.session_id uuid NOT NULL`.
+- Question: L5 predictive-refresh has no session_id (it is student+pathway-scoped). Migration 0006 has `session_id NOT NULL REFERENCES session_record(id)`. Options: (A) Add migration to make session_id nullable; (B) skip pipeline_event for L5; use intelligence_audit_log as sole observability; (C) write pipeline_event with a sentinel/null session by bypassing the FK.
+- Why ambiguous: The C-C-D-V Verification step 7 assumes step=5 is written; schema constraint makes this impossible without a migration.
+- Blocking? yes — cannot write pipeline_event without session_id.
+- Code affected: `supabase/functions/intelligence-svc/handlers.ts`, verification grep commands.
+- Status: resolved
+- Resolution (2026-05-19): **Option B**. L5 does NOT write pipeline_event. intelligence_audit_log is the sole observability surface for predictive-refresh. Documented in ADR-0032. Verification step 7 ("pipeline step=5") removed from C-C-D-V. ISSUE-0016 filed to evaluate a dedicated async_pipeline_event table for L5/L7/L9 in v1.1.
+
 ### Q-29.3 — retention_half_life source for spec §12.2 pessimistic forecast
 
 - Date raised: 2026-05-19 (Stage 29 prep)

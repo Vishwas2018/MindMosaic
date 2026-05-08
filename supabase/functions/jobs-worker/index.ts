@@ -1,14 +1,14 @@
 /// <reference lib="deno.ns" />
 /**
- * jobs-worker — Stage 28.
+ * jobs-worker — Stage 29.
  *
  * Generic job-dispatch runtime (ADR-0031). Called by pg_cron every minute
  * (cron registration: deploy-time step, see DEV_PLAN Stage 28 notes).
  * Accepts POST requests; returns a BatchResult JSON.
  *
  * Routes (job_type → owning service):
- *   pipeline.causal.evaluate_full → intelligence-svc
- *     POST /intelligence/pipeline/causal-full
+ *   pipeline.causal.evaluate_full  → intelligence-svc POST /intelligence/pipeline/causal-full
+ *   pipeline.predictive_refresh    → intelligence-svc POST /intelligence/pipeline/predictive-refresh
  *
  * Service env:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
@@ -32,6 +32,9 @@ function buildRouteMap(): RouteMap {
   return {
     'pipeline.causal.evaluate_full': {
       url: `${INTELLIGENCE_SVC_URL}/intelligence/pipeline/causal-full`,
+    },
+    'pipeline.predictive_refresh': {
+      url: `${INTELLIGENCE_SVC_URL}/intelligence/pipeline/predictive-refresh`,
     },
   };
 }

@@ -28,7 +28,15 @@
  *   Helpers       (≥ 2)    — canonicalize / walkPrereqsDepth1 / blendBehaviour
  */
 import { describe, expect, it, vi } from 'vitest';
-import { processSession, processCausalFull, type DbClient } from '../handlers.ts';
+import {
+  processSession,
+  processCausalFull,
+  processPredictiveRefresh,
+  getPredictions,
+  L5_ALGORITHM_VERSION,
+  type DbClient,
+  type PredictionsCallerContext,
+} from '../handlers.ts';
 import type { SkillGraphCache } from '../../_shared/skill-graph-cache.ts';
 import {
   ALGORITHM_VERSION,
@@ -607,7 +615,6 @@ describe('intelligence-svc — processCausalFull L3b', () => {
     const result = await processCausalFull({
       client, sessionId: SESSION_ID, traceId: 'trace-l3b', skillGraph: null,
     });
-    expect(result.ok).toBe(true);
     if (!result.ok) throw new Error('expected ok');
     expect(result.data.status).toBe('already_processed');
     expect(result.data.causal_full).toBeNull();
@@ -677,5 +684,237 @@ describe('intelligence-svc — processCausalFull L3b', () => {
     if (result.ok) throw new Error('expected err');
     expect(result.status).toBe(404);
     expect(result.code).toBe('NOT_FOUND');
+  });
+});
+
+// ─── L5 processPredictiveRefresh tests ──────────────────────────────────────
+
+const PATHWAY_SLUG = 'naplan-y5-numeracy';
+const PATHWAY_ID   = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const FRAMEWORK_CONFIG_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+const STRAND_NUMBER = '00000001-0000-4000-8000-000000000001'; // number-algebra
+const STRAND_MEASURE = '00000001-0000-4000-8000-000000000002'; // measurement-space
+
+// Fixed "now" for L5 tests: 2026-05-19T10:00:00Z
+const L5_NOW = '2026-05-19T10:00:00.000Z';
+// earliest attempt date 30 days ago → satisfies ≥7-day history guard
+const OLD_ATTEMPT = '2026-04-19T10:00:00.000Z';
+// recent attempt date 1 day ago → fails ≥7-day history guard
+const RECENT_ATTEMPT = '2026-05-18T10:00:00.000Z';
+
+const L5_SKILLS_STUB: QueryStub = {
+  data: [
+    { id: SKILL_A, slug: 'place-value',   parent_id: STRAND_NUMBER,  pathway_tags: ['naplan', 'icas'] },
+    { id: SKILL_B, slug: 'fractions',     parent_id: STRAND_NUMBER,  pathway_tags: ['naplan', 'icas'] },
+    { id: SKILL_C, slug: 'geometry',      parent_id: STRAND_MEASURE, pathway_tags: ['naplan', 'icas'] },
+  ],
+  error: null,
+};
+
+const L5_STRANDS_STUB: QueryStub = {
+  data: [
+    { id: STRAND_NUMBER,  slug: 'number-algebra' },
+    { id: STRAND_MEASURE, slug: 'measurement-space' },
+  ],
+  error: null,
+};
+
+function buildL5Stubs(opts: {
+  masteryData?: Array<{ skill_id: string; mastery_level: number; total_attempts: number; last_attempted_at: string | null }>;
+  velocityData?: Array<{ skill_id: string; velocity: number }>;
+  auditDedupHit?: boolean;
+} = {}): Stubs {
+  const {
+    masteryData = [
+      { skill_id: SKILL_A, mastery_level: 0.5, total_attempts: 4, last_attempted_at: OLD_ATTEMPT },
+      { skill_id: SKILL_B, mastery_level: 0.7, total_attempts: 5, last_attempted_at: OLD_ATTEMPT },
+      { skill_id: SKILL_C, mastery_level: 0.3, total_attempts: 3, last_attempted_at: OLD_ATTEMPT },
+    ],
+    velocityData = [
+      { skill_id: SKILL_A, velocity: 0.002 },
+      { skill_id: SKILL_B, velocity: 0.001 },
+      { skill_id: SKILL_C, velocity: 0.003 },
+    ],
+    auditDedupHit = false,
+  } = opts;
+
+  const dedupStub: QueryStub = auditDedupHit
+    ? { data: [{ id: 'prior-l5' }], error: null }
+    : EMPTY_LIST;
+
+  return {
+    intelligence_audit_log: [dedupStub, EMPTY_OK], // dedup check + audit insert
+    user_profile: { data: { id: STUDENT_ID, tenant_id: TENANT_ID, year_level: 'Y5' }, error: null },
+    pathway: { data: { id: PATHWAY_ID, slug: PATHWAY_SLUG, framework_config_id: FRAMEWORK_CONFIG_ID }, error: null },
+    framework_config: {
+      data: {
+        id: FRAMEWORK_CONFIG_ID,
+        blueprint: { strands: [{ slug: 'number-algebra', weight: 0.6 }, { slug: 'measurement-space', weight: 0.4 }] },
+        scoring_rules: {},
+      },
+      error: null,
+    },
+    skill_node: [L5_SKILLS_STUB, L5_STRANDS_STUB], // first: skills; second: strands
+    skill_mastery: { data: masteryData, error: null },
+    learning_velocity: { data: velocityData, error: null },
+    cohort_metric_cache: EMPTY_OK, // upsert
+  };
+}
+
+describe('intelligence-svc — processPredictiveRefresh L5', () => {
+  it('prediction returns for student with 10+ sessions', async () => {
+    const client = buildClient(buildL5Stubs());
+    const result = await processPredictiveRefresh(
+      { student_id: STUDENT_ID, pathway_slug: PATHWAY_SLUG, tenant_id: TENANT_ID, trace_id: 'trace-l5' },
+      client,
+      { now: () => L5_NOW },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const data = result.data as { status: string; current_readiness_score: number };
+    expect(data.status).not.toBe('insufficient_data');
+    expect(typeof data.current_readiness_score).toBe('number');
+    expect(data.current_readiness_score).toBeGreaterThanOrEqual(0);
+    expect(data.current_readiness_score).toBeLessThanOrEqual(1);
+  });
+
+  it('insufficient_data returned below data threshold', async () => {
+    const client = buildClient(buildL5Stubs({
+      masteryData: [
+        { skill_id: SKILL_A, mastery_level: 0.5, total_attempts: 1, last_attempted_at: RECENT_ATTEMPT },
+        { skill_id: SKILL_B, mastery_level: 0.7, total_attempts: 1, last_attempted_at: RECENT_ATTEMPT },
+        { skill_id: SKILL_C, mastery_level: 0.3, total_attempts: 1, last_attempted_at: RECENT_ATTEMPT },
+      ],
+    }));
+    const result = await processPredictiveRefresh(
+      { student_id: STUDENT_ID, pathway_slug: PATHWAY_SLUG, tenant_id: TENANT_ID, trace_id: 'trace-l5' },
+      client,
+      { now: () => L5_NOW },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect((result.data as { status: string }).status).toBe('insufficient_data');
+  });
+
+  it('projected_readiness is null when exam_date omitted', async () => {
+    const client = buildClient(buildL5Stubs());
+    const result = await processPredictiveRefresh(
+      { student_id: STUDENT_ID, pathway_slug: PATHWAY_SLUG, exam_date: null, tenant_id: TENANT_ID, trace_id: 'trace-l5' },
+      client,
+      { now: () => L5_NOW },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const data = result.data as { projected_readiness: unknown; on_track: unknown };
+    expect(data.projected_readiness).toBeNull();
+    expect(data.on_track).toBeNull();
+  });
+
+  it('projected_readiness computed when exam_date provided', async () => {
+    const client = buildClient(buildL5Stubs());
+    const result = await processPredictiveRefresh(
+      {
+        student_id: STUDENT_ID,
+        pathway_slug: PATHWAY_SLUG,
+        exam_date: '2026-10-15',
+        tenant_id: TENANT_ID,
+        trace_id: 'trace-l5',
+      },
+      client,
+      { now: () => L5_NOW },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    const data = result.data as { projected_readiness: unknown; on_track: unknown };
+    expect(typeof data.projected_readiness).toBe('number');
+    expect((data.projected_readiness as number)).toBeGreaterThanOrEqual(0);
+    expect((data.projected_readiness as number)).toBeLessThanOrEqual(1);
+    expect(typeof data.on_track).toBe('boolean');
+  });
+
+  it('idempotency: second call returns already_processed', async () => {
+    const client = buildClient(buildL5Stubs({ auditDedupHit: true }));
+    const result = await processPredictiveRefresh(
+      { student_id: STUDENT_ID, pathway_slug: PATHWAY_SLUG, tenant_id: TENANT_ID, trace_id: 'trace-l5' },
+      client,
+      { now: () => L5_NOW },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect((result.data as { already_processed?: boolean }).already_processed).toBe(true);
+    // No cohort_metric_cache upsert should happen on dedup short-circuit
+    const upserts = client.calls.filter(c => c.op === 'upsert' && c.table === 'cohort_metric_cache');
+    expect(upserts).toHaveLength(0);
+  });
+
+  it('GET /intelligence/predictions returns stale envelope when cache expired', async () => {
+    const staleComputedAt = '2026-05-19T08:00:00.000Z'; // 2 hours before L5_NOW
+    const client = buildClient({
+      cohort_metric_cache: {
+        data: [{ value: { status: 'fresh', current_readiness_score: 0.65 }, computed_at: staleComputedAt }],
+        error: null,
+      },
+    });
+    const result = await getPredictions(STUDENT_ID, PATHWAY_SLUG, client, null, { now: () => L5_NOW });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data.status).toBe('stale');
+    expect(result.data.stale_since).toBe(staleComputedAt);
+    expect(result.data.payload).not.toBeNull();
+  });
+
+  it('GET /intelligence/predictions returns no_data when no cache row', async () => {
+    const client = buildClient({
+      cohort_metric_cache: { data: [], error: null },
+    });
+    const result = await getPredictions(STUDENT_ID, PATHWAY_SLUG, client, null, { now: () => L5_NOW });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data.status).toBe('no_data');
+    expect(result.data.stale_since).toBeNull();
+    expect(result.data.payload).toBeNull();
+  });
+
+  it('GET denies cross-student read for non-teacher role', async () => {
+    const client = buildClient({
+      cohort_metric_cache: {
+        data: [{ value: { status: 'fresh', current_readiness_score: 0.65 }, computed_at: L5_NOW }],
+        error: null,
+      },
+    });
+    const otherStudentCaller: PredictionsCallerContext = { userId: 'other-student-uuid', role: 'student' };
+    const result = await getPredictions(STUDENT_ID, PATHWAY_SLUG, client, otherStudentCaller, { now: () => L5_NOW });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected err');
+    expect(result.status).toBe(403);
+    expect(result.code).toBe('FORBIDDEN');
+  });
+
+  it('writes audit log with pre-compute input_snapshot and post-compute output + processing_time_ms', async () => {
+    const client = buildClient(buildL5Stubs());
+    await processPredictiveRefresh(
+      { student_id: STUDENT_ID, pathway_slug: PATHWAY_SLUG, tenant_id: TENANT_ID, trace_id: 'trace-l5' },
+      client,
+      { now: () => L5_NOW, perfNow: () => 0 },
+    );
+    const inserts = client.calls.filter(c => c.op === 'insert' && c.table === 'intelligence_audit_log');
+    expect(inserts).toHaveLength(1);
+    const row = inserts[0]!.args as {
+      event_type: string;
+      algorithm_version: string;
+      input_snapshot: { student_id: string; pathway_slug: string; skill_count: number; data_points: number };
+      output: { current_readiness_score: number; gap_skill_count: number; processing_time_ms: number };
+    };
+    // Pre-compute: input fields derived from incoming data before algorithm runs.
+    expect(row.event_type).toBe('L5.predictive.refresh');
+    expect(row.algorithm_version).toBe(L5_ALGORITHM_VERSION);
+    expect(row.input_snapshot.student_id).toBe(STUDENT_ID);
+    expect(row.input_snapshot.pathway_slug).toBe(PATHWAY_SLUG);
+    expect(typeof row.input_snapshot.skill_count).toBe('number');
+    expect(typeof row.input_snapshot.data_points).toBe('number');
+    // Post-compute: output fields produced by the algorithm.
+    expect(typeof row.output.current_readiness_score).toBe('number');
+    expect(typeof row.output.gap_skill_count).toBe('number');
+    expect(typeof row.output.processing_time_ms).toBe('number');
   });
 });

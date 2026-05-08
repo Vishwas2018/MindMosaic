@@ -1,5 +1,5 @@
 /**
- * intelligence-svc handlers — Stage 28.
+ * intelligence-svc handlers — Stage 29.
  *
  * Stage 28 changes vs Stage 20:
  *   - ISSUE-0006 fix: L3a now reads skill graph via getSkillGraph() (ADR-0028)
@@ -9,6 +9,14 @@
  *   - processCausalFull added: L3b full traversal (traverse_upstream +
  *     traverse_downstream) per spec §5.1.3/4 (Q-28.6, Q-28.7). Called by
  *     jobs-worker via POST /intelligence/pipeline/causal-full (ADR-0031).
+ *
+ * Stage 29 additions:
+ *   - processPredictiveRefresh added: L5 predictive intelligence per spec §12.
+ *     Called by jobs-worker via POST /intelligence/pipeline/predictive-refresh.
+ *     ADR-0032: L5 does NOT write pipeline_event (session_id NOT NULL FK);
+ *     intelligence_audit_log is the sole observability surface for this step.
+ *   - getPredictions added: GET /intelligence/predictions/:student_id/:pathway_slug.
+ *     Reads cohort_metric_cache and returns fresh/stale/no_data envelope.
  *
  * Pipeline (Spec §7.2 sync portion — L1+L2+L3a, must complete inline):
  *   0. Audit-log dedup (Q-20.7).
@@ -25,6 +33,8 @@
  * Async pipeline (jobs-worker → this handler):
  *   3b. L3b Causal-full — traverse_upstream + traverse_downstream per
  *       spec §5.1.3/4; pipeline_event(step=4); audit log.
+ *   5.  L5 Predictive-refresh — readiness score + gap skills + mastery
+ *       timelines; cohort_metric_cache UPSERT; audit log only (ADR-0032).
  *
  * Q-28.8 note: spec §5.1.3 requires strength >= 0.4 edge filter; §5.1.4
  * requires dependency_class == required filter. The SkillGraphCache adjacency
@@ -38,12 +48,13 @@
  *   - canonicalize() on every audit-log input_snapshot.
  *   - No Math.random; no Date.now() as algorithm input.
  *   - L3b traversal: output sorted skill_id ASC for determinism.
+ *   - L5 gap skills: sorted skill_id ASC; strand iteration sorted strandId ASC.
  *
  * Spec refs: §5.1.3, §5.1.4, §7.2, §7.4.2, §8.1, §9.2, §9.3, §9.5, §9.6,
- * §10.2; arch §4.5, §5.2; ADR-0027, ADR-0028, ADR-0031.
+ * §10.2, §12.1–12.4; arch §4.5, §5.2; ADR-0027, ADR-0028, ADR-0031, ADR-0032.
  */
 
-import { EngineStateSchema, type EngineState } from '@mm/engines';
+import { EngineStateSchema, type EngineState, retentionHalfLifeDays } from '@mm/engines';
 import {
   ALGORITHM_VERSION,
   blendBehaviour,
@@ -113,6 +124,7 @@ export type DbBuilder = {
   eq: (col: string, val: unknown) => DbBuilder;
   in: (col: string, vals: unknown[]) => DbBuilder;
   gte: (col: string, val: unknown) => DbBuilder;
+  contains: (col: string, val: unknown) => DbBuilder;
   order: (col: string, opts?: { ascending?: boolean }) => DbBuilder;
   limit: (n: number) => DbBuilder;
   maybeSingle: () => Promise<{ data: unknown | null; error: { message: string; code?: string } | null }>;
@@ -1090,4 +1102,448 @@ function sortMisconceptions<T extends { misconception_id: string }>(rows: T[]): 
   return [...rows].sort((a, b) =>
     a.misconception_id < b.misconception_id ? -1 : a.misconception_id > b.misconception_id ? 1 : 0,
   );
+}
+
+// ─── L5 Predictive Intelligence ──────────────────────────────────────────────
+
+export const L5_ALGORITHM_VERSION = 'L5.v1' as const;
+
+const L5_SKILL_THRESHOLD = 0.6;
+const L5_TARGET_THRESHOLD_DEFAULT = 0.7;
+const L5_MASTERY_DATE_CAP_DAYS = 365;
+
+interface BlueprintStrand {
+  slug: string;
+  weight: number;
+}
+
+interface L5Blueprint {
+  strands: BlueprintStrand[];
+}
+
+interface L5ScoringRules {
+  target_threshold?: number;
+  [key: string]: unknown;
+}
+
+export interface PredictiveRefreshInput {
+  student_id: string;
+  pathway_slug: string;
+  exam_date?: string | null;
+  tenant_id: string;
+  trace_id: string;
+}
+
+export interface PredictiveSkillGap {
+  skill_id: string;
+  mastery_level: number;
+  velocity: number;
+  estimated_mastery_date: string | null;
+}
+
+export type PredictiveRefreshPayload =
+  | { status: 'insufficient_data' }
+  | {
+      status: 'fresh';
+      current_readiness_score: number;
+      projected_readiness: number | null;
+      on_track: boolean | null;
+      gap_skills: PredictiveSkillGap[];
+      data_points: number;
+      computed_at: string;
+    };
+
+export type PredictiveRefreshResult =
+  | { already_processed: true }
+  | PredictiveRefreshPayload;
+
+export interface GetPredictionsResponse {
+  status: 'fresh' | 'stale' | 'no_data';
+  stale_since: string | null;
+  payload: unknown;
+}
+
+/**
+ * L5 predictive-refresh handler (spec §12).
+ *
+ * ADR-0032: pipeline_event.session_id is NOT NULL — L5 has no session, so
+ * pipeline_event writes are skipped. intelligence_audit_log is the sole
+ * observability surface for this step.
+ *
+ * Dedup key: (event_type='L5.predictive.refresh', algorithm_version, student_id,
+ * pathway_slug) — differs from L1–L3 session-scoped dedup because L5 operates
+ * at the student+pathway level across all sessions, not per-session. A student
+ * should be refreshed at most once per (pathway, algorithm version) run.
+ */
+export async function processPredictiveRefresh(
+  input: PredictiveRefreshInput,
+  db: DbClient,
+  effects?: Partial<Effects>,
+): Promise<HandlerResult<PredictiveRefreshResult>> {
+  const eff = { ...DEFAULT_EFFECTS, ...effects };
+  const t0 = eff.perfNow();
+  const {
+    student_id: studentId,
+    pathway_slug: pathwaySlug,
+    exam_date: examDate,
+    tenant_id: tenantId,
+    trace_id: traceId,
+  } = input;
+
+  // 0. Dedup — (student_id, pathway_slug, algorithm_version).
+  // L1–L3 dedup is session-scoped (input_snapshot->>session_id); L5 is
+  // student+pathway-scoped because predictive-refresh aggregates across all
+  // pathway sessions, not a single session.
+  const dedupRes = await db
+    .from('intelligence_audit_log')
+    .select('id')
+    .eq('event_type', 'L5.predictive.refresh')
+    .eq('algorithm_version', L5_ALGORITHM_VERSION)
+    .eq('input_snapshot->>student_id', studentId)
+    .eq('input_snapshot->>pathway_slug', pathwaySlug)
+    .limit(1);
+  if (dedupRes.error !== null) {
+    return err(500, 'INTERNAL_ERROR', `L5 dedup lookup failed: ${dedupRes.error.message}`);
+  }
+  if (((dedupRes.data ?? []) as unknown[]).length > 0) {
+    return ok<PredictiveRefreshResult>({ already_processed: true });
+  }
+
+  // 1. Load user_profile for year_level → retention half-life.
+  const profileRes = await db
+    .from('user_profile')
+    .select('id, year_level')
+    .eq('id', studentId)
+    .maybeSingle();
+  if (profileRes.error !== null) return err(500, 'INTERNAL_ERROR', profileRes.error.message);
+  if (profileRes.data === null) return err(404, 'NOT_FOUND', `Student '${studentId}' not found`);
+  const profile = profileRes.data as { id: string; year_level: string | null };
+  const yearLevelNum = profile.year_level !== null
+    ? parseInt(profile.year_level.replace(/\D/g, ''), 10)
+    : 0;
+  const halfLifeDays = retentionHalfLifeDays(Number.isNaN(yearLevelNum) ? 0 : yearLevelNum);
+
+  // 2. Load pathway.
+  const pathwayRes = await db
+    .from('pathway')
+    .select('id, slug, framework_config_id')
+    .eq('slug', pathwaySlug)
+    .maybeSingle();
+  if (pathwayRes.error !== null) return err(500, 'INTERNAL_ERROR', pathwayRes.error.message);
+  if (pathwayRes.data === null) return err(404, 'NOT_FOUND', `Pathway '${pathwaySlug}' not found`);
+  const pathway = pathwayRes.data as { id: string; slug: string; framework_config_id: string };
+
+  // 3. Load framework_config (blueprint strands + scoring_rules).
+  const frameworkRes = await db
+    .from('framework_config')
+    .select('id, blueprint, scoring_rules')
+    .eq('id', pathway.framework_config_id)
+    .maybeSingle();
+  if (frameworkRes.error !== null) return err(500, 'INTERNAL_ERROR', frameworkRes.error.message);
+  if (frameworkRes.data === null) {
+    return err(500, 'INTERNAL_ERROR', `framework_config '${pathway.framework_config_id}' not found`);
+  }
+  const frameworkConfig = frameworkRes.data as {
+    id: string;
+    blueprint: L5Blueprint;
+    scoring_rules: L5ScoringRules;
+  };
+  const blueprint = frameworkConfig.blueprint;
+  const targetThreshold =
+    (frameworkConfig.scoring_rules.target_threshold as number | undefined) ??
+    L5_TARGET_THRESHOLD_DEFAULT;
+  const blueprintWeightBySlug = new Map(blueprint.strands.map(s => [s.slug, s.weight]));
+
+  // 4. Load pathway leaf skills (level='skill', filtered by exam family client-side).
+  // Exam family is extracted from pathway slug prefix (v1: 'naplan', 'icas').
+  const examFamily = pathwaySlug.split('-')[0] ?? '';
+  const allSkillsRes = await db
+    .from('skill_node')
+    .select('id, slug, parent_id, pathway_tags')
+    .eq('level', 'skill');
+  if (allSkillsRes.error !== null) return err(500, 'INTERNAL_ERROR', allSkillsRes.error.message);
+  const allSkills = (allSkillsRes.data ?? []) as Array<{
+    id: string;
+    slug: string;
+    parent_id: string;
+    pathway_tags: string[];
+  }>;
+  const pathwaySkills =
+    examFamily !== ''
+      ? allSkills.filter(s => s.pathway_tags.includes(examFamily))
+      : allSkills;
+  const skillIds = pathwaySkills.map(s => s.id).sort();
+
+  if (skillIds.length === 0) {
+    return err(404, 'NOT_FOUND', `No skills found for pathway '${pathwaySlug}'`);
+  }
+
+  // 5. Load skill_mastery for student × pathway skills.
+  const masteryRes = await db
+    .from('skill_mastery')
+    .select('skill_id, mastery_level, total_attempts, last_attempted_at')
+    .eq('student_id', studentId)
+    .in('skill_id', skillIds);
+  if (masteryRes.error !== null) return err(500, 'INTERNAL_ERROR', masteryRes.error.message);
+  const masteryRows = (masteryRes.data ?? []) as Array<{
+    skill_id: string;
+    mastery_level: number;
+    total_attempts: number;
+    last_attempted_at: string | null;
+  }>;
+
+  // 6. Load strand nodes (for blueprint weight mapping via parent_id).
+  const strandIds = [...new Set(pathwaySkills.map(s => s.parent_id))].sort();
+  const strandRes = await db
+    .from('skill_node')
+    .select('id, slug')
+    .in('id', strandIds);
+  if (strandRes.error !== null) return err(500, 'INTERNAL_ERROR', strandRes.error.message);
+  const strandRows = (strandRes.data ?? []) as Array<{ id: string; slug: string }>;
+  const strandById = new Map(strandRows.map(s => [s.id, s.slug]));
+
+  // 7. Load learning_velocity for student × pathway skills.
+  const velocityRes = await db
+    .from('learning_velocity')
+    .select('skill_id, velocity')
+    .eq('student_id', studentId)
+    .in('skill_id', skillIds);
+  if (velocityRes.error !== null) return err(500, 'INTERNAL_ERROR', velocityRes.error.message);
+  const velocityRows = (velocityRes.data ?? []) as Array<{ skill_id: string; velocity: number }>;
+  const velocityMap = new Map(velocityRows.map(v => [v.skill_id, v.velocity]));
+
+  // 8. Build mastery map + §12.4 data-threshold guard.
+  const masteryRowMap = new Map(masteryRows.map(r => [r.skill_id, r]));
+  const totalAttempts = masteryRows.reduce((s, r) => s + r.total_attempts, 0);
+  const attemptDates = masteryRows
+    .filter(r => r.last_attempted_at !== null)
+    .map(r => new Date(r.last_attempted_at!).getTime());
+  const nowMs = new Date(eff.now()).getTime();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const oldestAttemptMs = attemptDates.length > 0 ? Math.min(...attemptDates) : nowMs;
+  const sufficientData = totalAttempts >= 5 && nowMs - oldestAttemptMs >= sevenDaysMs;
+
+  const nowIso = eff.now();
+  const nowDate = new Date(nowIso);
+  nowDate.setMinutes(0, 0, 0);
+  const timeBucket = nowDate.toISOString();
+
+  if (!sufficientData) {
+    const insufficientPayload: PredictiveRefreshPayload = { status: 'insufficient_data' };
+    // ISSUE-0015: category mismatch accepted; v1.1 migrates to dedicated student_prediction_cache table
+    await db.from('cohort_metric_cache').upsert(
+      {
+        cohort_key: studentId,
+        metric_key: `readiness:${pathwaySlug}`,
+        time_bucket: timeBucket,
+        tenant_id: tenantId,
+        value: insufficientPayload,
+        computed_at: nowIso,
+      },
+      { onConflict: 'cohort_key,metric_key,time_bucket,tenant_id' },
+    );
+    await db.from('intelligence_audit_log').insert({
+      student_id: studentId,
+      tenant_id: tenantId,
+      event_type: 'L5.predictive.refresh',
+      layer: 'predictive',
+      algorithm_version: L5_ALGORITHM_VERSION,
+      trace_id: traceId,
+      input_snapshot: JSON.parse(
+        canonicalize({ student_id: studentId, pathway_slug: pathwaySlug, skill_count: skillIds.length, data_points: totalAttempts }),
+      ),
+      output: JSON.parse(canonicalize({ status: 'insufficient_data', processing_time_ms: Math.round(eff.perfNow() - t0) })),
+    });
+    return ok<PredictiveRefreshResult>(insufficientPayload);
+  }
+
+  // 9. Compute current_readiness_score (§10.3 strand-weighted sum).
+  // Skills grouped by strand; avg mastery per strand; weighted by blueprint weight.
+  // Sorted strandId ASC for replay determinism (ADR-0027).
+  const strandMastery = new Map<string, number[]>();
+  for (const skill of [...pathwaySkills].sort((a, b) => a.id.localeCompare(b.id))) {
+    const mastery = masteryRowMap.get(skill.id)?.mastery_level ?? 0;
+    const levels = strandMastery.get(skill.parent_id) ?? [];
+    levels.push(mastery);
+    strandMastery.set(skill.parent_id, levels);
+  }
+  const currentReadinessScore = computeStrandWeightedScore(strandMastery, strandById, blueprintWeightBySlug);
+
+  // 10. Projected readiness (§12.1) — only when exam_date provided.
+  let projectedReadiness: number | null = null;
+  let onTrack: boolean | null = null;
+
+  if (examDate !== null && examDate !== undefined && examDate !== '') {
+    const examDateMs = new Date(examDate).getTime();
+    const daysRemaining = Math.max(0, (examDateMs - nowMs) / (24 * 60 * 60 * 1000));
+
+    const strandProjected = new Map<string, number[]>();
+    for (const skill of [...pathwaySkills].sort((a, b) => a.id.localeCompare(b.id))) {
+      const mastery = masteryRowMap.get(skill.id)?.mastery_level ?? 0;
+      const velocity = velocityMap.get(skill.id) ?? 0;
+      let projected = Math.min(1.0, mastery + velocity * daysRemaining);
+      projected *= Math.exp(-0.693 * daysRemaining / halfLifeDays);
+      const arr = strandProjected.get(skill.parent_id) ?? [];
+      arr.push(projected);
+      strandProjected.set(skill.parent_id, arr);
+    }
+    projectedReadiness = computeStrandWeightedScore(strandProjected, strandById, blueprintWeightBySlug);
+    onTrack = projectedReadiness >= targetThreshold;
+  }
+
+  // 11. Gap skills (§12.3) — sorted skill_id ASC for replay determinism.
+  const gapSkills: PredictiveSkillGap[] = [];
+  for (const skill of [...pathwaySkills].sort((a, b) => a.id.localeCompare(b.id))) {
+    const mastery = masteryRowMap.get(skill.id)?.mastery_level ?? 0;
+    if (mastery < L5_SKILL_THRESHOLD) {
+      const velocity = velocityMap.get(skill.id) ?? 0;
+      const daysNeeded = predictMasteryDateDays(mastery, velocity, L5_SKILL_THRESHOLD);
+      const estimatedMasteryDate =
+        daysNeeded !== null
+          ? new Date(nowMs + daysNeeded * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? null
+          : null;
+      gapSkills.push({ skill_id: skill.id, mastery_level: mastery, velocity, estimated_mastery_date: estimatedMasteryDate });
+    }
+  }
+
+  // 12. UPSERT cohort_metric_cache.
+  // ISSUE-0015: category mismatch accepted; v1.1 migrates to dedicated student_prediction_cache table
+  const payload: PredictiveRefreshPayload = {
+    status: 'fresh',
+    current_readiness_score: currentReadinessScore,
+    projected_readiness: projectedReadiness,
+    on_track: onTrack,
+    gap_skills: gapSkills,
+    data_points: totalAttempts,
+    computed_at: nowIso,
+  };
+  await db.from('cohort_metric_cache').upsert(
+    {
+      cohort_key: studentId,
+      metric_key: `readiness:${pathwaySlug}`,
+      time_bucket: timeBucket,
+      tenant_id: tenantId,
+      value: payload,
+      computed_at: nowIso,
+    },
+    { onConflict: 'cohort_key,metric_key,time_bucket,tenant_id' },
+  );
+
+  // 13. INSERT intelligence_audit_log.
+  const processingTimeMs = Math.round(eff.perfNow() - t0);
+  await db.from('intelligence_audit_log').insert({
+    student_id: studentId,
+    tenant_id: tenantId,
+    event_type: 'L5.predictive.refresh',
+    layer: 'predictive',
+    algorithm_version: L5_ALGORITHM_VERSION,
+    trace_id: traceId,
+    input_snapshot: JSON.parse(
+      canonicalize({ student_id: studentId, pathway_slug: pathwaySlug, skill_count: skillIds.length, data_points: totalAttempts }),
+    ),
+    output: JSON.parse(canonicalize({ current_readiness_score: currentReadinessScore, gap_skill_count: gapSkills.length, processing_time_ms: processingTimeMs })),
+  });
+
+  return ok<PredictiveRefreshResult>(payload);
+}
+
+/**
+ * Caller identity passed to getPredictions for role-gated access control.
+ * null = service-role caller (bypasses all checks).
+ * Role 'teacher' / 'admin' / 'platform_admin' can read any student's predictions.
+ * All other roles (student, parent) may only read their own (userId === studentId).
+ */
+export type PredictionsCallerContext = { userId: string; role: string } | null;
+
+/**
+ * GET /intelligence/predictions — reads cohort_metric_cache and returns
+ * fresh / stale / no_data envelope per spec constraints §1h TTL.
+ *
+ * Auth (arch §6.3): service-role → bypass; teacher/admin → any student;
+ * student/parent → own predictions only (userId must match studentId).
+ */
+export async function getPredictions(
+  studentId: string,
+  pathwaySlug: string,
+  db: DbClient,
+  caller: PredictionsCallerContext,
+  effects?: Partial<Effects>,
+): Promise<HandlerResult<GetPredictionsResponse>> {
+  const eff = { ...DEFAULT_EFFECTS, ...effects };
+
+  // Role gate — null caller = service-role bypass.
+  if (caller !== null) {
+    const canReadAny =
+      caller.role === 'teacher' ||
+      caller.role === 'admin' ||
+      caller.role === 'platform_admin';
+    if (!canReadAny && caller.userId !== studentId) {
+      return err(403, 'FORBIDDEN', 'Students may only read their own predictions');
+    }
+  }
+
+  const cacheRes = await db
+    .from('cohort_metric_cache')
+    .select('value, computed_at')
+    .eq('cohort_key', studentId)
+    .eq('metric_key', `readiness:${pathwaySlug}`)
+    .order('computed_at', { ascending: false })
+    .limit(1);
+
+  if (cacheRes.error !== null) {
+    return err(500, 'INTERNAL_ERROR', cacheRes.error.message);
+  }
+
+  const rows = (cacheRes.data ?? []) as Array<{ value: unknown; computed_at: string }>;
+  if (rows.length === 0) {
+    return ok<GetPredictionsResponse>({ status: 'no_data', stale_since: null, payload: null });
+  }
+
+  const row = rows[0]!;
+  const nowMs = new Date(eff.now()).getTime();
+  const computedAtMs = new Date(row.computed_at).getTime();
+  const oneHourMs = 60 * 60 * 1000;
+  const isFresh = computedAtMs > nowMs - oneHourMs;
+
+  if (isFresh) {
+    return ok<GetPredictionsResponse>({ status: 'fresh', stale_since: null, payload: row.value });
+  }
+  return ok<GetPredictionsResponse>({ status: 'stale', stale_since: row.computed_at, payload: row.value });
+}
+
+// ─── L5 pure helpers ─────────────────────────────────────────────────────────
+
+function computeStrandWeightedScore(
+  strandLevels: Map<string, number[]>,
+  strandById: Map<string, string>,
+  blueprintWeightBySlug: Map<string, number>,
+): number {
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (const strandId of [...strandLevels.keys()].sort()) {
+    const levels = strandLevels.get(strandId)!;
+    const strandSlug = strandById.get(strandId);
+    const weight = strandSlug !== undefined ? (blueprintWeightBySlug.get(strandSlug) ?? 0) : 0;
+    const avgMastery = levels.reduce((s, m) => s + m, 0) / levels.length;
+    weightedSum += avgMastery * weight;
+    totalWeight += weight;
+  }
+  return totalWeight > 0 ? weightedSum / totalWeight : 0;
+}
+
+function predictMasteryDateDays(
+  current: number,
+  velocity: number,
+  target: number,
+): number | null {
+  if (velocity <= 0) return null;
+  const rawDays = (target - current) / velocity;
+  const adjusted = rawDays * (1 + 0.5 * current);
+  if (adjusted > L5_MASTERY_DATE_CAP_DAYS) {
+    console.warn(
+      JSON.stringify({ level: 'warn', event: 'mastery_date_capped', adjusted_days: adjusted, capped_at: L5_MASTERY_DATE_CAP_DAYS }),
+    );
+    return L5_MASTERY_DATE_CAP_DAYS;
+  }
+  return Math.ceil(adjusted);
 }
