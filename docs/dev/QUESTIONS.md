@@ -9,6 +9,43 @@
 
 ## Resolved
 
+### Q-29.3 — retention_half_life source for spec §12.2 pessimistic forecast
+
+- Date raised: 2026-05-19 (Stage 29 prep)
+- Asked of: self
+- Source: Spec §12.2 `forecast_mastery(student, skill, target_date)` — uses `retention_half_life(student, skill)`. No such column or computed field exists in the DB schema. `behaviour_profile` carries engagement signals but not a derived half-life.
+- Question: (i) Fixed lookup by year_level in a constants file (replay-stable, no behaviour_profile noise); (ii) derive from `behaviour_profile` fields (`avg_time_on_task_ms`, `avg_guess_rate`); (iii) hardcode a single default (e.g. 60 days for all students).
+- Why ambiguous: Spec references a function without a schema counterpart; deriving from behaviour_profile is feasible in v1.1 when more session data exists.
+- Blocking? no
+- Assumed answer (if proceeding): Option (i).
+- Code affected: `packages/engines/src/constants/retention.ts` (new), `supabase/functions/intelligence-svc/handlers.ts`.
+- Status: resolved
+- Resolution (2026-05-19): **Option (i)**. `HALF_LIFE_DAYS_BY_YEAR_LEVEL` constant in `packages/engines/src/constants/retention.ts`: `{ y5: 60, y7: 90, y9: 120, default: 90 }`. Year level sourced from `user_profile.year_level` (already read by intelligence-svc). Replay-stable; v1.1 may replace with a derived value once more session data accumulates.
+
+### Q-29.2 — exam_date source for §12.1 projection branch
+
+- Date raised: 2026-05-19 (Stage 29 prep)
+- Asked of: product owner
+- Source: Spec §12.1 `predict_exam_readiness(student, pathway, exam_date)` uses `exam_date` as projection horizon. Spec mentions `user_profile.exam_date: date | null` (spec line 3054). No migration has this column.
+- Question: (A) Add `exam_date date` to `user_profile` via new migration; (B) accept `exam_date` as an optional payload field on the predictive-refresh job (null → skip projection branch, return `projected_readiness: null`); (C) hardcode exam window per `framework_config` exam family.
+- Why ambiguous: Spec requires the column; no migration has it; adding it is out of scope for the 1-day budget.
+- Blocking? yes
+- Code affected: `supabase/functions/intelligence-svc/handlers.ts`, `supabase/migrations/` (new migration if A).
+- Status: resolved
+- Resolution (2026-05-19): **Option B**. `exam_date?: string | null` on the predictive-refresh job payload. When null, `projected_readiness` and `on_track` return as null; `current_readiness_score`, per-skill mastery, gap skills, and mastery timelines still computed. `user_profile.exam_date` deferred to v1.1. Filed as ISSUE-0014 + DEV-20260519-1.
+
+### Q-29.1 — pipeline.predictive_refresh target service
+
+- Date raised: 2026-05-19 (Stage 29 prep)
+- Asked of: product owner
+- Source: DEV_PLAN Stage 29 deliverables (`/intelligence/predictions/{student_id}/{pathway_slug}`); arch §4.5 (intelligence-svc owns the predictions endpoint); ADR-0031 routing table (speculative: `pipeline.l5.*` → `analytics-svc`, Stage 32+); arch ownership table (`analytics-svc` owns `cohort_metric_cache`).
+- Question: Does `pipeline.predictive_refresh` handler live in `intelligence-svc` (where arch §4.5 places the GET endpoint) or `analytics-svc` (ADR-0031 speculative L5 target)? `analytics-svc` does not exist yet; 1-day budget.
+- Why ambiguous: ADR-0031's routing table was speculative for Stage 32+; it conflicts with arch §4.5 and the 1-day budget constraint.
+- Blocking? yes
+- Code affected: `supabase/functions/intelligence-svc/handlers.ts`, `supabase/functions/jobs-worker/index.ts`.
+- Status: resolved
+- Resolution (2026-05-19): **intelligence-svc**. Arch §4.5 is authoritative: `GET /intelligence/predictions/...` lives on intelligence-svc; the pipeline handler belongs there too. ADR-0031 speculative `pipeline.l5.* → analytics-svc` entry removed and replaced with concrete `pipeline.predictive_refresh → intelligence-svc` entry. ADR-0031 amended (Stage 29 note added).
+
 ### Q-28.8 — SkillGraphCache.adjacency lacks strength / dependency_class metadata for spec-required edge filters
 
 - Date raised: 2026-05-18 (Stage 28)

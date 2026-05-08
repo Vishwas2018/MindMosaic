@@ -1,6 +1,7 @@
 # ADR-0031 — Jobs-worker / domain-service boundary
 
 - Status: accepted
+- Amended: 2026-05-19 (Stage 29) — `pipeline.predictive_refresh` route added; speculative `pipeline.l5.*` → `analytics-svc` entry removed.
 - Date: 2026-05-18
 - Stage: 28
 - Tags: backend | architecture | async-pipeline
@@ -59,7 +60,7 @@ Each `job_type` maps to an owning service URL:
 | job_type | Owning service | HTTP path |
 | -------- | -------------- | --------- |
 | `pipeline.causal.evaluate_full` | `intelligence-svc` | `POST /intelligence/pipeline/causal-full` |
-| `pipeline.l5.*` (Stage 32+) | `analytics-svc` | TBD |
+| `pipeline.predictive_refresh` | `intelligence-svc` | `POST /intelligence/pipeline/predictive-refresh` |
 | `pipeline.l7.*` / `pipeline.l9.*` (Stage 36+) | `orchestration-svc` | TBD |
 
 HTTP call uses `SUPABASE_SERVICE_ROLE_KEY` (`x-mm-service-role` header) and propagates
@@ -94,7 +95,9 @@ the domain-service handler.
   retries or silent drops.
 - Follow-ups: Stage 32+ jobs must document `job_type → service URL` mapping in
   OWNERS.md. Intelligence-svc must expose `POST /intelligence/pipeline/causal-full`
-  as a service-role-only endpoint (no student JWT path).
+  as a service-role-only endpoint (no student JWT path). Future service splits
+  (dedicated `analytics-svc` for analytics/L6 + `orchestration-svc` for L7/L9)
+  deferred to when those services are designed; route map updated when they land.
 
 ## Implementation notes
 
@@ -105,3 +108,7 @@ Files: `supabase/functions/jobs-worker/index.ts`,
 `supabase/migrations/` (job_queue schema additions per Q-28.3/Q-28.4),
 `supabase/functions/jobs-worker/__tests__/contract.test.ts` ·
 Related: ADR-0017, ADR-0018, ADR-0027, ADR-0028, ISSUE-0006
+
+Amended 2026-05-19 (Stage 29): `pipeline.predictive_refresh →
+intelligence-svc /intelligence/pipeline/predictive-refresh` route
+added to jobs-worker route map. Q-29.1 resolved.

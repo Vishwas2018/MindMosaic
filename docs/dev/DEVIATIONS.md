@@ -3,6 +3,18 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260519-1 — Spec §12.1 predict_exam_readiness: exam_date column deferred
+
+- Date: 2026-05-19
+- Stage: 29
+- Type: scope-reduction (v1.1 deferral)
+- What the stage said: Implement spec §12.1 `predict_exam_readiness(student, pathway, exam_date)` fully, including the `days_remaining` projection branch that requires `exam_date`.
+- What I actually did: `exam_date` accepted as an optional payload field (`exam_date?: string | null`). When null, `projected_readiness` and `on_track` are returned as null; `current_readiness_score`, per-skill mastery levels, gap skills, and mastery timelines are still computed. `user_profile.exam_date` column not added to migration.
+- Why: No migration has `exam_date` on `user_profile`. Adding it requires a new migration and a teacher/student UI ingress path that is out of scope for the 1-day Stage 29 budget. Q-29.2 Resolution: Option B (optional payload field).
+- Impact on later stages: ISSUE-0014 filed to track the full implementation. Stage 32+ (intelligence endpoints round-out) or a dedicated UI stage must add the column and wire the ingress. Spec amendment deferred post-launch.
+- Linked: Q-29.2, ISSUE-0014
+- Resolved by: v1.1 (when exam_date ingress ships)
+
 ### DEV-20260515-1 — Stage 25 route target: DEV_PLAN says `(student)/page.tsx`; actual implementation at `(student)/dashboard/page.tsx`
 <!-- Resolved 2026-05-15, Stage 25, commit 975e815: dashboard/page.tsx implemented at the correct path; self-resolving. -->
 

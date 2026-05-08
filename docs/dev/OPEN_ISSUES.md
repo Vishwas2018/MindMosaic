@@ -190,6 +190,30 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 # Returns: zero hits in source (only references in node_modules).
 ```
 
+### ISSUE-0014 — exam_date column on user_profile missing; §12.1 projection branch incomplete
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-19 (Stage 29)
+- Area: backend (intelligence-svc, migration) + frontend (teacher/student UI)
+- Tags: predictive · dto-discipline · v1.1
+
+**Summary.** Spec §12.1 `predict_exam_readiness(student, pathway, exam_date)` requires `exam_date` as a projection horizon. No migration adds this column to `user_profile`. Stage 29 implements the projection branch conditionally: when `exam_date` is null (the default for v1 launch), `projected_readiness` and `on_track` are returned as null; all other predictive outputs (`current_readiness_score`, per-skill mastery levels, gap skills, mastery timelines) are computed.
+
+**Recommended fix (v1.1).** (1) Migration 0015: `ALTER TABLE user_profile ADD COLUMN exam_date date;`. (2) Build teacher/student UI to set exam date per pathway. (3) Wire payload from `user_profile.exam_date` in the predictive-refresh job creation path. (4) Restore the `projected_readiness` + `on_track` computation in `processPredictiveRefresh`. Linked: DEV-20260519-1, Q-29.2.
+
+### ISSUE-0015 — cohort_metric_cache reused for per-student predictions (category mismatch)
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-19 (Stage 29)
+- Area: backend (intelligence-svc, analytics-svc)
+- Tags: architecture · v1.1
+
+**Summary.** Stage 29 stores per-student readiness predictions in `cohort_metric_cache` per DEV_PLAN directive (`cohort_key = student_id::text`). The table is semantically a cohort analytics aggregate read-model owned by `analytics-svc` per the arch ownership table; its RLS grants teacher/org_admin/platform_admin access only — no student SELECT. Intelligence-svc bypasses RLS via service-role, so the functional v1 path is correct. However, accumulated per-student rows will grow unboundedly and won't be pruned by any analytics sweeper. Cache write site is marked `// ISSUE-0015` for grep-ability.
+
+**Recommended fix (v1.1).** Introduce `student_prediction_cache (student_id, pathway_slug, tenant_id, value jsonb, computed_at timestamptz, PRIMARY KEY (student_id, pathway_slug))` with appropriate RLS (student SELECT own rows; teacher/admin SELECT any). Migrate Stage 29 prediction writes to this table. Add a sweeper cron to prune rows older than 7 days.
+
 
 ## Resolved
 
