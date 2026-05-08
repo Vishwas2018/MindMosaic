@@ -3,6 +3,18 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260523-1 — Arch §4.8 Idempotency-Key not enforced server-side in v1 assignments-svc
+
+- Date: 2026-05-23
+- Stage: 33
+- Type: scope-reduction
+- What the stage said: Arch §4.8 specifies Idempotency-Key on `POST /assignments` (Teacher) and `POST /assignments/{id}/start` (Student). Expected: server-side dedup via `api_idempotency_key` table or equivalent.
+- What I actually did: v1 ships header accepted (parsed + logged at handler entry site) but no dedup storage or replay detection. Inline comment at parse site: `// DEV-20260523-1 + ISSUE-0023: Idempotency-Key parsed but not enforced in v1.`
+- Why: v1 has no teacher concurrency pressure; duplicate-create risk theoretical. Implementing idempotency storage requires resolving whether to (A) reuse `api_idempotency_key` (owned by assessment-svc per arch §1.2 — cross-service ownership question) or (B) add `idempotency_key` column to `assignment` + `assignment_session` tables (new migration). Budget protection for 2-day Stage 33. Q-33.7 Option C resolution.
+- Impact on later stages: Assignment POSTs will double-insert on retried requests until ISSUE-0023 is resolved in v1.1. Risk low in v1 (no parallel creation UX; single-user assignment creation has no retry pressure).
+- Linked: ISSUE-0023, Q-33.7
+- Resolved by: v1.1 (ISSUE-0023)
+
 ### DEV-20260522-2 — Saved C-C-D-V specified POST /analytics/generate-assignment after service-role gate; shipped before
 
 - Date: 2026-05-22

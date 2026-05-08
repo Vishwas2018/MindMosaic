@@ -9,6 +9,97 @@
 
 ## Resolved
 
+### Q-33.7 — POST /assignments Idempotency-Key: enforce server-side or accept and log only?
+
+- Date raised: 2026-05-23 (Stage 33 prep)
+- Asked of: self
+- Source: Arch §4.8 — POST /assignments (Teacher, Idempotency-Key) + POST /assignments/{id}/start (Student, Idempotency-Key)
+- Question: (A) Enforce via shared `api_idempotency_key` table; (B) add `idempotency_key` column to assignment + assignment_session tables; (C) accept and log header but no server-side dedup in v1.
+- Why ambiguous: Option A requires cross-service ownership check (api_idempotency_key owned by assessment-svc per arch §1.2). Option B requires a new migration column. Both add scope to a 2-day stage. v1 has no concurrent teacher creation UX.
+- Blocking? yes (T3 round-trip — auth model + scope)
+- Assumed answer (if proceeding): **Option C** — header parsed and logged only; no dedup in v1.
+- Code affected: `supabase/functions/assignments-svc/handlers.ts` (parse site for createAssignment + startAssignment)
+- Status: resolved
+- Resolution (2026-05-23): **Option C**. Inline comment `// DEV-20260523-1 + ISSUE-0023: Idempotency-Key parsed but not enforced in v1.` DEV-20260523-1 filed. ISSUE-0023 (medium, v1.1) tracking enforcement choice.
+
+### Q-33.6 — POST /assignments/{id}/archive: allowed from which source statuses?
+
+- Date raised: 2026-05-23 (Stage 33 prep)
+- Asked of: self
+- Source: Arch §4.8 — POST /assignments/{id}/archive (Teacher, Archive). Spec §24.1 defines status enum: draft | published | archived. No explicit transition rules for archive source states.
+- Question: (A) Only from 'published'; (B) from 'draft' or 'published' (soft-delete semantics); (C) from any status.
+- Why ambiguous: Spec §24 defines assignment_session transitions explicitly but not assignment status transitions other than draft → published.
+- Blocking? no (T3 self-resolve permitted — filter inclusivity)
+- Assumed answer (if proceeding): **Option B** — archive from 'draft' or 'published'. Already 'archived' → 422 UNPROCESSABLE.
+- Code affected: `supabase/functions/assignments-svc/handlers.ts` (archiveAssignment)
+- Status: resolved
+- Resolution (2026-05-23): **Option B**. Consistent with soft-delete semantics. Inline guard: `if (assignment.status === 'archived') → 422 UNPROCESSABLE`.
+
+### Q-33.5 — PATCH /assignments/{id} pre-publish guard: which error code?
+
+- Date raised: 2026-05-23 (Stage 33 prep)
+- Asked of: self
+- Source: Arch §4.8 — PATCH /assignments/{id} "Teacher (creator), Update (pre-publish)". Arch §1.5 error vocabulary.
+- Question: (A) 409 SESSION_CONFLICT when assignment.status !== 'draft'; (B) 422 UNPROCESSABLE; (C) 403 FORBIDDEN.
+- Why ambiguous: "pre-publish" constraint is semantic (wrong state), not a concurrency conflict or role failure.
+- Blocking? no (T3 self-resolve permitted — error code selection)
+- Assumed answer (if proceeding): **Option B** — 422 UNPROCESSABLE (`"Semantically invalid"` per arch §1.5).
+- Code affected: `supabase/functions/assignments-svc/handlers.ts` (updateAssignment)
+- Status: resolved
+- Resolution (2026-05-23): **Option B**. 422 UNPROCESSABLE with code `UNPROCESSABLE` and message `"Assignment is not in draft status"`.
+
+### Q-33.4 — GET /assignments/for-student: cross-student access rules?
+
+- Date raised: 2026-05-23 (Stage 33 prep)
+- Asked of: self
+- Source: Arch §4.8 — GET /assignments/for-student/{student_id}?status= (Role-gated). Spec §24.8 roles table.
+- Question: (A) student reads own only; non-teacher with mismatched student_id → 403; (B) parent reads linked child; teacher reads own-class students; admin reads any.
+- Why ambiguous: "Role-gated" in arch §4.8 is underspecified; spec §24.8 provides the full permission matrix.
+- Blocking? no (T3 self-resolve permitted — role gating detail)
+- Assumed answer (if proceeding): **Option B** — full spec §24.8 matrix: student → own only; teacher → any in own classes; parent → linked children; org_admin + platform_admin → any in tenant.
+- Code affected: `supabase/functions/assignments-svc/handlers.ts` (getAssignmentsForStudent)
+- Status: resolved
+- Resolution (2026-05-23): **Option B**. Cross-student read by student or parent (non-linked child) → 403 FORBIDDEN. Consistent with intelligence-svc `checkStudentAccess` pattern.
+
+### Q-33.3 — `in_progress → completed` trigger: how does assignments-svc learn a linked session was processed?
+
+- Date raised: 2026-05-23 (Stage 33 morning ritual pre-read)
+- Asked of: self + operator
+- Source: Spec §24.3 state transition: "`in_progress → completed`: linked session reaches `processed` state". assignments-svc does not own session_record (arch §1.2 ASN).
+- Question: (A) Outbox-driven: intelligence-svc writes `outbox_event(assignment_session_completed)` → jobs-worker dispatches to new assignments-svc pipeline endpoint; (B) Polling pg_cron every 5 min joining assignment_session to session_record WHERE processed; (C) Deferred to v1.1; (D) Read-time join in GET /assignments/{id}/tracking — no background update.
+- Why ambiguous: Spec §24.3 specifies the trigger ("session reaches processed state") but not the mechanism. Option A is real-time but requires jobs-worker + ADR-0031 amendment. Option B is simple but has 5-min latency. Neither is specified by arch.
+- Blocking? yes (T3 round-trip — deliverable scope + schema)
+- Assumed answer (if proceeding): **Option B** — pg_cron polling every 5 minutes, batched in migration 0015 with Q-33.2's fn_mark_overdue_assignments(). ISSUE-0024 (low) filed for v1.1 outbox upgrade.
+- Code affected: `supabase/migrations/0015_assignment_cron_functions.sql` (fn_sync_assignment_completion())
+- Status: resolved
+- Resolution (2026-05-23): **Option B**. cron.schedule('assignments.sync_completion', '*/5 * * * *', 'SELECT fn_sync_assignment_completion()'). ISSUE-0024 filed for outbox-driven upgrade path.
+
+### Q-33.2 — `assignments.mark_overdue` cron: pg_cron in new migration vs Deno.cron vs jobs-worker?
+
+- Date raised: 2026-05-23 (Stage 33 morning ritual pre-read)
+- Asked of: self + operator
+- Source: DEV_PLAN Stage 33 deliverables — "daily cron assignments.mark_overdue transitions past-due to overdue". Arch §5.5 cron table does NOT list this cron. Migration 0008_cron.sql pattern.
+- Question: (A) pg_cron function in new migration 0015; (B) Deno.cron inside assignments-svc; (C) jobs-worker job_type pipeline.assignments.mark_overdue.
+- Why ambiguous: Arch §5.5 omits this cron; DEV_PLAN names it but not the mechanism. Three valid implementations.
+- Blocking? yes (T3 round-trip — schema: new migration required for Option A)
+- Assumed answer (if proceeding): **Option A** — new migration 0015_assignment_cron_functions.sql. Consistent with 0008 pattern (LANGUAGE sql VOLATILE, no SECURITY DEFINER); no jobs-worker changes.
+- Code affected: `supabase/migrations/0015_assignment_cron_functions.sql` (new)
+- Status: resolved
+- Resolution (2026-05-23): **Option A**. fn_mark_overdue_assignments() in migration 0015. cron.schedule('assignments.mark_overdue', '0 1 * * *', 'SELECT fn_mark_overdue_assignments()'). Spec §24.3 condition: due_at + 24h < now() AND status IN ('pending', 'in_progress').
+
+### Q-33.1 — POST /assignments/{id}/start delegation: how does assignments-svc create session_record (owned by assessment-svc)?
+
+- Date raised: 2026-05-23 (Stage 33 morning ritual pre-read)
+- Asked of: self + operator
+- Source: DEV_PLAN Stage 33 — "POST /assignments/{id}/start creates session with assignment_id populated (delegates to assessment-svc)". Arch §1.2: ASN (assessment-svc) owns session_record. assessment-svc POST /sessions/create requires Bearer JWT (no service-role bypass). CreateSessionRequest.assignment_id exists (packages/types/src/session.ts line 20).
+- Question: (A) Forward student Bearer JWT from assignments-svc to assessment-svc POST /sessions/create with assignment_id in body; (B) add service-role bypass to assessment-svc POST /sessions/create; (C) write session_record directly with service_role (violates arch §1.2).
+- Why ambiguous: assessment-svc's session creation is JWT-gated; assignments-svc must create a session without bypassing the ownership boundary.
+- Blocking? yes (T3 round-trip — auth model)
+- Assumed answer (if proceeding): **Option A** — forward student Authorization header + assignment_id in body. No assessment-svc changes. Requires ASSESSMENT_SVC_URL env var in assignments-svc.
+- Code affected: `supabase/functions/assignments-svc/handlers.ts` (startAssignment), `supabase/functions/assignments-svc/index.ts` (ASSESSMENT_SVC_URL)
+- Status: resolved
+- Resolution (2026-05-23): **Option A**. assignments-svc's startAssignment handler receives the student's Authorization header, passes it through to `fetch(ASSESSMENT_SVC_URL + '/sessions/create', { method: 'POST', headers: { Authorization, 'Idempotency-Key': ..., 'x-mm-trace-id': traceId }, body: JSON.stringify({ ... assignment_id }) })`. ASSESSMENT_SVC_URL documented in ISSUE-0018 (extended).
+
 ### Q-32.7 — getExplanation: return 403 or 404 when caller lacks access to another student's decision?
 
 - Date raised: 2026-05-22 (Stage 32)

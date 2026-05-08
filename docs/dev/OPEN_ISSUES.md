@@ -5,6 +5,39 @@
 
 ## Open
 
+### ISSUE-0024 — Real-time assignment tracking: v1 uses polling cron (5-min latency)
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-23 (Stage 33 prep, Q-33.3 resolution)
+- Area: backend (assignments-svc)
+- Tags: assignments-svc · real-time · v1.1 · assignment-session
+
+**Summary.** `assignment_session.status` transitions from `in_progress` to `completed` via `fn_sync_assignment_completion()` — a pg_cron polling function that runs every 5 minutes (migration 0015). Teacher tracking views (`GET /assignments/{id}/tracking`) may show stale `in_progress` status for up to 5 minutes after a student completes a session. Acceptable for v1 (teacher checking tracking is not latency-sensitive).
+
+**Fix (v1.1).** Upgrade to outbox-driven: when intelligence-svc processes a session (pipeline `processed` state), write `outbox_event` with type `assignment_session_completed`; jobs-worker dispatches new `job_type = pipeline.assignment_session_completed` to `assignments-svc POST /assignments/pipeline/session-completed`; handler does immediate UPDATE on `assignment_session`. Requires ADR-0031 route table amendment + new pipeline endpoint in assignments-svc.
+
+**Tracking pointer.** Q-33.3 Option B resolution. Migration 0015: `fn_sync_assignment_completion()`.
+
+### ISSUE-0023 — Idempotency-Key enforcement on assignments-svc POST endpoints
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-23 (Stage 33 prep, Q-33.7 resolution)
+- Area: backend (assignments-svc)
+- Tags: assignments-svc · idempotency · v1.1 · arch-drift
+
+**Summary.** Arch §4.8 specifies Idempotency-Key on `POST /assignments` (teacher create) and `POST /assignments/{id}/start` (student start). v1 ships without server-side enforcement: the header is parsed and logged (with inline `// DEV-20260523-1 + ISSUE-0023` comment at parse site) but no dedup storage or replay detection is implemented. Duplicate-create risk is theoretical in v1 — no teacher concurrency UX exists; single-user assignment creation has no retry pressure. Q-33.7 Option C resolution.
+
+**Fix (v1.1).** Choose between:
+
+- Option A: Reuse shared `api_idempotency_key` table (owned by assessment-svc per arch §1.2) — requires verifying cross-service write permission and RLS shape.
+- Option B: Add `idempotency_key` column to `assignment` and `assignment_session` tables with UNIQUE constraint; enforce dedup at INSERT time in a new migration.
+
+**Recommended:** Option B (self-contained; no cross-service table ownership questions).
+
+**Tracking pointer.** DEV-20260523-1. Parse-and-log site: `supabase/functions/assignments-svc/handlers.ts` (createAssignment + startAssignment).
+
 ### ISSUE-0022 — GET /intelligence/audit-log pagination: v1 returns LIMIT 200 + truncated flag
 
 - Status: open
@@ -73,7 +106,9 @@
 
 **Pre-existing gap.** `INTELLIGENCE_SVC_URL` was already undocumented at Stage 28. `ANALYTICS_SVC_URL` surfaces it. `ORCHESTRATION_SVC_URL` added at Stage 31 (same pattern — falls back to `${SUPABASE_URL}/functions/v1/orchestration-svc` if not set, but the fallback is not documented anywhere for deployers).
 
-**Fix (post-Stage 31, v1 close or Stage 36).** Add env var table to `docs/dev/deployment.md` (create if absent) listing all Edge Function env vars with default resolution logic. Or add `.env.example` at repo root. Vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`. Refs: `supabase/functions/jobs-worker/index.ts`.
+**Stage 33 update (2026-05-23).** `ASSESSMENT_SVC_URL` added to assignments-svc (Q-33.1 Option A — `POST /assignments/{id}/start` forwards student JWT to assessment-svc). Now 4 undocumented service URL vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`, `ASSESSMENT_SVC_URL`. Pattern: each falls back to `${SUPABASE_URL}/functions/v1/<service-name>` if not set, but fallback logic is not documented anywhere for deployers.
+
+**Fix (v1 close or Stage 36).** Add env var table to `docs/dev/deployment.md` (create if absent) listing all Edge Function env vars with default resolution logic. Or add `.env.example` at repo root. Vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`, `ASSESSMENT_SVC_URL`. Refs: `supabase/functions/jobs-worker/index.ts`, `supabase/functions/assignments-svc/index.ts`.
 
 ### ISSUE-0013 — Evening ritual test count methodology (tail truncation drift)
 
