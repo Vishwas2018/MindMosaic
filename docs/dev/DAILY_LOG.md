@@ -2,6 +2,54 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 29 — 2026-05-19
+
+**Planned (from DEV_PLAN.md Stage 29):** L5 Predictive Intelligence — `pipeline.predictive_refresh` job handler, GET predictions endpoint (role-gated), retention decay constants, §12.4 data-threshold guard, strand-weighted readiness score, gap skill ranking. 1-day budget (Day 42).
+
+**Actually delivered:**
+
+- `packages/engines/src/constants/retention.ts` (new): `HALF_LIFE_DAYS_BY_YEAR_LEVEL` (`y5=60, y7=90, y9=120, default=90`) + `retentionHalfLifeDays()`. Exported from `@mm/engines` barrel. (commit e42492b)
+- `intelligence-svc/handlers.ts`: `processPredictiveRefresh()` + `getPredictions()`. Dedup on `(student_id, pathway_slug, algorithm_version='L5.v1')`. §12.4 guard. Strand-level blueprint weighted sum. Retention decay. Audit output includes `processing_time_ms`. `ISSUE-0015` at both `cohort_metric_cache` write sites. `PredictionsCallerContext` role gate (null=service-role bypass; student/parent=own only; teacher/admin=any). (commit e42492b)
+- `intelligence-svc/index.ts`: POST `/intelligence/pipeline/predictive-refresh` (service-role). GET `/intelligence/predictions/:student_id/:pathway_slug` (role-gated, placed before global service-role gate). (commit e42492b)
+- `jobs-worker/index.ts`: `pipeline.predictive_refresh` route entry per ADR-0031. (commit e42492b)
+- `contract.test.ts`: 9 new L5 tests including DEV_PLAN exit criterion, role-gate test, and audit lifecycle test (pre-compute `input_snapshot` + post-compute `output + processing_time_ms`). Total: 412 → 421. (commit e42492b)
+- `docs/dev/decisions/0032-pipeline-event-session-scope.md`: ADR-0032 accepted. (commit e42492b)
+- Q-29.1..4 resolved; ISSUE-0014/0015/0016 filed; DEV-20260519-1 filed. (commits e278071 + e42492b)
+
+**Time spent:** ~1 day (on 1-day budget)
+
+**Surprises / departures:**
+
+1. **Two default-resolution drifts caught pre-push in review.** (a) Docstring retained `TODO Stage 32 JWT` comment — corrected to reflect implemented role-gated auth (decision 1B: role-gate this stage; DEV_PLAN line 313 cited). (b) `on_track` field initially unverified against spec — confirmed 3A: spec §12.1 line 1934 explicitly names the field. Both corrected in amended commit; zero leaked to main. ISSUE-0013 discipline honored — full `pnpm test` output captured; 421 count is exact, not tail-truncated.
+2. **ADR-0032 required mid-stage.** `pipeline_event.session_id NOT NULL FK` blocks L5 writes (no session context). Decision: skip `pipeline_event`; `intelligence_audit_log` is sole observability surface. ISSUE-0016 filed for v1.1 `async_pipeline_event` table.
+
+**Decisions made (not in stage):**
+
+- ADR-0032: `pipeline_event.session_id NOT NULL` blocks L5 writes — `intelligence_audit_log` is sole L5 observability surface
+
+**Deviations logged:**
+
+- DEV-20260519-1 (exam_date column deferred to v1.1; `projected_readiness` + `on_track` return null when no exam_date)
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0014 opened (medium): `exam_date` column on `user_profile` missing; §12.1 projection branch incomplete — v1.1
+- ISSUE-0015 opened (low): `cohort_metric_cache` reused for per-student predictions (category mismatch) — v1.1
+- ISSUE-0016 opened (low): `async_pipeline_event` table for L5/L7/L9 observability parity post ADR-0032 — v1.1
+- Q-29.1 resolved: `pipeline.predictive_refresh` handler → intelligence-svc (arch §4.5 authoritative)
+- Q-29.2 resolved: Option B — `exam_date` on job payload, null → skip projection; ISSUE-0014 + DEV-20260519-1 filed
+- Q-29.3 resolved: Option (i) — `HALF_LIFE_DAYS_BY_YEAR_LEVEL` constants in retention.ts
+- Q-29.4 resolved: Option B — L5 skips `pipeline_event`; ADR-0032 filed; ISSUE-0016 filed
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (11 packages) · Tests ✅ (421 passed / 1 skipped) · Build ✅ · RLS ✅ (no RLS changes)
+
+**Tomorrow — first thing:**
+Stage 30 — L7 Teacher Intelligence (Day 43). Read DEV_PLAN Stage 30 + Spec §13 + arch §4.6; surface Q-30.* before coding.
+
+---
+
 ## Stage 28 — 2026-05-18
 
 **Planned (from DEV_PLAN.md Stage 28):** Generic job-worker Edge Function (ADR-0031) + `pipeline.causal.evaluate_full` async pipeline step (L3b: `traverse_upstream` + `traverse_downstream` per spec §5.1.3/4) + ISSUE-0006 fix (L3a → skill-graph-cache). 2-day budget (Days 40–41).
