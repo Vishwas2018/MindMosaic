@@ -2,6 +2,70 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 32 — 2026-05-22
+
+**Planned (from DEV_PLAN.md Stage 32):** Intelligence + Analytics Endpoints Complete — 8 new read endpoints (5 intelligence-svc: learner-profile, causal-map, behaviour-profile, audit-log, explain; 3 analytics-svc: cohort, pathway-readiness, generate-assignment as ephemeral DraftAssignmentDTO). Zero new migrations. 1-day budget (Day 45).
+
+**Actually delivered:**
+
+- `supabase/functions/intelligence-svc/handlers.ts` (+538 lines): `getLearnerProfile`, `getCausalMap`, `getBehaviourProfile`, `getAuditLog`, `getExplanation`; helpers: `checkStudentAccess`, `staleSince`; constants: `THIRTY_DAYS_MS`, `AUDIT_LOG_LIMIT = 200`, `VALID_AUDIT_LAYERS`.
+- `supabase/functions/intelligence-svc/index.ts` (+67 lines): 5 new routes placed before service-role gate via combined `roleGatedMatch` block.
+- `supabase/functions/intelligence-svc/__tests__/contract.test.ts` (+227 lines, 53 total, was 43).
+- `supabase/functions/analytics-svc/handlers.ts` (+403 lines): `getCohort`, `getPathwayReadiness`, `generateAssignment`; Q-32.3 Option B (single composite score mapped to all four `PathwayReadinessDTO` dimensions); full `exclude_recently_seen` via session_record + session_response join (Q-32.5 Option B).
+- `supabase/functions/analytics-svc/index.ts` (+86 lines): 3 new routes placed before service-role gate.
+- `supabase/functions/analytics-svc/__tests__/contract.test.ts` (+211 lines, 22 total, was 12).
+- `docs/dev/QUESTIONS.md` (+65 lines): Q-32.3–Q-32.7 filed and resolved.
+- `docs/dev/DEVIATIONS.md` (+21 lines): DEV-20260522-2 filed.
+- `docs/prompts/2026-05-22_stage-32.md` (−2/+4 lines): Deliverables corrected to match shipped route gate placement.
+- Prep commit (411bbbd): Q-32.1–Q-32.2 resolved; DEV-20260522-1 filed; ISSUE-0021/0022 filed; C-C-D-V saved.
+- Implementation + evening commit (77e3143): all 9 files above.
+
+**Time spent:** 1 day (on 1-day budget)
+
+**Surprises / departures:**
+
+1. **Q-32.3 (PathwayReadinessDTO field gap)**: No per-dimension breakdown in L5 cache — single composite score only. Q-32.3 Option B applied: composite score mapped to all four DTO dimensions (`skill_readiness`, `coverage`, `condition_readiness`, `composite_readiness`); `active_misconceptions_affecting = 0`; `predicted_ready_date`/`exam_date`/`days_remaining = null` per DEV-20260519-1.
+2. **Q-32.4 (composite_label thresholds)**: Spec §6.5 names enum values but not numeric boundaries. Resolved: `<0.3=not_ready, <0.5=developing, <0.7=on_track, <0.85=ready, ≥0.85=strong`.
+3. **Q-32.5 (exclude_recently_seen)**: Full implementation via class_student → session_record (14-day cutoff) → session_response join (3 extra DB reads). Option B applied.
+4. **Q-32.6 (misconception status filter)**: `student_misconception WHERE status IN ('active', 'suspected')`. Option B applied.
+5. **Q-32.7 (getExplanation 404 policy)**: Returns 404 for both not-found and unauthorized — do not leak existence. Option B applied. Inline comment added per Constraints.
+6. **DEV-20260522-2 (generate-assignment route placement)**: Saved C-C-D-V said "POST after service-role gate; teacher role check in handler" — internally inconsistent. Bearer JWT auth cannot run after the gate. Implementation correctly placed before gate; C-C-D-V corrected in same commit; DEV-20260522-2 filed.
+
+**Decisions made (not in stage):**
+
+- Q-32.3 Option B: single composite score mapped to all four `PathwayReadinessDTO` dimensions (no new ADR — resolves via documented Q)
+- Q-32.4: composite_label thresholds `<0.3/0.5/0.7/0.85/≥0.85` (inline default, no ADR)
+- Q-32.5 Option B: full exclude_recently_seen via session record join (inline, no ADR)
+- Q-32.6 Option B: `status IN ('active', 'suspected')` (inline, no ADR)
+- Q-32.7 Option B: 404 for both not-found and unauthorized (inline, no ADR)
+- No new ADRs (ADR count holds at 33)
+
+**Deviations logged:**
+
+- DEV-20260522-2 (impl commit — generate-assignment route gate placement C-C-D-V error)
+- DEV-20260522-1 filed in prep commit (auto-groups path param deviation, Stage 30 carry)
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0021 (medium) opened: auto-groups query-vs-path-param arch drift (prep commit)
+- ISSUE-0022 (low) opened: audit-log cursor pagination deferred to v1.1 (prep commit)
+- Q-32.1–Q-32.2 resolved (prep commit)
+- Q-32.3–Q-32.7 opened and resolved (implementation commit)
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (13 packages) · Tests ✅ (467 passed / 1 skipped) · Build n/a · RLS ✅ (no new migrations)
+
+**Process retro:**
+
+- (a) **STRUCTURAL: T3 drift now consistent across Stages 30, 31, 32.** Mid-implementation Qs filed atomically with close commit (T2-clean) but resolved without operator round-trip (T3-bypassed). Q-32.3 was the named T3 budget-gate slot — single-composite-to-four-fields shape collapse is a DTO structural decision that warranted operator review. All three stages shipped on budget; no post-hoc structural defect found; but the gate is unexercised. **Proposed Option 3 (hybrid T3)**: operator round-trip REQUIRED when Q resolution touches DTO shape, deliverable scope, schema, or auth model; self-resolve PERMITTED for tight implementation details (numeric thresholds, filter inclusivity, performance tuning) with documented options + rationale + reasonable default cited. Q-32.3 would have triggered operator round-trip; Q-32.4/5/6 would have been self-resolve. Alternatives: Option 1 (all mid-impl Qs require operator pause), Option 2 (accept current pattern as the rule). **Operator decision requested at Stage 33 morning ritual; default if undecided = Option 3.**
+- (b) **Q-32.7 redundant filing.** Already pinned verbatim in C-C-D-V Constraints. Filed for traceability but inflates Q count. Minor noise, not structural.
+- (c) **Saved-C-C-D-V route-gate contradiction caught at pre-push, not pre-read.** Origin: "GETs before / POSTs after" boilerplate paste-merged without walking gate logic. Discipline lesson: route placement claims must be consistent with handler auth model; walk the gate logic explicitly when authoring C-C-D-V.
+
+**Tomorrow — first thing:**
+
+Stage 33 — Assignments Service (Days 46–47, 2-day budget). Morning ritual: read DEV_PLAN Stage 33; verify spec section number (T1). Operator decision on T3 hybrid Option 3 required before implementation begins.
+
 ## Stage 31 — 2026-05-21
 
 **Planned (from DEV_PLAN.md Stage 31):** L9 Orchestration Weekly Plan — `pipeline.orchestration_replan` handler with idempotency + priority queue; supersedes prev plan + plan_revision + audit log; plan_override honoured; `GET /orchestration/plan/{student_id}/current` + `POST /orchestration/generate-plan/{student_id}`. 1-day budget (Day 44).
