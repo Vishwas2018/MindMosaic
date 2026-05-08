@@ -214,17 +214,38 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 
 **Recommended fix (v1.1).** Introduce `student_prediction_cache (student_id, pathway_slug, tenant_id, value jsonb, computed_at timestamptz, PRIMARY KEY (student_id, pathway_slug))` with appropriate RLS (student SELECT own rows; teacher/admin SELECT any). Migrate Stage 29 prediction writes to this table. Add a sweeper cron to prune rows older than 7 days.
 
-### ISSUE-0016 — async_pipeline_event table for L5/L7/L9 observability parity (post ADR-0032)
+### ISSUE-0017 — High-fatigue intervention alert deferred (per-session data not directly queryable)
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-20 (Stage 30)
+- Area: backend (analytics-svc, intelligence-svc)
+- Tags: teacher-intelligence · intervention-alert · v1.1
+
+**Summary.** Spec §14.2 defines a "High fatigue" intervention alert trigger: "Avg fatigue onset < 15 min over last 5 sessions." `behaviour_profile.avg_fatigue_onset_minutes` is a rolling average over all sessions; it does not expose the per-session window needed to evaluate the last-5-session condition. Loading per-session fatigue onset requires joining `learning_event` or `behaviour_signal` events (event_type added migration 0013), neither of which is a direct column read on `behaviour_profile`. Stage 30 implements 5 of 6 §14.2 trigger types; `high_fatigue` is omitted with an inline `// ISSUE-0017:` comment at the trigger-evaluation site in `analytics-svc/handlers.ts`.
+
+**Recommended fix (v1.1).** (1) Extend `behaviour_profile` with a `fatigue_onset_last_5_sessions real[] DEFAULT '{}'` column populated by the L2 behaviour intelligence handler on each session close. (2) Implement the `high_fatigue` alert trigger in `processTeacherRefresh`: `AVG(fatigue_onset_last_5_sessions) < 15` minutes. Linked: Spec §14.2, `behaviour_profile` schema (migration 0005), ADR-0032 Stage 30 amendment, ISSUE-0016.
+
+### ISSUE-0016 — async_pipeline_event and analytics_audit_log tables for full observability parity (post ADR-0032)
 
 - Status: open
 - Severity: low
 - Reported: 2026-05-19 (Stage 29)
-- Area: backend (intelligence-svc, migration)
+- Updated: 2026-05-20 (Stage 30) — audit_log gap added; scope extended.
+- Area: backend (intelligence-svc, analytics-svc, migration)
 - Tags: observability · pipeline · v1.1
 
-**Summary.** `pipeline_event.session_id` is `NOT NULL` (migration 0006), blocking writes from L5/L7/L9 pipeline steps which operate at student+pathway scope (no session). ADR-0032 resolves this for Stage 29 by skipping `pipeline_event` for L5 and using `intelligence_audit_log` exclusively. Step 5 is absent from `pipeline_event` coverage; monitoring queries tracking pipeline step enumeration will miss L5 progress.
+**Summary.** Two separate `NOT NULL` FK constraints block observability writes from non-session-scoped and non-student-scoped pipeline stages:
 
-**Recommended fix (v1.1).** Introduce a dedicated `async_pipeline_event` table without a session_id FK: `async_pipeline_event (id uuid PK, student_id, pathway_slug, step, step_name, status, started_at, completed_at, error, created_at)`. L5/L7/L9 write to this table; L1/L2/L3a/L3b continue writing to `pipeline_event`. Linked: ADR-0032, Q-29.4.
+1. **`pipeline_event.session_id NOT NULL`** (migration 0006) — blocks L5/L7/L9 pipeline steps, which operate at student+pathway or class+skill scope (no session). ADR-0032 (Stage 29) resolves this by skipping `pipeline_event` for L5 and using `intelligence_audit_log` instead. Steps 5 and 7 are absent from `pipeline_event` coverage.
+
+2. **`intelligence_audit_log.student_id NOT NULL`** (migration 0005) — blocks L7 class-scoped writes. ADR-0032 Stage 30 amendment resolves this by skipping `intelligence_audit_log` for L7 too. Observability for L7 is provided entirely by `intervention_alert` inserts + `cohort_metric_cache` UPSERT (domain artifacts as observability surface). Any future pipeline stage that is neither session-scoped nor student-scoped faces the same gap.
+
+**Recommended fix (v1.1).** Introduce two tables:
+- `async_pipeline_event (id uuid PK, scope_type text, scope_id uuid, step int, step_name text, status text, started_at timestamptz, completed_at timestamptz, error text, created_at timestamptz)` — covers L5/L7/L9 and any future non-session step; `scope_type` = `'student_pathway'` | `'class_skill'`; `scope_id` = student_id or class_id as applicable.
+- `analytics_audit_log (id uuid PK, scope_type text, scope_id uuid, event_type text, input_snapshot jsonb, output jsonb, algorithm_version text, trace_id uuid, created_at timestamptz)` — class-scoped audit log for analytics pipeline stages without `student_id` constraint.
+
+L5 writes `async_pipeline_event` (scope_type='student_pathway'); L7/L9 write both. L1/L2/L3a/L3b continue writing `pipeline_event`. Linked: ADR-0032, ADR-0033, Q-29.4, Q-30.2, ISSUE-0017.
 
 ## Resolved
 

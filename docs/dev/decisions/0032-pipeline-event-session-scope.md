@@ -1,6 +1,7 @@
-# ADR-0032 — Pipeline observability split: L5 writes only intelligence_audit_log
+# ADR-0032 — Pipeline observability split: non-session-scoped stages use domain artifacts only
 
 - Status: accepted
+- Amended: 2026-05-20 (Stage 30) — scope extended to L7; `intelligence_audit_log.student_id NOT NULL` also blocks class-scoped writes; pattern generalised (see Stage 30 amendment section below).
 - Date: 2026-05-19
 - Stage: 29
 - Tags: backend | architecture | async-pipeline | observability
@@ -83,3 +84,29 @@ Files: `supabase/functions/intelligence-svc/handlers.ts` (L5 handler — no
 pipeline_event calls), `supabase/functions/intelligence-svc/__tests__/contract.test.ts`
 (L5 test suite — no pipeline_event stub expected) ·
 Related: ADR-0027, ADR-0031, Q-29.4, ISSUE-0016
+
+---
+
+## Stage 30 Amendment — intelligence_audit_log also unusable for class-scoped L7; generalised pattern
+
+**Additional constraint discovered (Stage 30 morning pre-read, Q-30.2).**
+
+`intelligence_audit_log` was established as the universal observability fallback in this ADR — every pipeline layer that cannot write `pipeline_event` writes here instead. However, the `intelligence_audit_log` schema (arch §2.8, migration 0005) enforces:
+
+```sql
+student_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE
+```
+
+L7 teacher intelligence (`pipeline.teacher_refresh`, Stage 30) operates at **class + skill** granularity — it aggregates mastery, velocity, misconceptions and behaviour profiles across all students in a class roster. There is no single `student_id` to supply. The constraint is load-bearing: it enforces referential integrity and drives the per-student index. Weakening it would require a migration and would impact all downstream audit queries.
+
+**Resolution (Q-30.2 → Option B):** Skip `intelligence_audit_log` for L7 as well. Extend the ADR-0032 pattern.
+
+**Generalised pattern (applies to L7, and any future pipeline stage that is neither session-scoped nor student-scoped):**
+
+> A pipeline stage that cannot supply `session_id` (pipeline_event constraint) AND cannot supply `student_id` (intelligence_audit_log constraint) uses its **domain artifact writes** as the sole observability surface. For L7 this means: (1) `intervention_alert` INSERT rows for each triggered alert type per student, and (2) the `cohort_metric_cache` UPSERT carrying the full cluster group payload + `computed_at` + `processing_time_ms`. These artifacts are queryable, auditable, and sufficient for monitoring dashboard parity.
+
+**Code markers:** `analytics-svc/handlers.ts` carries a `// ADR-0032: intelligence_audit_log skipped — student_id NOT NULL blocks class-scoped writes; observability via intervention_alert + cohort_metric_cache` comment at the non-call site.
+
+**Follow-ups:** ISSUE-0016 extended to include the audit_log gap. ISSUE-0016 now covers: (1) `pipeline_event.session_id NOT NULL` gap for L5/L7/L9, (2) `intelligence_audit_log.student_id NOT NULL` gap for L7 (and any future class/cohort-scoped stage). Long-term fix remains the `async_pipeline_event` + `analytics_audit_log` tables proposed in ISSUE-0016.
+
+**Files:** `supabase/functions/analytics-svc/handlers.ts` (L7 handler — no pipeline_event calls, no intelligence_audit_log calls) · Related: Q-30.2, ADR-0033, ISSUE-0016, ISSUE-0017

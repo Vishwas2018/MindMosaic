@@ -9,6 +9,54 @@
 
 ## Resolved
 
+### Q-30.4 — High-fatigue intervention alert data source
+
+- Date raised: 2026-05-20 (Stage 30 morning)
+- Asked of: self
+- Source: Spec §14.2 trigger rules — "Avg fatigue onset < 15 min over last 5 sessions"
+- Question: `behaviour_profile.avg_fatigue_onset_minutes` is a rolling average over all sessions, not the last 5. Per-session fatigue data lives in `learning_event` or `behaviour_signal` (event_type added migration 0013), not a direct column read. Should we (A) use `avg_fatigue_onset_minutes` as a proxy for spec §14.2 ("recent") fatigue, or (B) defer high_fatigue alert entirely and implement the other 5 trigger types?
+- Why ambiguous: Spec trigger says "last 5 sessions"; available column is a rolling aggregate. Using the proxy violates spec intent and could mislead teacher UI.
+- Blocking? no — other 5 trigger types are directly satisfiable from seed data per DEV_PLAN exit criterion
+- Code affected: `supabase/functions/analytics-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-20): **Option B**. High-fatigue alert deferred. Stage 30 implements 5 of 6 §14.2 trigger types (declining_performance, persistent_misconception, repair_failure, low_persistence, exceptional_progress). Inline comment `// ISSUE-0017: high_fatigue alert deferred — requires per-session fatigue onset data (last 5 sessions), not available from behaviour_profile rolling average` at the trigger-evaluation site. ISSUE-0017 filed (low, v1.1).
+
+### Q-30.3 — k-means clustering implementation in Deno
+
+- Date raised: 2026-05-20 (Stage 30 morning)
+- Asked of: self
+- Source: Spec §14.1 "k-means clustering on feature vectors"; no Deno stdlib or safe esm.sh package available
+- Question: (A) Hand-roll Lloyd's algorithm in `packages/engines/src/algorithms/kmeans.ts` (pure TypeScript, no deps, replay-stable); (B) use simple nearest-centroid single-pass (not proper k-means).
+- Why ambiguous: Spec says "k-means" implying Lloyd's iteration; no stdlib available.
+- Blocking? no — code is straightforward once decided
+- Code affected: `packages/engines/src/algorithms/kmeans.ts` (new), `packages/engines/src/index.ts`
+- Status: resolved
+- Resolution (2026-05-20): **Option A**. Lloyd's k-means in `packages/engines/src/algorithms/kmeans.ts`. Determinism contract: sort input by student_id ASC before passing (caller responsibility); first k points after sort = initial centroids; iteration cap 20; tie-break assignment by group index ASC; no `Math.random`. Exported from `@mm/engines` barrel. 4 unit tests in `@mm/engines`.
+
+### Q-30.2 — intelligence_audit_log.student_id NOT NULL blocks class-scoped L7 audit writes
+
+- Date raised: 2026-05-20 (Stage 30 morning)
+- Asked of: self
+- Source: Arch §2.8 schema (`intelligence_audit_log.student_id uuid NOT NULL REFERENCES user_profile(id)`); ADR-0032 (Stage 29); ISSUE-0016
+- Question: L7 operates at class+skill granularity (no single student_id). Options: (A) write one audit_log row per student in the class; (B) skip intelligence_audit_log for L7 — observability via intervention_alert inserts + cohort_metric_cache UPSERT; (C) new analytics_audit_log table (migration, out of budget).
+- Why ambiguous: ADR-0032 established audit_log as the fallback for pipeline_event gaps; now audit_log itself is the constraint. ISSUE-0016 body drafted assuming audit_log was usable for L7.
+- Blocking? yes — determines mock shape for contract tests and handler observability design
+- Code affected: `supabase/functions/analytics-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-20): **Option B**. Skip `intelligence_audit_log` for L7. Extend ADR-0032 in place with Stage 30 amendment: generalised pattern — any non-session-scoped, non-student-scoped pipeline stage uses its domain artifacts as the observability surface. `// ADR-0032:` comment in handlers.ts at non-call site. ISSUE-0016 body extended to mention the audit_log gap.
+
+### Q-30.1 — Service boundary: pipeline.teacher_refresh handler and /analytics/* endpoints
+
+- Date raised: 2026-05-20 (Stage 30 morning)
+- Asked of: product owner
+- Source: ADR-0031 routing table (speculative `pipeline.l7.* → orchestration-svc`, Stage 36+); DEV_PLAN Stage 30 deliverables (`/analytics/auto-groups`, `/analytics/intervention-alerts`); arch §4.7 (analytics-svc owns these endpoints); arch §1.2 ownership table (ANL = `intervention_alert`, `cohort_metric_cache`)
+- Question: Which service owns `pipeline.teacher_refresh` and the L7 read endpoints? ADR-0031 says orchestration-svc (speculative); DEV_PLAN + arch say analytics-svc.
+- Why ambiguous: ADR-0031 routing entry was explicitly speculative (Stage 36+) and named the wrong owning service relative to the arch endpoint table. No analytics-svc exists.
+- Blocking? yes — determines directory to build in, workspace to add, route map entry
+- Code affected: `supabase/functions/analytics-svc/` (new), `supabase/functions/jobs-worker/index.ts`, `docs/dev/decisions/0031-*.md`
+- Status: resolved
+- Resolution (2026-05-20): **Option A — analytics-svc**. Arch §4.7 + arch §1.2 + DEV_PLAN Stage 30 are jointly authoritative. ADR-0031 speculative `pipeline.l7.* / pipeline.l9.* → orchestration-svc` entry replaced: `pipeline.teacher_refresh → analytics-svc` added (concrete); `pipeline.l9.* → orchestration-svc` retained (still speculative, Stage 31+). ADR-0033 filed (location decision).
+
 ### Q-29.4 — pipeline_event step=5 writability for L5 (no session_id)
 
 - Date raised: 2026-05-19 (Stage 29 pre-implementation)
