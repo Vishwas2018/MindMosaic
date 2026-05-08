@@ -5,3 +5,4 @@ packages:
   - "supabase/functions/assessment-svc"
   - "supabase/functions/intelligence-svc"
   - "supabase/functions/jobs-worker"
+  - "supabase/functions/analytics-svc"

@@ -9,6 +9,19 @@
 
 ## Resolved
 
+### Q-30.6 — "for >14 days" velocity trigger condition and window_days semantics
+
+- Date raised: 2026-05-20 (Stage 30 pre-push verification)
+- Asked of: self
+- Source: Spec §14.2 trigger table — "Velocity < -0.02 for >14 days on ≥3 skills" and "Velocity > +0.05 across ≥3 skills for 14+ days"
+- Question: The "for >14 days" clause in §14.2 trigger conditions — does it require (A) filtering `learning_velocity` rows where `computed_at` is more than 14 days old (sustained decline for over 14 days), or (B) reading all velocity rows whose `window_days = 14` (i.e., the 14-day rolling window velocity itself satisfies the "14-day" condition)?
+- Why ambiguous: The schema stores one rolling window velocity per (student, skill) — not a time series. "For >14 days" could mean either the measurement window or a staleness requirement.
+- Blocking? no — implementation uses Option B; answer must be confirmed before Stage 32 if trigger sensitivity matters
+- Assumed answer (if proceeding): **Option B** — `learning_velocity.window_days = 14` (default for all rows) means each velocity record IS the 14-day window measurement. If that measurement is < -0.02 (declining) or > +0.05 (exceptional), the spec's "for >14 days" / "for 14+ days" condition is satisfied. No `computed_at` staleness filter applied. If a different interpretation is intended (e.g., velocity must be negative for TWO consecutive 14-day windows, implying historical data storage), it would require schema changes not present in v1.
+- Code affected: `supabase/functions/analytics-svc/handlers.ts` (trigger evaluation for declining_performance and exceptional_progress)
+- Status: resolved
+- Resolution (2026-05-20): **Option B** — window_days=14 satisfies the "14-day" condition. Default interpretation; no code change needed. Stage 32+ should revisit if product requires sustained-window detection requiring historical velocity snapshots.
+
 ### Q-30.4 — High-fatigue intervention alert data source
 
 - Date raised: 2026-05-20 (Stage 30 morning)

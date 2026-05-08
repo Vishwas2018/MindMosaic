@@ -5,6 +5,20 @@
 
 ## Open
 
+### ISSUE-0018 — Env var documentation gap: INTELLIGENCE_SVC_URL and ANALYTICS_SVC_URL undocumented
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-20 (Stage 30 pre-push verification)
+- Area: infra / docs
+- Tags: deployment · env-vars · analytics-svc · jobs-worker
+
+**Summary.** `INTELLIGENCE_SVC_URL` (jobs-worker, Stage 28) and `ANALYTICS_SVC_URL` (jobs-worker, Stage 30) are referenced in `supabase/functions/jobs-worker/index.ts` and mentioned in `docs/prompts/` (non-authoritative prompt logs) but are not documented in any deployment guide, `.env.example`, `.toml`, or `OWNERS.md`. A deployer starting fresh has no authoritative reference for these env vars beyond reading the code.
+
+**Pre-existing gap.** `INTELLIGENCE_SVC_URL` was already undocumented at Stage 28. `ANALYTICS_SVC_URL` surfaces it.
+
+**Fix (post-Stage 30, v1 close or Stage 36).** Add env var table to `docs/dev/deployment.md` (create if absent) listing all Edge Function env vars with default resolution logic. Or add `.env.example` at repo root. Refs: `supabase/functions/jobs-worker/index.ts` lines for both constants.
+
 ### ISSUE-0013 — Evening ritual test count methodology (tail truncation drift)
 
 - Status: open

@@ -7,3 +7,4 @@ export * from './skill.js';
 export * from './diagnostic.js';
 export * from './adaptive.js';
 export * from './constants/retention.js';
+export * from './algorithms/kmeans.js';

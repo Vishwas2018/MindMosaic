@@ -248,6 +248,12 @@ importers:
         specifier: ^5.4.19
         version: 5.4.21(@types/node@20.19.39)
 
+  supabase/functions/analytics-svc:
+    dependencies:
+      '@mm/engines':
+        specifier: workspace:*
+        version: link:../../../packages/engines
+
   supabase/functions/assessment-svc:
     dependencies:
       '@mm/engines':
@@ -267,6 +273,8 @@ importers:
       '@mm/types':
         specifier: workspace:*
         version: link:../../../packages/types
+
+  supabase/functions/jobs-worker: {}
 
 packages:
 

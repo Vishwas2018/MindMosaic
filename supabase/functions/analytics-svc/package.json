@@ -1,0 +1,13 @@
+{
+  "name": "@mm/analytics-svc",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@mm/engines": "workspace:*"
+  }
+}
