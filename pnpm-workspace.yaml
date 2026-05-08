@@ -6,3 +6,4 @@ packages:
   - "supabase/functions/intelligence-svc"
   - "supabase/functions/jobs-worker"
   - "supabase/functions/analytics-svc"
+  - "supabase/functions/orchestration-svc"

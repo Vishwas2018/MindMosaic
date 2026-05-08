@@ -7,15 +7,17 @@
  * Accepts POST requests; returns a BatchResult JSON.
  *
  * Routes (job_type → owning service):
- *   pipeline.causal.evaluate_full  → intelligence-svc POST /intelligence/pipeline/causal-full
- *   pipeline.predictive_refresh    → intelligence-svc POST /intelligence/pipeline/predictive-refresh
- *   pipeline.teacher_refresh       → analytics-svc    POST /analytics/pipeline/teacher-refresh
+ *   pipeline.causal.evaluate_full  → intelligence-svc    POST /intelligence/pipeline/causal-full
+ *   pipeline.predictive_refresh    → intelligence-svc    POST /intelligence/pipeline/predictive-refresh
+ *   pipeline.teacher_refresh       → analytics-svc       POST /analytics/pipeline/teacher-refresh
+ *   pipeline.orchestration_replan  → orchestration-svc   POST /orchestration/pipeline/orchestration-replan
  *
  * Service env:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
- *   INTELLIGENCE_SVC_URL   (default: ${SUPABASE_URL}/functions/v1/intelligence-svc)
- *   ANALYTICS_SVC_URL      (default: ${SUPABASE_URL}/functions/v1/analytics-svc)
- *   JOB_WORKER_BATCH_SIZE  (default: 10)
+ *   INTELLIGENCE_SVC_URL    (default: ${SUPABASE_URL}/functions/v1/intelligence-svc)
+ *   ANALYTICS_SVC_URL       (default: ${SUPABASE_URL}/functions/v1/analytics-svc)
+ *   ORCHESTRATION_SVC_URL   (default: ${SUPABASE_URL}/functions/v1/orchestration-svc)
+ *   JOB_WORKER_BATCH_SIZE   (default: 10)
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getTraceId } from '../_shared/trace-id.ts';
@@ -31,6 +33,9 @@ const INTELLIGENCE_SVC_URL =
 const ANALYTICS_SVC_URL =
   Deno.env.get('ANALYTICS_SVC_URL') ??
   `${SUPABASE_URL}/functions/v1/analytics-svc`;
+const ORCHESTRATION_SVC_URL =
+  Deno.env.get('ORCHESTRATION_SVC_URL') ??
+  `${SUPABASE_URL}/functions/v1/orchestration-svc`;
 const BATCH_SIZE = parseInt(Deno.env.get('JOB_WORKER_BATCH_SIZE') ?? '10', 10);
 
 function buildRouteMap(): RouteMap {
@@ -43,6 +48,9 @@ function buildRouteMap(): RouteMap {
     },
     'pipeline.teacher_refresh': {
       url: `${ANALYTICS_SVC_URL}/analytics/pipeline/teacher-refresh`,
+    },
+    'pipeline.orchestration_replan': {
+      url: `${ORCHESTRATION_SVC_URL}/orchestration/pipeline/orchestration-replan`,
     },
   };
 }

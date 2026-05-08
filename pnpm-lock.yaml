@@ -276,6 +276,12 @@ importers:
 
   supabase/functions/jobs-worker: {}
 
+  supabase/functions/orchestration-svc:
+    dependencies:
+      '@mm/engines':
+        specifier: workspace:*
+        version: link:../../../packages/engines
+
 packages:
 
   '@adobe/css-tools@4.4.4':

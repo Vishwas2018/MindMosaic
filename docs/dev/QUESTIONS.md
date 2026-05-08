@@ -9,6 +9,47 @@
 
 ## Resolved
 
+### Q-31.7 — SELECT FOR UPDATE unavailable in Supabase JS client; concurrency guard for SUPERSEDE+INSERT
+
+- Date raised: 2026-05-21 (Stage 31 implementation)
+- Asked of: self
+- Source: C-C-D-V Stage 31: "SUPERSEDE+INSERT must wrap in a transaction with SELECT ... FOR UPDATE on the existing active plan row."
+- Question: Supabase JS client `.from()` queries do not expose `FOR UPDATE` locking. Options: (A) Use audit_log dedup (primary idempotency) + optimistic UPDATE WHERE status='active' + `idx_plan_active` unique partial index as DB-level concurrency guard; (B) call an RPC function (Postgres function) that wraps the operation in a real transaction with FOR UPDATE; (C) accept the race condition and rely solely on `idx_plan_active` unique constraint violation to detect duplicates.
+- Why ambiguous: C-C-D-V text says "SELECT FOR UPDATE" but the Supabase JS client cannot issue advisory locks via `.from()` chaining.
+- Blocking? no
+- Assumed answer (if proceeding): **Option A**. Concurrency guard: (1) idempotency check `updated_at > scheduled_at` early return; (2) UPDATE existing active plan → superseded WHERE status='active' (optimistic lock — if zero rows affected, another replan won the race; handler returns); (3) INSERT new plan; `idx_plan_active` unique partial index provides DB-level duplicate prevention. Inline comment at write site: `// FOR UPDATE not available in Supabase JS client; idx_plan_active unique partial index + optimistic UPDATE as concurrency guard (Q-31.7).`
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-21): **Option A**. Audit_log dedup + optimistic UPDATE + idx_plan_active unique index. No RPC needed in v1.
+
+### Q-31.6 — `recommendation_key` hash format: spec says "deterministic hash" but specifies no hash function
+
+- Date raised: 2026-05-21 (Stage 31 implementation)
+- Asked of: self
+- Source: Spec §16.6.1 (line ~2504): `dismiss_recommendation` override filtered by matching `recommendation_key`. Spec describes key as "deterministic hash of (skill_id, mode, rationale_class)" without naming the hash function.
+- Question: (A) Use colon-separated composite string `${skill_id}:${mode}:${rationale_class}` (deterministic, no crypto, no Deno/Node mismatch); (B) SHA-256 hash of concatenated fields (true hash, but requires crypto API); (C) use `skill_id` alone as the match key.
+- Why ambiguous: Spec says "hash" implying a fixed-length digest, but providing no algorithm. True hash adds complexity and cross-environment test friction.
+- Blocking? no
+- Assumed answer (if proceeding): **Option A** — `${skill_id}:${mode}:${rationale_class}`. Deterministic composite string; matches spec's stated intent (stable, reproducible key); no crypto dependency; v1.1 can migrate to SHA-256 if key collision concerns arise (skill UUIDs already unique).
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-21): **Option A**. Colon-separated composite string. Inline comment at use site.
+
+### Q-31.5 — 20% enjoyment guardrail: mastery threshold for "good at" skills not spec-pinned
+
+- Date raised: 2026-05-21 (Stage 31 implementation)
+- Asked of: self
+- Source: Spec §16.6 (line ~2478): "At least 20% of plan time is 'enjoyment' sessions". L6 stretch (primary enjoyment source) is PHASE-2 deferred. "Skills the student is good at" threshold not defined in spec §16.
+- Question: (A) Use `mastery_level > 0.7` as "good at" proxy for enjoyment skill selection; fill 20% of `available_minutes_per_week` with these skills after main queue assembly; (B) skip enjoyment guardrail in v1 entirely with PHASE-2 stub; (C) use `mastery_level > 0.8`.
+- Why ambiguous: Spec names the guardrail but the L6 stretch layer (primary enjoyment mechanism) is PHASE-2 deferred. No spec text defines the mastery threshold for "enjoyment-eligible" skills. The "20% of plan time" means minutes (not session count).
+- Blocking? no
+- Assumed answer (if proceeding): **Option A** — `mastery_level > 0.7` threshold; enjoyment skills from `skill_mastery WHERE mastery_level > 0.7` filtered to enrolled pathways; added at LOW priority after step 5 in queue assembly; stop filling at 20% of `available_minutes_per_week`. L6 stretch step returns `[]` (PHASE-2) and does not contribute to this pad.
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-21): **Option A**. `mastery_level > 0.7` as enjoyment-eligible proxy. Enjoyment pad applied after main queue assembly. "20% of plan time" = 0.2 × available_minutes_per_week minutes (time-based, not session count).
+
+
+
 ### Q-31.4 — POST /orchestration/generate-plan/{student_id}: synchronous or async?
 
 - Date raised: 2026-05-21 (Stage 31 morning ritual)
