@@ -73,12 +73,12 @@ Stage 34 SLA note: outbox → notifications 5s wall-clock SLA (DEV-20260524-1) c
   - **Resolved at Stage 25 audit:** ISSUE-0012
 - Open questions: 0 (Q-34.1–Q-34.6 all resolved)
 - Open bugs: 0
-- Deviations logged: 10 total (4 resolved, 6 open)
+- Deviations logged: 10 total (5 resolved, 5 open)
   - DEV-20260430-1 resolved Stage 15
   - DEV-20260503-2 ongoing v1.1 (content.recalibration no-op)
   - DEV-20260511-1 resolved Stage 22b
   - DEV-20260515-1 self-resolved Stage 25
-  - DEV-20260518-1 ongoing — spec §5.1.4 student parameter defect
+  - DEV-20260518-1 resolved Stage 28 — spec §5.1.4 student parameter defect; code workaround shipped (traverseUpstreamHelper + traverseDownstreamHelper). [Correction 2026-05-25: prior PROJECT_STATE erroneously carried this as "ongoing" — DEVIATIONS.md "Resolved by: Stage 28" is authoritative.]
   - DEV-20260519-1 ongoing — exam_date column deferred; §12.1 projection branch null until v1.1
   - DEV-20260522-1 ongoing v1.1 — auto-groups query-vs-path-param (Stage 37 fix)
   - DEV-20260522-2 resolved Stage 32 — generate-assignment C-C-D-V gate placement error

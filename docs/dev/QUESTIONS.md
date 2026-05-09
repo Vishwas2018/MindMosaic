@@ -9,6 +9,81 @@
 
 ## Resolved
 
+### Q-35.4 — override_plan_item HTTP status: 400 or 501?
+
+- Date raised: 2026-05-25 (Stage 35 prep — T2-tightened: filed before handler code)
+- Asked of: self (T3 self-resolve)
+- Source: DEV_PLAN Stage 35 Deliverables — "`pin_skill` + `dismiss_recommendation` types only; `override_plan_item` deferred"
+- Question: When a caller sends `type: 'override_plan_item'` to POST /orchestration/overrides, what HTTP status should the handler return?
+  - **(A)** `400 BAD_REQUEST` with code `'UNSUPPORTED_TYPE'` and message `'override_plan_item deferred in v1; not yet supported.'` — correct because the *client* sent an unsupported value for this deployment.
+  - **(B)** `501 NOT_IMPLEMENTED` — implies the server may implement it later.
+- Why ambiguous: Both statuses are defensible for a deferred enum value. 400 treats it as an invalid input; 501 treats it as a known future capability.
+- Blocking? no — tight implementation detail; T3 self-resolve permitted
+- Assumed answer (if proceeding): **Option A** — 400 UNSUPPORTED_TYPE
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts` (createOverride type guard)
+- Status: resolved
+- Resolution (2026-05-25, T3 self-resolve — Option 3 hybrid): **Option A**. 400 with `{ error: 'UNSUPPORTED_TYPE', message: 'override_plan_item deferred in v1; not yet supported.' }`. Rationale: consistent with how other v1-deferred enum paths return 400 in the codebase; 501 implies future server intent, which is out of scope for a contract surface. Inline comment at guard site: `// DEV_PLAN Stage 35: override_plan_item deferred (Q-35.4)`.
+
+### Q-35.3 — self-supersession: application-layer UPDATE or dual-INSERT?
+
+- Date raised: 2026-05-25 (Stage 35 prep — T2-tightened: filed before handler code)
+- Asked of: self (T3 self-resolve)
+- Source: Spec §16.6.1 line 2510 — "Overrides of the same `type` + `target` replace each other — creating a new `pin_skill` for the same `skill_id` extends the expiry and updates priority rather than stacking."
+- Question: No unique constraint exists on `plan_override` for `(student_id, type, target key)`. How to implement self-supersession without a DB-level guard?
+  - **(A)** SELECT existing active override of same `(student_id, type, target deterministic key)` → if found, UPDATE `expires_at` + `priority` (pin_skill only) in place, reuse existing row ID for the audit entry; if not found, INSERT new row.
+    - Deterministic key: `target->>'skill_id'` for `pin_skill`; `target->>'recommendation_key'` for `dismiss_recommendation`.
+  - **(B)** Always INSERT new row; SET existing active row's `expires_at = now()` (mark old as immediately expired). Two DML operations; preserves history of both rows.
+  - **(C)** Simple INSERT always; rely on consumption filter `.gte('expires_at', now())` — multiple valid rows can coexist; application reads only the most-recently-created. Stale rows accumulate.
+- Why ambiguous: Spec says "replace" and "extends the expiry" — language is mutational (Option A) but could be read as supersede (Option B). No DB constraint enforces either.
+- Blocking? no — tight implementation detail; T3 self-resolve permitted
+- Assumed answer (if proceeding): **Option A**
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts` (createOverride self-supersession logic)
+- Status: resolved
+- Resolution (2026-05-25, T3 self-resolve — Option 3 hybrid): **Option A**. SELECT + UPDATE/INSERT. Rationale: spec phrase "extends the expiry and updates priority" maps exactly to an UPDATE; cleanest audit trail (one active row per type+target per student; no accumulating expired rows). Inline comment at supersession site: `// Q-35.3 + Spec §16.6.1: self-supersession — UPDATE expires_at + priority if active override of same type+target exists.`
+
+### Q-35.2 — role gate: 'tutor' alongside 'teacher'?
+
+- Date raised: 2026-05-25 (Stage 35 prep — T2-tightened: filed before handler code)
+- Asked of: product owner / architect (T3 round-trip)
+- Source: Spec §16.6.1 line 2506 — "teachers only for students in their classes"; `supabase/migrations/0005_intelligence_orchestration.sql:437` — `CREATE POLICY po_teacher_select ON plan_override FOR SELECT USING (auth_role() IN ('teacher', 'tutor') AND ...)`
+- Question: Spec §16.6.1 says "teachers" without explicitly mentioning 'tutor'. The RLS po_teacher_select policy groups teacher + tutor together. Should the createOverride handler role gate include 'tutor' alongside 'teacher'?
+  - **(A)** Include 'tutor': role gate = `['parent', 'teacher', 'tutor', 'org_admin', 'platform_admin']`. Consistent with `po_teacher_select` RLS policy. Excluding tutor from create while allowing tutor SELECT creates an inconsistency — a tutor can READ overrides they cannot CREATE.
+  - **(B)** 'teacher' only: literal spec reading. Tutor cannot create overrides in v1.
+- Why ambiguous: Spec says "teacher" singularly; RLS policy groups teacher+tutor symmetrically. Auth model question — T3 round-trip required per Option 3 hybrid rules.
+- Blocking? yes — T3 round-trip; auth model is one of the four hard cases
+- Assumed answer (if proceeding): **Option A**
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts` (createOverride + deleteOverride role gate)
+- Status: resolved
+- Resolution (2026-05-25, T3 round-trip discharged): **Option A**. Role gate includes 'tutor'. Rationale: `po_teacher_select` RLS policy groups teacher+tutor throughout the plan_override table; excluding tutor from CREATE while permitting SELECT is an incoherence. Spec uses "teacher" as a role-class label that encompasses tutors in the system's role model. Inline comment at role gate: `// Q-35.2: tutor included with teacher per po_teacher_select RLS parity.`
+
+### Q-35.1 — POST /orchestration/overrides response DTO shape
+
+- Date raised: 2026-05-25 (Stage 35 prep — T2-tightened: filed before handler code)
+- Asked of: product owner / architect (T3 round-trip)
+- Source: Spec §16.6.1 (plan_override entity: 8 fields); `packages/types/src/orchestration.ts` — `PlanOverrideRequestSchema` exists; no `PlanOverrideDTOSchema` exists
+- Question: What fields does POST /orchestration/overrides return? Options:
+  - **(A — Modified)** Near-full entity with joined actor: `{ id, student_id, type, target, actor: { id, display_name }, expires_at, created_at }`. Drop `tenant_id` (auth-redundant). Actor as joined object mirrors `AssignmentDTO.created_by` (Stage 33 precedent).
+  - **(B)** Minimal — `{ id, type, target, expires_at, created_at }` (omit auth-redundant FKs: student_id, tenant_id, actor_id).
+  - **(C)** Simple ack — `{ id: uuid, expires_at: timestamptz }`.
+- Why ambiguous: Spec §16.6.1 shows the entity shape but does not specify the API response envelope. DTO shape is one of the four hard cases — T3 round-trip required.
+- Blocking? yes — DTO schema must be added to @mm/types before handler return type can be written
+- Assumed answer (if proceeding): **Modified Option A**
+- Code affected: `packages/types/src/orchestration.ts` (new PlanOverrideDTOSchema); `supabase/functions/orchestration-svc/handlers.ts` (createOverride return type + JOIN query)
+- Status: resolved
+- Resolution (2026-05-25, T3 round-trip discharged): **Modified Option A**.
+  ```typescript
+  PlanOverrideDTO = {
+    id: string;
+    student_id: string;
+    type: 'pin_skill' | 'dismiss_recommendation';
+    target: Record<string, unknown>;   // type-specific per Spec §16.6.1
+    actor: { id: string; display_name: string };
+    expires_at: string;   // ISO datetime
+    created_at: string;   // ISO datetime
+  }
+  ```
+  `tenant_id` dropped (auth-redundant). `actor` as joined object mirrors `AssignmentDTO.created_by` (Stage 33 precedent). Handler joins `user_profile` for `actor.display_name` in the single SELECT it already needs for actor_id authorization validation. `actor_id` FK not exposed directly; subsumed into `actor.id`. Type field constrained to v1-supported types only (`pin_skill | dismiss_recommendation`; `override_plan_item` remains in `PlanOverrideTypeSchema` for DB enum parity but is rejected at the API layer per Q-35.4).
+
 ### Q-34.6 — intervention_alert outbox aggregate_id: alert UUID or student UUID?
 
 - Date raised: 2026-05-24 (Stage 34 implementation — mid-impl)
