@@ -221,6 +221,7 @@ describe('assignments — StudentAssignmentDTOSchema extends AssignmentDTOSchema
     title: 'Test Assignment',
     description: null,
     mode: 'practice',
+    pathway_id: '00000000-0000-0000-0000-000000000010',
     target_skill_ids: [],
     target_skill_names: [],
     difficulty_range: null,

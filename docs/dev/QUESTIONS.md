@@ -9,6 +9,21 @@
 
 ## Resolved
 
+### Q-33.8 — startAssignment pathway_id gap: assignment table has no pathway_id; POST /sessions/create hard-requires it
+
+- Date raised: 2026-05-23 (Stage 33 implementation T1 reads)
+- Asked of: product owner / architect
+- Source: assessment-svc/handlers.ts lines 226-228 (hard validation); supabase/migrations/0007_new_domains.sql (no pathway_id column on assignment); packages/types/src/assignments.ts (no pathway_id in CreateAssignmentRequestSchema or AssignmentDTOSchema)
+- Question: POST /sessions/create hard-rejects pathway_id === null (assessment-svc/handlers.ts line 226-228). Assignment table (0007) and CreateAssignmentRequest have no pathway_id.
+  - **(A)** Add pathway_id column to assignment table; add to CreateAssignmentRequest + AssignmentDTO + StudentAssignmentDTO; startAssignment reads it from assignment row.
+  - **(B)** Derive pathway_id at startAssignment time from target_skill_ids[0] → skill_node → pathway join. No schema change; ambiguous when skills span pathways.
+  - **(C)** Make pathway_id optional in assessment-svc createSession — out of scope.
+- Why ambiguous: spec §24 defines assignments without pathway_id; assessment-svc session creation requires it. Gap not surfaced in Q-33.1 resolution.
+- Blocking? yes — T3 round-trip (DTO shape + schema).
+- Code affected: `supabase/migrations/0015_assignment_pathway_and_cron.sql`, `packages/types/src/assignments.ts`, `supabase/functions/assignments-svc/handlers.ts` (createAssignment + startAssignment)
+- Status: resolved
+- Resolution (2026-05-23): **Option A** with boundary refinement. `pathway_id uuid NOT NULL REFERENCES pathway(id) ON DELETE RESTRICT` added to assignment table in migration 0015 (renamed `0015_assignment_pathway_and_cron.sql`). `pathway_id: z.string().uuid()` added to `CreateAssignmentRequestSchema`, `AssignmentDTOSchema`, `StudentAssignmentDTOSchema` in packages/types/src/assignments.ts. **DraftAssignmentDTO unchanged** — Stage 32 shipped state preserved; teacher UI picks pathway pre-create, before the CreateAssignmentRequest is built. NOT NULL is safe: assignment table is empty in v1, no backfill required. createAssignment validates target_skill_ids ⊂ pathway (Q-33.8 v1 single-pathway constraint). startAssignment reads pathway_id from assignment row and forwards to POST /sessions/create.
+
 ### Q-33.7 — POST /assignments Idempotency-Key: enforce server-side or accept and log only?
 
 - Date raised: 2026-05-23 (Stage 33 prep)

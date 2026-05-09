@@ -7,3 +7,4 @@ packages:
   - "supabase/functions/jobs-worker"
   - "supabase/functions/analytics-svc"
   - "supabase/functions/orchestration-svc"
+  - "supabase/functions/assignments-svc"

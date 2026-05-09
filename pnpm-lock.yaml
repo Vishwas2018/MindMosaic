@@ -263,6 +263,12 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/types
 
+  supabase/functions/assignments-svc:
+    dependencies:
+      '@mm/engines':
+        specifier: workspace:*
+        version: link:../../../packages/engines
+
   supabase/functions/content-svc: {}
 
   supabase/functions/intelligence-svc:
