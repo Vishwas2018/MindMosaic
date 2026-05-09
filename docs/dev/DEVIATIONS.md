@@ -3,6 +3,18 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260526-1 — Parent dashboard ReadinessRing uses learner profile pathway_readiness rather than dedicated analytics-svc call
+
+- Date: 2026-05-26
+- Stage: 36
+- Type: substitution
+- What the stage said: SCREEN_SPECS §15 API calls list `GET /analytics/pathway-readiness/{child_id}/{pathway_slug}` as the source for the hero ring composite readiness value.
+- What I actually did: `useLearnerProfile(childId)` returns `LearningDNADTO.pathway_readiness: Record<string, PathwayReadinessDTO>`. The parent dashboard uses the first entry of this record for the ReadinessRing `value` + `label` props instead of making a second `usePathwayReadiness(childId, slug)` call.
+- Why: Chicken-and-egg dependency — calling `usePathwayReadiness(childId, slug)` requires a pathway slug as input, but the slug must first be derived from the learner profile or pathways list. The learner profile already contains the full `PathwayReadinessDTO` for every enrolled pathway (same data, same source service). A second redundant API call is avoided.
+- Impact on later stages: No later stage depends on whether this data comes from a standalone `usePathwayReadiness` call or from the learner profile bundle. If the parent dashboard later needs to select a specific pathway (e.g., "NAPLAN Y5 Numeracy readiness ring"), wire up `usePathwayReadiness` with an explicit slug selector at that stage.
+- Linked: ISSUE-0026 (useLearningPlan path — unrelated), Q-36.5 (ReadinessRing SVG resolved)
+- Resolved by: ongoing (acceptable for v1; explicit slug selection deferred to v1.1 per-pathway drill-down)
+
 ### DEV-20260524-1 — Stage 34 exit criterion '5s wall-clock SLA' not testable in sandbox
 
 - Date: 2026-05-24

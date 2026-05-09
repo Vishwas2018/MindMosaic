@@ -2,6 +2,50 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 36 — 2026-05-26
+
+**Planned (from DEV_PLAN.md Stage 36):** Parent Dashboard — SCREEN_SPECS §15; `apps/web/(parent)/parent/page.tsx`; ReadinessRing primitive; ExplanationCard formatter; all 7 content blocks; SDK hooks for parent data. 2-day budget (Days 50–51).
+
+**Actually delivered:**
+
+- Prep commit (d899b83): Q-36.1–Q-36.5 resolved + ISSUE-0026 filed + C-C-D-V saved to `docs/prompts/2026-05-26_stage-36.md`. Q-36.6/7/8 self-resolved during implementation (T2-tightened).
+- Implementation commit (56b4a9a): 19 files, 950 insertions, 25 deletions.
+  - `packages/core/src/explain-format.ts`: `buildExplanationCards()` v1 with `EXPLANATION_FORMATTER_VERSION = 'v1'`, severity-tiered copy templates (high/medium/low as const map), `MisconceptionInput` interface mapping `misconception_id` from `CausalMapDTO.active_misconceptions[]` (Q-36.6 self-resolve). 8 unit tests.
+  - `packages/ui/src/ReadinessRing/ReadinessRing.tsx`: SVG stroke-dasharray circular progress. Props: `value: number` (0–1, clamped), `label: string`, `size?: 'sm'|'md'|'lg'`. `role="img"` + `aria-label`. 4 axe/aria tests, 7 stories.
+  - `apps/web/src/app/(parent)/parent/page.tsx`: Full rewrite replacing EmptyState stub. 7 content blocks: ChildSwitcher (native `<select>` + localStorage `lastViewedChildId`), HeroSection (greeting + ReadinessRing using first entry of `learner_profile.pathway_readiness`), AtAGlanceSection (3 StatTiles), SubjectAreasSection (SkillBar per domain_profile), RecentSessionsSection (table), NoticedSection (ExplanationCards from CausalMapDTO), WhatHelpsSection (repair_queue CTAs). All states: loading skeletons, empty-no-children, empty-no-sessions, per-widget. URL param `?child={id}` + localStorage persistence.
+  - SDK: `useMyChildren` (identity.ts + ChildProfileSchema inline), `useLearnerProfile`, `useChildRecentSessions` (new — `GET /sessions/recent?student_id={id}&limit={n}`), `useCausalMap` path fix (`/${studentId}` suffix), `usePathwayReadiness` signature fix (`studentId + slug`, path `/analytics-svc/analytics/pathway-readiness/${studentId}/${slug}`). `mmKeys.pathwayReadiness` updated to `(studentId, slug)`. `zod` added to `@mm/sdk` deps.
+  - `apps/web/playwright/e2e/parent-dashboard.spec.ts`: test.skip-guarded E2E (fresh parent → empty state).
+
+**Time spent:** 1 day (Day 50 of 51-day budget — 1 day under budget)
+
+**Surprises / departures:**
+
+1. **DEV-20260526-1: PathwayReadinessRing uses learner profile data, not separate analytics-svc call.** SCREEN_SPECS §15 lists `GET /analytics/pathway-readiness/{child_id}/{pathway_slug}` as a distinct API call for the hero ring. Implementation uses `useLearnerProfile.data.pathway_readiness` (first entry) instead, which already contains `PathwayReadinessDTO` for each pathway. This avoids needing a slug before the profile loads (chicken-and-egg) and eliminates a redundant network call. Data is equivalent. Deviation logged.
+
+2. **zod not in @mm/sdk deps.** `identity.ts` defines `ChildProfileSchema` with `z.object(...)` but `zod` was not a declared dependency of `@mm/sdk`. Added `"zod": "^3.25.76"` (matching `@mm/types` version). No behavioural change — zod was already transitively available.
+
+3. **keys.test.ts `pathwayReadiness` arity fix.** `usePathwayReadiness` signature corrected from `(slug)` to `(studentId, slug)` per SCREEN_SPECS §15 API path; corresponding `mmKeys.orchestration.pathwayReadiness` key factory and test updated from 1→2 args. Test expectation updated to include both studentId and slug in key tuple.
+
+**Decisions made (not in stage):**
+
+- none (Q-36.6/7/8 self-resolves baked into impl; DEV-20260526-1 logged as deviation)
+
+**Deviations logged:**
+
+- DEV-20260526-1 (PathwayReadiness from learner profile, not dedicated analytics-svc call)
+
+**Issues opened / closed / questions raised:**
+
+- Q-36.6/7/8: self-resolved during implementation (T2-tightened)
+- ISSUE-0026: filed in prep commit (useLearningPlan path malformed — open, low severity, no Stage 36 consumer)
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (528/528 + 1 skipped) · Build unknown — TODO measure · RLS ✅ (no new tables)
+
+**Tomorrow — first thing:**
+Stage 37 — Teacher Dashboard (SCREEN_SPECS §16). Morning ritual pre-reads: teacher role guard, analytics-svc auto-groups handler shape, DEV-20260522-1 fix scope (query-vs-path-param, fix expected at Stage 37 per OPEN_ISSUES.md ISSUE-0021).
+
 ## Stage 35 — 2026-05-25
 
 **Planned (from DEV_PLAN.md Stage 35):** Plan Overrides — `POST /orchestration/overrides` + `DELETE /orchestration/overrides/{id}`; `PlanOverrideDTOSchema` in `@mm/types`; ≥10 contract tests. Day 49, 1-day budget.
