@@ -3,6 +3,18 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260524-1 — Stage 34 exit criterion '5s wall-clock SLA' not testable in sandbox
+
+- Date: 2026-05-24
+- Stage: 34
+- Type: scope-reduction
+- What the stage said: DEV_PLAN Stage 34 exit criteria: "End-to-end: assignment publish → notification appears for student within 5s."
+- What I actually did: Contract test invokes fn_drain_outbox_batch + jobs-worker dispatch + notifications-svc createNotification directly via mocked chain. No wall-clock wait. e2e test exercises full code path without cron scheduling. A 5-second production-level measurement is deferred to the deploy gate.
+- Why: Sandbox lacks Docker; pg_cron fires at 1-minute intervals (ADR-0018 precedent). The outbox dispatcher (pg_cron every minute) + jobs-worker (pg_cron every minute) give a worst-case wall-clock latency of ~120s in v1, not 5s. The 5s criterion is achievable only after production tuning (Database Webhook or sub-second cron — v1.1 path per ADR-0018). The contract test chain exercises the full logical path; production cron tuning + wall-clock measurement are deploy-gate activities.
+- Impact on later stages: Stage 41 (Phase 2 Exit Review) must include a deploy-environment wall-clock measurement for the notification path. Add to Phase 2 exit checklist.
+- Linked: ADR-0018, ISSUE-0024 (real-time upgrade pattern)
+- Resolved by: Production deploy gate (Stage 41 / deploy environment)
+
 ### DEV-20260523-1 — Arch §4.8 Idempotency-Key not enforced server-side in v1 assignments-svc
 
 - Date: 2026-05-23

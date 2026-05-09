@@ -5,6 +5,20 @@
 
 ## Open
 
+### ISSUE-0025 — Notification spam guard: soft dedup window production-tuning deferred
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-24 (Stage 34 prep, Q-34.4 resolution)
+- Area: backend (notifications-svc)
+- Tags: notifications-svc · dedup · v1.1 · spam-guard
+
+**Summary.** `createNotification` handler in notifications-svc deduplicates on `(user_id, type, payload->>'aggregate_id')` within a 1-hour window. This prevents duplicate notifications when, e.g., orchestration-svc triggers two rapid replans within the window. The 1h window is a v1 default; production usage may surface cases where the window is too aggressive (legitimate re-notifications suppressed) or too permissive (duplicates slip through due to different aggregate_id). `deduped: true` is emitted as a log field at the dedup check site so the hit-rate can be observed in production. T3 self-resolve: 1h default documented as default; Q-34.4 Option A resolution.
+
+**Fix (v1.1).** Observe dedup hit-rate via `deduped: true` log field over first 30 days of production usage. Revise window and keying strategy (may want `(user_id, type, date_trunc('day', now()))` for daily-cron-triggered types such as `assignment_due_soon`). Consider a dedicated `notification_dedup` table with TTL-indexed rows if the JSONB path query proves slow at scale.
+
+**Tracking pointer.** ISSUE-0025 inline comment at dedup check site in `supabase/functions/notifications-svc/handlers.ts`. DEV_PLAN Stage 34 C-C-D-V.
+
 ### ISSUE-0024 — Real-time assignment tracking: v1 uses polling cron (5-min latency)
 
 - Status: open

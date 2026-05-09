@@ -9,6 +9,63 @@
 
 ## Resolved
 
+### Q-34.4 — plan_updated + intervention_alert outbox writes: in Stage 34 or defer?
+
+- Date raised: 2026-05-24 (Stage 34 morning ritual)
+- Asked of: product owner / architect
+- Source: DEV_PLAN Stage 34 Deliverables — "domain events via outbox produce `notification` rows (`assignment_assigned`, `plan_updated`, `intervention_alert`)"
+- Question: DEV_PLAN lists all three event types in Stage 34 scope. However, neither orchestration-svc nor analytics-svc currently writes `outbox_event` rows for `plan_updated` or `intervention_alert`. Adding them requires amending two already-shipped services (Stage 31 + Stage 30). Options:
+  - **(A)** Full scope per DEV_PLAN: Stage 34 adds outbox_event INSERTs to orchestration-svc on replan completion (event_type=`plan_updated`) and analytics-svc after each intervention_alert INSERT (event_type=`intervention_alert`). Migration 0016 adds both dispatcher branches.
+  - **(B)** Scope reduction: Stage 34 delivers `assignment_assigned` notifications only. `plan_updated` / `intervention_alert` deferred to Stage 35+. File a deviation.
+- Why ambiguous: Cross-service amendments to shipped code add ~1–2h scope within a 1-day budget. With +2 buffer days banked the risk is manageable; however, scope reduction avoids cross-service churn and keeps Stage 34 focused on the new service scaffold.
+- Blocking? yes — T3 round-trip (scope determination, cross-service amendments to shipped services)
+- Assumed answer (if proceeding): **Option A** — full scope per DEV_PLAN
+- Code affected: `supabase/functions/orchestration-svc/handlers.ts`, `supabase/functions/analytics-svc/handlers.ts`, `supabase/migrations/0016_notification_dispatcher.sql`, `supabase/functions/notifications-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-24): **Option A**. Full scope per DEV_PLAN. Stage 34 adds outbox_event INSERTs at: orchestration-svc `processOrchestratorReplan` completion (event_type=`plan_updated`, payload=`{student_id, tenant_id, plan_id, session_count}`); analytics-svc `processTeacherRefresh` after each intervention_alert INSERT (event_type=`intervention_alert`, payload=`{student_id, teacher_id, tenant_id, alert_id, alert_type}`). Migration 0016 adds two more branches to fn_drain_outbox_batch. Budget risk accepted — +2 buffer days banked; cross-service writes are 2-line INSERTs at natural code-path sites.
+
+### Q-34.3 — channel scope: in-app only, or email/push in Stage 34?
+
+- Date raised: 2026-05-24 (Stage 34 morning ritual)
+- Asked of: self (T3 self-resolve)
+- Source: Spec §27.3 + §27.5; DEV_PLAN Stage 34 Objective "In-app notifications via outbox"
+- Question: Does Stage 34 implement email delivery per notification type, or in-app only?
+- Why ambiguous: Spec §27.3 says "Students and parents can configure per-type email delivery in preferences; in-app notifications are always on." Spec §27.5 says email is "owned by a separate transactional email service (e.g., Postmark, Resend)." Push is "deferred to Phase 5."
+- Blocking? no — self-resolvable from spec text
+- Assumed answer (if proceeding): In-app only
+- Code affected: `supabase/functions/notifications-svc/` (no email dispatch code written)
+- Status: resolved
+- Resolution (2026-05-24): **In-app only (T3 self-resolve).** Spec §27.5 explicitly defers email to a separate external service and push to Phase 5. DEV_PLAN Stage 34 objective says "in-app notifications via outbox." Arch §4.11 has no email endpoint. Stage 34 INSERTs notification rows only; no email dispatch, no push payload, no preference API.
+
+### Q-34.2 — notification storage table: exists in migration or requires new DDL in 0016?
+
+- Date raised: 2026-05-24 (Stage 34 morning ritual)
+- Asked of: self (T3 self-resolve)
+- Source: Pre-read of supabase/migrations/ directory
+- Question: Does the `notification` table already exist, or must migration 0016 CREATE TABLE?
+- Why ambiguous: DEV_PLAN says Stage 34 scaffolds notifications-svc (15th workspace); the outbox dispatcher in migration 0010 already references `notification.create` job_type, implying the table was anticipated. Exact migration file not confirmed at pre-read start.
+- Blocking? no — self-resolvable by reading migrations
+- Assumed answer (if proceeding): Table exists
+- Code affected: `supabase/migrations/0016_notification_dispatcher.sql` (no DDL needed)
+- Status: resolved
+- Resolution (2026-05-24): **Table exists (T3 self-resolve).** `notification` table DDL at `supabase/migrations/0007_new_domains.sql:239`. RLS Pattern E (`notification_own FOR ALL TO authenticated USING (user_id = auth_user_id()) WITH CHECK (user_id = auth_user_id())`) at line 334. `notification_type` enum at `supabase/migrations/0001_enums_tenancy_auth.sql:147`. Migration 0016 amends `fn_drain_outbox_batch` only — no `CREATE TABLE`.
+
+### Q-34.1 — event_type mismatch: Stage 33 writes `assignment_assigned`; migration 0010 handles `assignment.published`
+
+- Date raised: 2026-05-24 (Stage 34 morning ritual)
+- Asked of: product owner / architect
+- Source: `supabase/functions/assignments-svc/handlers.ts:570` (`event_type: 'assignment_assigned'`); `supabase/migrations/0010_outbox_dispatcher.sql:49` (`ELSIF event.event_type = 'assignment.published'`); `supabase/migrations/0010_outbox_dispatcher.sql:54` (`RAISE EXCEPTION 'unknown outbox event_type'`)
+- Question: Stage 33's `publishAssignment` writes outbox_event rows with `event_type = 'assignment_assigned'` (one per student, payload contains `student_id`). Migration 0010's fn_drain_outbox_batch handles `event_type = 'assignment.published'` only — any `assignment_assigned` event raises an exception that crashes the entire drain batch. The `assignment.published` branch appears to be speculative dead code (Stage 33 never writes it). Options:
+  - **(A)** Migration 0016 replaces `assignment.published` with `assignment_assigned` in fn_drain_outbox_batch. Pass `event.payload` (JSONB — already contains `student_id`, `tenant_id`) directly into the `notification.create` job payload. notifications-svc receives all data it needs without querying other tables. Stage 33 shipped code unchanged.
+  - **(B)** Amend Stage 33 to write `assignment.published` (one row per assignment). Migration 0010 stays. notifications-svc must then look up `assignment_target` to find student recipients — violates ownership (arch §1.2: `assignment_target` owned by assignments-svc).
+  - **(C)** Handle both event types in fn_drain_outbox_batch for backwards compatibility. Unnecessary complexity since `assignment.published` has never been written.
+- Why ambiguous: Migration 0010 was written at Stage 10 before assignments-svc design (Stage 33). The `assignment.published` naming was speculative. Stage 33 chose per-student outbox rows with `assignment_assigned` naming. These two systems have never been tested together.
+- Blocking? yes — T3 round-trip (dispatcher schema / payload contract — architectural). Any `assignment_assigned` events in the queue crash fn_drain_outbox_batch, blocking all other pipeline jobs.
+- Assumed answer (if proceeding): **Option A**
+- Code affected: `supabase/migrations/0016_notification_dispatcher.sql`, `supabase/functions/jobs-worker/index.ts`, `supabase/functions/notifications-svc/handlers.ts`
+- Status: resolved
+- Resolution (2026-05-24): **Option A**. Migration 0016 replaces the speculative `assignment.published` branch in fn_drain_outbox_batch with `assignment_assigned`. Job payload = `event.payload` (JSONB, already containing `student_id`, `tenant_id`, `assignment_id`, `published_at`). notifications-svc pipeline/create handler receives complete data; no cross-table queries. Stage 33 shipped code unchanged. ADR-0031 fourth amendment filed; `notification.create → notifications-svc` added to jobs-worker route map.
+
 ### Q-33.8 — startAssignment pathway_id gap: assignment table has no pathway_id; POST /sessions/create hard-requires it
 
 - Date raised: 2026-05-23 (Stage 33 implementation T1 reads)

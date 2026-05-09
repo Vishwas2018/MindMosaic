@@ -4,6 +4,7 @@
 - Amended: 2026-05-19 (Stage 29) — `pipeline.predictive_refresh` route added; speculative `pipeline.l5.*` → `analytics-svc` entry removed.
 - Amended: 2026-05-20 (Stage 30) — `pipeline.teacher_refresh` → `analytics-svc` added (concrete); speculative `pipeline.l7.* → orchestration-svc` entry replaced; `pipeline.l9.* → orchestration-svc` retained as still speculative. Q-30.1 resolved. ADR-0033 filed for location decision.
 - Amended: 2026-05-21 (Stage 31) — `pipeline.l9.*` wildcard replaced with concrete `pipeline.orchestration_replan → orchestration-svc → POST /orchestration/pipeline/orchestration-replan`. orchestration-svc confirmed as correct owner per arch §4.6 + §1.2. Q-31.1–Q-31.4 resolved. Third amendment.
+- Amended: 2026-05-24 (Stage 34) — `notification.create → notifications-svc → POST /notifications/pipeline/create` added (concrete). Q-34.1 resolved: outbox event_type `assignment_assigned` (Stage 33) → `notification.create` job; migration 0016 fixes fn_drain_outbox_batch alignment. Q-34.4 resolved: `plan_updated` + `intervention_alert` outbox events added to orchestration-svc replan + analytics-svc post-alert-INSERT paths respectively; migration 0016 adds both branches. Fourth amendment.
 - Date: 2026-05-18
 - Stage: 28
 - Tags: backend | architecture | async-pipeline
@@ -65,6 +66,7 @@ Each `job_type` maps to an owning service URL:
 | `pipeline.predictive_refresh` | `intelligence-svc` | `POST /intelligence/pipeline/predictive-refresh` |
 | `pipeline.teacher_refresh` | `analytics-svc` | `POST /analytics/pipeline/teacher-refresh` |
 | `pipeline.orchestration_replan` | `orchestration-svc` | `POST /orchestration/pipeline/orchestration-replan` |
+| `notification.create` | `notifications-svc` | `POST /notifications/pipeline/create` |
 
 HTTP call uses `SUPABASE_SERVICE_ROLE_KEY` (`x-mm-service-role` header) and propagates
 `x-mm-trace-id`. The owning service is responsible for idempotency (audit-log dedup
@@ -115,3 +117,13 @@ Related: ADR-0017, ADR-0018, ADR-0027, ADR-0028, ISSUE-0006
 Amended 2026-05-19 (Stage 29): `pipeline.predictive_refresh →
 intelligence-svc /intelligence/pipeline/predictive-refresh` route
 added to jobs-worker route map. Q-29.1 resolved.
+
+Amended 2026-05-24 (Stage 34): `notification.create → notifications-svc
+POST /notifications/pipeline/create` added to jobs-worker route map.
+`NOTIFICATIONS_SVC_URL` env var added to jobs-worker. `fn_drain_outbox_batch`
+in migration 0016 replaces the speculative `assignment.published` branch (dead
+code — Stage 33 never wrote that event type) with `assignment_assigned` +
+adds `plan_updated` + `intervention_alert` branches. orchestration-svc replan
+completion + analytics-svc post-alert-INSERT write outbox_event rows for the
+two new event types. Q-34.1 and Q-34.4 resolved. ISSUE-0025 filed for
+spam-guard dedup window tuning.
