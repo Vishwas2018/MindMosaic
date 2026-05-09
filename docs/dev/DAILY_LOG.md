@@ -2,6 +2,63 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 33 — 2026-05-23
+
+**Planned (from DEV_PLAN.md Stage 33):** Assignments Service — new 14th workspace `assignments-svc` with 9 endpoints (create, get, update, publish, archive, for-student, for-class, tracking, start); migration 0015 (pathway_id ALTER + 2 pg_cron functions); contract tests + e2e. Days 46–47, 2-day budget.
+
+**Actually delivered:**
+
+- `supabase/functions/assignments-svc/` (new — 14th workspace): `handlers.ts` (~993 lines, 9 handlers: `createAssignment`, `getAssignment`, `updateAssignment`, `publishAssignment`, `archiveAssignment`, `getAssignmentsForStudent`, `getAssignmentsForClass`, `getAssignmentTracking`, `startAssignment` + `markOverdue` + `syncAssignmentCompletion` for cron simulation), `index.ts` (~330 lines, 9 routes before service-role gate), `package.json`, `tsconfig.json`.
+- `supabase/functions/assignments-svc/__tests__/contract.test.ts` (594 lines, 19 tests) + `e2e.test.ts` (273 lines, 1 test, 6-step full lifecycle: create → publish → student-list → start → cron-sync → tracking-completed).
+- `supabase/migrations/0015_assignment_pathway_and_cron.sql` (90 lines): `ALTER TABLE assignment ADD COLUMN pathway_id uuid NOT NULL REFERENCES pathway(id) ON DELETE RESTRICT` (Q-33.8 Option A); `fn_mark_overdue_assignments()` + `assignment.mark_overdue` cron daily 01:00 UTC (Q-33.2 Option A); `fn_sync_assignment_completion()` + `assignment.sync_completion` cron every 5 min (Q-33.3 Option B).
+- `packages/types/src/assignments.ts`: `pathway_id: z.string().uuid()` added to `CreateAssignmentRequestSchema` + `AssignmentDTOSchema` (Q-33.8 boundary refinement; `DraftAssignmentDTO` in analytics-svc unchanged — Stage 32 shipped state preserved).
+- `packages/types/src/__tests__/schemas.test.ts`: `pathway_id` fixture added to `StudentAssignmentDTOSchema` round-trip test.
+- `pnpm-workspace.yaml`: `supabase/functions/assignments-svc` added as 14th workspace entry.
+- Prep commit (b4c244e): Q-33.1–Q-33.7 resolved; DEV-20260523-1, ISSUE-0023, ISSUE-0024 filed; C-C-D-V saved (docs/prompts/2026-05-23_stage-33.md).
+- Implementation commit (fa206fe): 13 files, 2,362 insertions, Q-33.8 resolved mid-impl T3 round-trip.
+
+**Time spent:** 2 days (on 2-day budget — Days 46–47)
+
+**Surprises / departures:**
+
+1. **Q-33.8 (pathway_id schema gap — T3 round-trip mid-impl)**: `POST /sessions/create` hard-rejects `pathway_id === null` (assessment-svc/handlers.ts:226-228) but `assignment` table and `CreateAssignmentRequest` had no `pathway_id`. Surfaced mid-impl as a blocking T3 gap (DTO shape + schema). Option A applied: `pathway_id NOT NULL` added to migration 0015; added to `CreateAssignmentRequestSchema` + `AssignmentDTOSchema`; `DraftAssignmentDTO` unchanged. `startAssignment` reads `pathway_id` from assignment row and forwards to assessment-svc with student JWT. First T3 Option 3 round-trip — worked as designed.
+2. **DEV-20260523-1 (Idempotency-Key not enforced)**: Arch §4.8 specifies Idempotency-Key on `POST /assignments` + `POST /assignments/{id}/start`. v1 ships parse-and-log only (Q-33.7 Option C). Pre-read R5 confirmed `api_idempotency_key` owned by assessment-svc (Pattern G) — cross-service write would require ownership coordination not in v1 scope.
+3. **e2e Proxy-mutation failure (recovered)**: Initial e2e.test.ts used Proxy property assignment to set per-step stubs. A Proxy without a `set` trap silently ignores the write; `get` trap always returns fresh functions regardless. Rewritten using same sequential-counter `buildClient` from contract.test.ts, with separate `buildClient` instances per step.
+
+**Decisions made (not in stage):**
+
+- Q-33.8 Option A (pathway_id NOT NULL on assignment table) — operator T3 round-trip
+- Q-33.7 Option C (Idempotency-Key parse-and-log only in v1) — self-resolve under T3 Option 3
+- Q-33.4 Option A (student reads own; teacher reads any student in tenant) — self-resolve
+- Q-33.5 Option A (422 UNPROCESSABLE for patch-on-published) — self-resolve
+- Q-33.6 Option A (archive allowed from draft or published; 422 if already archived) — self-resolve
+- No new ADRs (ADR count holds at 33)
+
+**Deviations logged:**
+
+- DEV-20260523-1 (prep commit — Idempotency-Key enforcement deferred)
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0023 (medium) opened: Idempotency-Key enforcement deferred to v1.1 (prep commit)
+- ISSUE-0024 (low) opened: real-time tracking upgrade (cron → outbox-driven) deferred to v1.1 (prep commit)
+- ISSUE-0018 updated: `ASSESSMENT_SVC_URL` added to undocumented env var list (now 4 undocumented service URL vars)
+- Q-33.1–Q-33.7 filed and resolved (prep commit); Q-33.8 filed and resolved mid-impl (T3 round-trip)
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (14 packages) · Tests ✅ (487 passed / 1 skipped) · Build n/a · RLS n/a (migration 0015 adds no RLS policies — assignments-svc uses service-role key throughout)
+
+**Process retro:**
+
+- (a) **T3 Option 3 first stage in force — worked as designed.** Q-33.8 (DTO + schema gap on `pathway_id`) correctly triggered mid-impl operator round-trip; Q-33.4/5/6 correctly self-resolved with documented defaults. Zero drift. Three-stage drift pattern (Stages 30, 31, 32) broken on first stage of new discipline. T3 Option 3 recommended for canonisation in CLAUDE.md or a discipline file at Stage 34 evening retro.
+- (b) **Pre-read R5 caught `api_idempotency_key` ownership (Pattern G, owned by assessment-svc)** — confirms Q-33.7 Option C was the right call before implementation. T1 read discipline working as designed.
+- (c) **2-day budget shipped on time, no buffer consumption.** First Phase 2 multi-day stage clean. Phase 2 buffer remains +2 banked.
+
+**Tomorrow — first thing:**
+
+Stage 34 — Notifications Service (Day 48, 1-day budget). Pre-read MUST verify spec section number (T1 — DEV_PLAN cites arch §X; read spec TOC). Confirm `outbox_event` type `assignment_assigned` consumer shape (Stage 33 → Stage 34 handoff). Pre-read R5-style: verify cross-service table ownership before assuming write access.
+
 ## Stage 32 — 2026-05-22
 
 **Planned (from DEV_PLAN.md Stage 32):** Intelligence + Analytics Endpoints Complete — 8 new read endpoints (5 intelligence-svc: learner-profile, causal-map, behaviour-profile, audit-log, explain; 3 analytics-svc: cohort, pathway-readiness, generate-assignment as ephemeral DraftAssignmentDTO). Zero new migrations. 1-day budget (Day 45).
