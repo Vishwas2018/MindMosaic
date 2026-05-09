@@ -158,6 +158,27 @@ interface PlanOverrideRow {
   expires_at: string;
 }
 
+interface PlanOverrideFullRow {
+  id: string;
+  student_id: string;
+  actor_id: string;
+  type: 'pin_skill' | 'dismiss_recommendation' | 'override_plan_item';
+  target: Record<string, unknown>;
+  expires_at: string;
+  priority: number;
+  created_at: string;
+}
+
+interface PlanOverrideDTOLocal {
+  id: string;
+  student_id: string;
+  type: 'pin_skill' | 'dismiss_recommendation';
+  target: Record<string, unknown>;
+  actor: { id: string; display_name: string };
+  expires_at: string;
+  created_at: string;
+}
+
 interface SkillNodeRow {
   id: string;
   name: string;
@@ -805,4 +826,241 @@ export async function generatePlan(
   await processOrchestratorReplan(payload, db, now, generateUuid);
 
   return getCurrentPlan(studentId, 'weekly', caller, db);
+}
+
+// ---------------------------------------------------------------------------
+// createOverride — Stage 35
+// ---------------------------------------------------------------------------
+
+const OVERRIDE_ALLOWED_ROLES = ['parent', 'teacher', 'tutor', 'org_admin', 'platform_admin'];
+
+export async function createOverride(
+  studentId: string,
+  caller: Caller,
+  body: { type: string; target: Record<string, unknown>; expires_in_days?: number },
+  db: DbClient,
+  now: Date = new Date()
+): Promise<{ data: PlanOverrideDTOLocal | null; status: number; error?: string; message?: string }> {
+  // actor_id NOT NULL FK rejects empty userId (service-role dual-path guard)
+  if (!caller.userId) {
+    return {
+      data: null,
+      status: 403,
+      error: 'FORBIDDEN',
+      message: 'Bearer JWT required for override operations; service-role not permitted as actor.',
+    };
+  }
+
+  // Role gate (Q-35.2 Option A)
+  if (!OVERRIDE_ALLOWED_ROLES.includes(caller.role)) {
+    return {
+      data: null,
+      status: 403,
+      error: 'FORBIDDEN',
+      message: `Role '${caller.role}' is not permitted to create plan overrides.`,
+    };
+  }
+
+  // override_plan_item rejection (Q-35.4 Option A)
+  if (body.type === 'override_plan_item') {
+    return {
+      data: null,
+      status: 400,
+      error: 'UNSUPPORTED_TYPE',
+      message: 'override_plan_item deferred in v1; not yet supported.',
+    };
+  }
+
+  if (body.type !== 'pin_skill' && body.type !== 'dismiss_recommendation') {
+    return { data: null, status: 400, error: 'BAD_REQUEST', message: `Unsupported override type: ${body.type}` };
+  }
+  const overrideType = body.type as 'pin_skill' | 'dismiss_recommendation';
+
+  // Link verification per role (Q-35.2 Option A)
+  if (caller.role === 'parent') {
+    const { data: links } = (await db
+      .from('parent_student_link')
+      .select('student_id')
+      .eq('parent_id', caller.userId)
+      .eq('student_id', studentId)
+      .limit(1)) as { data: Array<{ student_id: string }> | null; error: unknown };
+    if (!links || links.length === 0) {
+      return { data: null, status: 403, error: 'FORBIDDEN', message: 'Parent is not linked to this student.' };
+    }
+  } else if (caller.role === 'teacher' || caller.role === 'tutor') {
+    const { data: classes } = (await db
+      .from('class_group')
+      .select('id')
+      .eq('teacher_id', caller.userId)) as { data: Array<{ id: string }> | null; error: unknown };
+    const classIds = (classes ?? []).map((c) => c.id);
+    if (classIds.length === 0) {
+      return { data: null, status: 403, error: 'FORBIDDEN', message: 'Caller has no class roster.' };
+    }
+    const { data: enrolled } = (await db
+      .from('class_student')
+      .select('student_id')
+      .in('class_id', classIds)
+      .eq('student_id', studentId)
+      .limit(1)) as { data: Array<{ student_id: string }> | null; error: unknown };
+    if (!enrolled || enrolled.length === 0) {
+      return { data: null, status: 403, error: 'FORBIDDEN', message: "Student is not on caller's class roster." };
+    }
+  }
+  // org_admin / platform_admin: no additional link check (JWT role claim verified by auth middleware)
+
+  // Actor display_name + tenant_id join (mirrors Stage 33 fetchDisplayName pattern;
+  // tenant_id required for intelligence_audit_log NOT NULL constraint and plan_override INSERT)
+  const { data: actorRows } = (await db
+    .from('user_profile')
+    .select('display_name,tenant_id')
+    .eq('id', caller.userId)
+    .limit(1)) as { data: Array<{ display_name: string; tenant_id: string }> | null; error: unknown };
+  const actorDisplayName = actorRows?.[0]?.display_name ?? '';
+  const tenantId = actorRows?.[0]?.tenant_id ?? '';
+
+  // Self-supersession: SELECT active overrides of same (student_id, type) (Q-35.3 Option A)
+  const nowIso = now.toISOString();
+  const expiryDays = body.expires_in_days ?? OVERRIDE_DEFAULT_EXPIRY_DAYS;
+  const expiresAt = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: activeRows } = (await db
+    .from('plan_override')
+    .select('id,student_id,actor_id,type,target,expires_at,priority,created_at')
+    .eq('student_id', studentId)
+    .eq('type', overrideType)
+    .gte('expires_at', nowIso)) as { data: PlanOverrideFullRow[] | null; error: unknown };
+
+  // Deterministic key: target->>'skill_id' (pin_skill) or target->>'recommendation_key' (dismiss)
+  let existingRow: PlanOverrideFullRow | null = null;
+  if (activeRows && activeRows.length > 0) {
+    if (overrideType === 'pin_skill') {
+      existingRow = activeRows.find((r) => r.target['skill_id'] === body.target['skill_id']) ?? null;
+    } else {
+      existingRow =
+        activeRows.find(
+          (r) => r.target['recommendation_key'] === body.target['recommendation_key']
+        ) ?? null;
+    }
+  }
+
+  let resultRow: PlanOverrideFullRow;
+  const isUpdate = existingRow !== null;
+
+  if (isUpdate) {
+    // Self-supersession: UPDATE expires_at + priority (pin_skill only per spec §16.6.1)
+    const patch: Record<string, unknown> = { expires_at: expiresAt };
+    if (overrideType === 'pin_skill' && typeof body.target['priority'] === 'number') {
+      patch['priority'] = body.target['priority'] as number;
+    }
+    await db.from('plan_override').update(patch).eq('id', existingRow!.id);
+    resultRow = { ...existingRow!, expires_at: expiresAt };
+  } else {
+    // INSERT new override row (tenant_id NOT NULL — sourced from actor user_profile)
+    const newId = crypto.randomUUID();
+    const priority = typeof body.target['priority'] === 'number' ? (body.target['priority'] as number) : 100;
+    await db.from('plan_override').insert({
+      id: newId,
+      student_id: studentId,
+      tenant_id: tenantId,
+      actor_id: caller.userId,
+      type: overrideType,
+      target: body.target,
+      expires_at: expiresAt,
+      priority,
+    });
+    resultRow = {
+      id: newId,
+      student_id: studentId,
+      actor_id: caller.userId,
+      type: overrideType,
+      target: body.target,
+      expires_at: expiresAt,
+      priority,
+      created_at: nowIso,
+    };
+  }
+
+  // Audit log — spec §16.6.1: every override creation writes an entry with layer='L9_override'
+  await db.from('intelligence_audit_log').insert({
+    student_id: studentId,
+    tenant_id: tenantId,
+    event_type: 'override_created',
+    layer: 'L9_override',
+    algorithm_version: L9_ALGORITHM_VERSION,
+    input_snapshot: {
+      override_id: resultRow.id,
+      type: overrideType,
+      target: body.target,
+      expires_at: expiresAt,
+      actor_id: caller.userId,
+    },
+    output: { success: true },
+    trace_id: null,
+  });
+
+  return {
+    data: {
+      id: resultRow.id,
+      student_id: studentId,
+      type: overrideType,
+      target: body.target,
+      actor: { id: caller.userId, display_name: actorDisplayName },
+      expires_at: expiresAt,
+      created_at: resultRow.created_at,
+    },
+    status: isUpdate ? 200 : 201,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// deleteOverride — Stage 35
+// ---------------------------------------------------------------------------
+
+export async function deleteOverride(
+  overrideId: string,
+  caller: Caller,
+  db: DbClient
+): Promise<{ data: { deleted: true } | null; status: number; error?: string; message?: string }> {
+  // Fetch override to verify existence and actor ownership
+  // (tenant_id fetched for intelligence_audit_log NOT NULL constraint)
+  const { data: rows, error: fetchErr } = (await db
+    .from('plan_override')
+    .select('id,actor_id,student_id,tenant_id')
+    .eq('id', overrideId)
+    .limit(1)) as {
+    data: Array<{ id: string; actor_id: string; student_id: string; tenant_id: string }> | null;
+    error: unknown;
+  };
+
+  if (fetchErr) return { data: null, status: 500, error: 'DB_ERROR', message: 'Failed to fetch override.' };
+  const row = rows?.[0] ?? null;
+  if (!row) return { data: null, status: 404, error: 'NOT_FOUND', message: 'Override not found.' };
+
+  // Authorization: actor_id = caller.userId OR org_admin/platform_admin
+  const isAdmin = caller.role === 'org_admin' || caller.role === 'platform_admin';
+  if (!isAdmin && row.actor_id !== caller.userId) {
+    return {
+      data: null,
+      status: 403,
+      error: 'FORBIDDEN',
+      message: 'Only the original actor or an admin may delete this override.',
+    };
+  }
+
+  // DELETE the override row
+  await db.from('plan_override').delete().eq('id', overrideId);
+
+  // Audit log — spec §16.6.1: every override deletion writes an entry with layer='L9_override'
+  await db.from('intelligence_audit_log').insert({
+    student_id: row.student_id,
+    tenant_id: row.tenant_id,
+    event_type: 'override_deleted',
+    layer: 'L9_override',
+    algorithm_version: L9_ALGORITHM_VERSION,
+    input_snapshot: { override_id: overrideId, deleted_by_actor_id: caller.userId },
+    output: { success: true },
+    trace_id: null,
+  });
+
+  return { data: { deleted: true }, status: 204 };
 }

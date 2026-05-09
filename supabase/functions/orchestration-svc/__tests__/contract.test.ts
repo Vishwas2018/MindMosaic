@@ -1,10 +1,10 @@
 /**
- * orchestration-svc contract tests — Stage 31.
+ * orchestration-svc contract tests — Stage 31 + Stage 35.
  *
  * Vitest in Node. The Deno dispatcher (index.ts) is NOT exercised here —
  * we test pure handler functions with a mocked Supabase-like client.
  *
- * Coverage (9 tests, names verbatim from C-C-D-V Stage 31):
+ * Coverage (19 tests):
  *   processOrchestratorReplan (7):
  *     happy path: weekly plan generated with priority queue and supersedes prior active plan
  *     idempotent skip: plan.updated_at > scheduled_at → no DB writes
@@ -16,11 +16,26 @@
  *   getCurrentPlan (2):
  *     GET /orchestration/plan/current returns active plan for caller student
  *     GET denies cross-student read for non-teacher caller
+ *   createOverride (7) — Stage 35:
+ *     createOverride: pin_skill INSERT with caller actor_id and 14-day default expiry
+ *     createOverride: dismiss_recommendation INSERT
+ *     createOverride: override_plan_item → 400 UNSUPPORTED_TYPE (Q-35.4)
+ *     createOverride: self-supersession UPDATE on existing pin_skill for same skill_id (Q-35.3)
+ *     createOverride: parent unlinked student → 403
+ *     createOverride: student caller → 403 (role gate rejects)
+ *     createOverride: tutor caller succeeds (Q-35.2)
+ *   deleteOverride (2) — Stage 35:
+ *     deleteOverride: caller actor_id matches → 204 + audit log
+ *     deleteOverride: wrong actor non-admin → 403
+ *   consumption path sanity (1) — Stage 35:
+ *     expired override: existing consumption filter excludes from replan (no-touch sanity check)
  */
 import { describe, expect, it } from 'vitest';
 import {
   processOrchestratorReplan,
   getCurrentPlan,
+  createOverride,
+  deleteOverride,
   type DbClient,
 } from '../handlers.ts';
 
@@ -474,5 +489,285 @@ describe('getCurrentPlan', () => {
 
     // No DB calls made (access denied before query)
     expect(db.calls).toHaveLength(0);
+  });
+});
+
+// ─── Stage 35: createOverride + deleteOverride contract tests ────────────────
+
+const ACTOR_ID    = 'u0000000-0000-4000-8000-000000000010';
+const ACTOR_B     = 'u0000000-0000-4000-8000-000000000011';
+const OVERRIDE_ID = 'ov000000-0000-4000-8000-000000000001';
+const CLASS_ID    = 'cg000000-0000-4000-8000-000000000001';
+const TEST_NOW    = new Date('2026-05-25T09:00:00.000Z');
+const TEST_FUTURE = new Date('2026-06-08T09:00:00.000Z').toISOString(); // +14 days
+
+function teacherStubs(overrideStubs: QueryStub | QueryStub[]): Stubs {
+  return {
+    class_group:  { data: [{ id: CLASS_ID }], error: null },
+    class_student: { data: [{ student_id: STUDENT_ID }], error: null },
+    user_profile:  { data: [{ display_name: 'Ms. Smith', tenant_id: TENANT_ID }], error: null },
+    plan_override: overrideStubs,
+    intelligence_audit_log: { data: null, error: null },
+  };
+}
+
+describe('createOverride', () => {
+  it('createOverride: pin_skill INSERT with caller actor_id and 14-day default expiry', async () => {
+    const db = buildClient(teacherStubs([
+      { data: [], error: null },      // SELECT active (no existing)
+      { data: null, error: null },    // INSERT
+    ]));
+
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: ACTOR_ID, role: 'teacher' },
+      { type: 'pin_skill', target: { skill_id: SKILL_PIN } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(201);
+    expect(result.data).toBeDefined();
+    expect(result.data!.type).toBe('pin_skill');
+    expect(result.data!.actor.id).toBe(ACTOR_ID);
+    expect(result.data!.expires_at).toBe(TEST_FUTURE);
+    expect(result.data!.student_id).toBe(STUDENT_ID);
+
+    // INSERT to plan_override
+    const insertCall = db.calls.find((c) => c.table === 'plan_override' && c.op === 'insert');
+    expect(insertCall).toBeDefined();
+    const row = insertCall!.args as Record<string, unknown>;
+    expect(row['actor_id']).toBe(ACTOR_ID);
+    expect(row['type']).toBe('pin_skill');
+    expect(row['expires_at']).toBe(TEST_FUTURE);
+
+    // Audit log written
+    const auditCall = db.calls.find((c) => c.table === 'intelligence_audit_log' && c.op === 'insert');
+    expect(auditCall).toBeDefined();
+    const audit = auditCall!.args as Record<string, unknown>;
+    expect(audit['event_type']).toBe('override_created');
+    expect(audit['layer']).toBe('L9_override');
+    expect(audit['algorithm_version']).toBe('L9.v1');
+  });
+
+  it('createOverride: dismiss_recommendation INSERT', async () => {
+    const db = buildClient(teacherStubs([
+      { data: [], error: null },    // SELECT active
+      { data: null, error: null },  // INSERT
+    ]));
+
+    const dismissKey = `${SKILL_GAP}:practice:practice`;
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: ACTOR_ID, role: 'teacher' },
+      { type: 'dismiss_recommendation', target: { recommendation_key: dismissKey } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(201);
+    expect(result.data!.type).toBe('dismiss_recommendation');
+    expect(result.data!.target['recommendation_key']).toBe(dismissKey);
+
+    const insertCall = db.calls.find((c) => c.table === 'plan_override' && c.op === 'insert');
+    expect(insertCall).toBeDefined();
+    expect((insertCall!.args as Record<string, unknown>)['type']).toBe('dismiss_recommendation');
+  });
+
+  it('createOverride: override_plan_item → 400 UNSUPPORTED_TYPE (Q-35.4)', async () => {
+    const db = buildClient({});
+
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: ACTOR_ID, role: 'teacher' },
+      { type: 'override_plan_item', target: { plan_id: PLAN_ID, order: 1 } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(400);
+    expect(result.error).toBe('UNSUPPORTED_TYPE');
+    expect(result.message).toContain('override_plan_item');
+
+    // No DB calls
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it('createOverride: self-supersession UPDATE on existing pin_skill for same skill_id (Q-35.3)', async () => {
+    const existingOverride: Record<string, unknown> = {
+      id: OVERRIDE_ID,
+      student_id: STUDENT_ID,
+      actor_id: ACTOR_ID,
+      type: 'pin_skill',
+      target: { skill_id: SKILL_PIN },
+      expires_at: TEST_FUTURE,
+      priority: 100,
+      created_at: PAST,
+    };
+
+    const db = buildClient(teacherStubs([
+      { data: [existingOverride], error: null }, // SELECT finds existing row
+      { data: null, error: null },               // UPDATE
+    ]));
+
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: ACTOR_ID, role: 'teacher' },
+      { type: 'pin_skill', target: { skill_id: SKILL_PIN } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(200); // UPDATE path returns 200
+    expect(result.data!.id).toBe(OVERRIDE_ID);
+
+    // UPDATE was called, not INSERT
+    const updateCall = db.calls.find((c) => c.table === 'plan_override' && c.op === 'update');
+    expect(updateCall).toBeDefined();
+    const patch = updateCall!.args as Record<string, unknown>;
+    expect(patch['expires_at']).toBe(TEST_FUTURE);
+
+    const insertCall = db.calls.find((c) => c.table === 'plan_override' && c.op === 'insert');
+    expect(insertCall).toBeUndefined();
+  });
+
+  it('createOverride: parent unlinked student → 403', async () => {
+    const db = buildClient({
+      parent_student_link: { data: [], error: null }, // no link
+    });
+
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: ACTOR_ID, role: 'parent' },
+      { type: 'pin_skill', target: { skill_id: SKILL_PIN } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+
+    // No plan_override calls after link check fails
+    const overrideCalls = db.calls.filter((c) => c.table === 'plan_override');
+    expect(overrideCalls).toHaveLength(0);
+  });
+
+  it('createOverride: student caller → 403 (role gate rejects)', async () => {
+    const db = buildClient({});
+
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: STUDENT_ID, role: 'student' },
+      { type: 'pin_skill', target: { skill_id: SKILL_PIN } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+
+    // Role gate fires before any DB call
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it('createOverride: tutor caller succeeds (Q-35.2)', async () => {
+    const db = buildClient({
+      class_group:  { data: [{ id: CLASS_ID }], error: null },
+      class_student: { data: [{ student_id: STUDENT_ID }], error: null },
+      user_profile:  { data: [{ display_name: 'Mr. Jones', tenant_id: TENANT_ID }], error: null },
+      plan_override: [
+        { data: [], error: null },    // SELECT active
+        { data: null, error: null },  // INSERT
+      ],
+      intelligence_audit_log: { data: null, error: null },
+    });
+
+    const result = await createOverride(
+      STUDENT_ID,
+      { userId: ACTOR_ID, role: 'tutor' },
+      { type: 'pin_skill', target: { skill_id: SKILL_PIN } },
+      db,
+      TEST_NOW
+    );
+
+    expect(result.status).toBe(201);
+    expect(result.data).toBeDefined();
+    expect(result.data!.type).toBe('pin_skill');
+    expect(result.data!.actor.display_name).toBe('Mr. Jones');
+
+    // class_group queried with teacher_id (tutor uses same link table as teacher)
+    const classCall = db.calls.find((c) => c.table === 'class_group');
+    expect(classCall).toBeDefined();
+    expect(classCall!.conditions?.some((cond) => cond.col === 'teacher_id' && cond.val === ACTOR_ID)).toBe(true);
+  });
+});
+
+describe('deleteOverride', () => {
+  it('deleteOverride: caller actor_id matches → 204 + audit log', async () => {
+    const db = buildClient({
+      plan_override: [
+        { data: [{ id: OVERRIDE_ID, actor_id: ACTOR_ID, student_id: STUDENT_ID, tenant_id: TENANT_ID }], error: null }, // SELECT
+        { data: null, error: null }, // DELETE
+      ],
+      intelligence_audit_log: { data: null, error: null },
+    });
+
+    const result = await deleteOverride(OVERRIDE_ID, { userId: ACTOR_ID, role: 'teacher' }, db);
+
+    expect(result.status).toBe(204);
+    expect(result.data!.deleted).toBe(true);
+
+    // DELETE was called on plan_override
+    const deleteCall = db.calls.find((c) => c.table === 'plan_override' && c.op === 'delete');
+    expect(deleteCall).toBeDefined();
+    expect(deleteCall!.conditions?.some((cond) => cond.col === 'id' && cond.val === OVERRIDE_ID)).toBe(true);
+
+    // Audit log written with override_deleted
+    const auditCall = db.calls.find((c) => c.table === 'intelligence_audit_log' && c.op === 'insert');
+    expect(auditCall).toBeDefined();
+    const audit = auditCall!.args as Record<string, unknown>;
+    expect(audit['event_type']).toBe('override_deleted');
+    expect(audit['layer']).toBe('L9_override');
+    const snap = audit['input_snapshot'] as Record<string, unknown>;
+    expect(snap['override_id']).toBe(OVERRIDE_ID);
+    expect(snap['deleted_by_actor_id']).toBe(ACTOR_ID);
+  });
+
+  it('deleteOverride: wrong actor non-admin → 403', async () => {
+    const db = buildClient({
+      plan_override: {
+        data: [{ id: OVERRIDE_ID, actor_id: ACTOR_ID, student_id: STUDENT_ID, tenant_id: TENANT_ID }],
+        error: null,
+      },
+    });
+
+    const result = await deleteOverride(OVERRIDE_ID, { userId: ACTOR_B, role: 'teacher' }, db);
+
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+
+    // DELETE not called
+    const deleteCall = db.calls.find((c) => c.table === 'plan_override' && c.op === 'delete');
+    expect(deleteCall).toBeUndefined();
+  });
+});
+
+describe('override consumption path sanity', () => {
+  it('expired override: existing consumption filter excludes from replan (no-touch sanity check)', async () => {
+    const db = buildClient(baseStubs());
+
+    await processOrchestratorReplan(BASE_PAYLOAD, db, NOW, UUID_GEN);
+
+    // Verify the plan_override SELECT includes gte('expires_at', ...) filter —
+    // the DB enforces expiry; this confirms the condition is passed correctly.
+    const overrideSelectCall = db.calls.find(
+      (c) => c.table === 'plan_override' && c.op === 'select'
+    );
+    expect(overrideSelectCall).toBeDefined();
+    const gteCondition = overrideSelectCall!.conditions?.find(
+      (cond) => cond.kind === 'gte' && cond.col === 'expires_at'
+    );
+    expect(gteCondition).toBeDefined();
+    expect(gteCondition!.val).toBe(NOW.toISOString());
   });
 });

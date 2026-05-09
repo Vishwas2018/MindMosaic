@@ -66,3 +66,17 @@ export const PlanOverrideRequestSchema = z.object({
   expires_in_days: z.number().int().optional(),
 });
 export type PlanOverrideRequest = z.infer<typeof PlanOverrideRequestSchema>;
+
+export const PlanOverrideDTOSchema = z.object({
+  id: z.string().uuid(),
+  student_id: z.string().uuid(),
+  type: z.enum(['pin_skill', 'dismiss_recommendation']),
+  target: z.record(z.string(), z.unknown()),
+  actor: z.object({
+    id: z.string().uuid(),
+    display_name: z.string(),
+  }),
+  expires_at: z.string().datetime(),
+  created_at: z.string().datetime(),
+});
+export type PlanOverrideDTO = z.infer<typeof PlanOverrideDTOSchema>;
