@@ -155,6 +155,7 @@ describe('processTeacherRefresh', () => {
         { data: null, error: null }, // index 1: insert
       ],
       cohort_metric_cache:   { data: null, error: null },
+      outbox_event:          { data: null, error: null }, // Stage 34: intervention_alert outbox write
     });
 
     const result = await processTeacherRefresh(BASE_PAYLOAD, db, NOW);
@@ -255,6 +256,7 @@ describe('processTeacherRefresh', () => {
         { data: null, error: null },
       ],
       cohort_metric_cache:   { data: null, error: null },
+      outbox_event:          { data: null, error: null }, // Stage 34: intervention_alert outbox write
     });
 
     const result = await processTeacherRefresh(BASE_PAYLOAD, db, NOW);
@@ -290,6 +292,7 @@ describe('processTeacherRefresh', () => {
         { data: null, error: null },
       ],
       cohort_metric_cache:   { data: null, error: null },
+      outbox_event:          { data: null, error: null }, // Stage 34: intervention_alert outbox write
     });
 
     const result = await processTeacherRefresh(BASE_PAYLOAD, db, NOW);
@@ -364,6 +367,7 @@ describe('processTeacherRefresh', () => {
         { data: null, error: null },
       ],
       cohort_metric_cache:   { data: null, error: null },
+      outbox_event:          { data: null, error: null }, // Stage 34: intervention_alert outbox write
     });
 
     const result = await processTeacherRefresh(BASE_PAYLOAD, db, NOW);

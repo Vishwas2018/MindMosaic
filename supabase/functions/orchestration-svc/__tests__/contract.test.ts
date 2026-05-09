@@ -179,6 +179,7 @@ function baseStubs(planOverride: QueryStub | QueryStub[] = [
       { data: null, error: null }, // UPDATE completed
     ],
     intelligence_audit_log: { data: null, error: null },
+    outbox_event: { data: null, error: null }, // Stage 34: plan_updated outbox write
   };
 }
 

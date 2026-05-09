@@ -68,6 +68,10 @@ export type { TextAreaProps } from './TextArea/TextArea.js';
 export { FormField, FieldWrapper } from './FormField/FormField.js';
 export type { FormFieldProps, FieldWrapperProps } from './FormField/FormField.js';
 
+// Notifications
+export { Bell } from './Bell/Bell.js';
+export type { BellProps } from './Bell/Bell.js';
+
 // Overlay & feedback
 export { Dialog, DialogContent } from './Dialog/Dialog.js';
 export type { DialogProps } from './Dialog/Dialog.js';

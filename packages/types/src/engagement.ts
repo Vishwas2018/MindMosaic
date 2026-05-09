@@ -44,3 +44,10 @@ export const NotificationDTOSchema = z.object({
   created_at: z.string().datetime(),
 });
 export type NotificationDTO = z.infer<typeof NotificationDTOSchema>;
+
+export const NotificationsListSchema = z.array(NotificationDTOSchema);
+export const MarkAllReadResponseSchema = z.object({ count: z.number().int().nonnegative() });
+export const CreateNotificationResponseSchema = z.object({
+  deduped: z.boolean(),
+  notification: NotificationDTOSchema.nullable(),
+});

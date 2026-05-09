@@ -365,6 +365,18 @@ export async function processTeacherRefresh(
       .from('intervention_alert')
       .insert(alertsToInsert)) as { data: unknown; error: unknown };
     if (insertErr) throw new Error(`intervention_alert insert failed: ${String(insertErr)}`);
+
+    // Q-34.4: notify teacher per alert (ADR-0031 fourth amendment).
+    // aggregate_id = student_id UUID (Q-34.6 self-resolve: alert_id not returned by bulk INSERT).
+    // ISSUE-0025 dedup guard: (teacher_id, intervention_alert, student_id) within 1h in notifications-svc.
+    await db.from('outbox_event').insert(
+      alertsToInsert.map((a) => ({
+        aggregate_type: 'alert',
+        aggregate_id: a.student_id,
+        event_type: 'intervention_alert',
+        payload: { student_id: a.student_id, teacher_id: a.teacher_id, tenant_id: a.tenant_id, alert_type: a.alert_type },
+      }))
+    );
   }
 
   // 9. Upsert cohort_metric_cache

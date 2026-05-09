@@ -282,6 +282,8 @@ importers:
 
   supabase/functions/jobs-worker: {}
 
+  supabase/functions/notifications-svc: {}
+
   supabase/functions/orchestration-svc:
     dependencies:
       '@mm/engines':

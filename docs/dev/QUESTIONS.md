@@ -9,6 +9,38 @@
 
 ## Resolved
 
+### Q-34.6 — intervention_alert outbox aggregate_id: alert UUID or student UUID?
+
+- Date raised: 2026-05-24 (Stage 34 implementation — mid-impl)
+- Asked of: self (T3 self-resolve)
+- Source: `supabase/migrations/0001_enums_tenancy_auth.sql` (`outbox_event.aggregate_id uuid NOT NULL`); analytics-svc/handlers.ts `processTeacherRefresh` (bulk INSERT without `.select('id')`)
+- Question: `outbox_event.aggregate_id` is `uuid NOT NULL`. For `intervention_alert` events, the natural aggregate is the alert row itself. However, `processTeacherRefresh` uses `db.from('intervention_alert').insert(alertsToInsert)` without `.select('id')`, so individual alert IDs are not returned by the bulk INSERT. Options:
+  - **(A)** Use `student_id` UUID as `aggregate_id`. Dedup semantics: `(teacher_id, intervention_alert, student_id)` within 1h — prevents duplicate teacher alerts for the same student within the window. Correct for the use case.
+  - **(B)** Add `.select('id')` to the analytics-svc bulk INSERT, return alert IDs, use them as `aggregate_id`. Requires refactoring the analytics-svc INSERT call.
+  - **(C)** Use a deterministic composite UUID derived from `student_id + alert_type + tenant_id`. Avoids refactoring but adds complexity.
+- Why ambiguous: `outbox_event.aggregate_id` is typed as `uuid NOT NULL` — cannot use composite strings. Alert IDs are not available without a schema change to the INSERT.
+- Blocking? no — tight implementation detail; T3 self-resolve permitted
+- Assumed answer (if proceeding): **Option A** — student_id UUID as aggregate_id
+- Code affected: `supabase/functions/analytics-svc/handlers.ts` (outbox INSERT after intervention_alert INSERT)
+- Status: resolved
+- Resolution (2026-05-24, T3 self-resolve): **Option A**. `aggregate_id = a.student_id` (UUID). ISSUE-0025 dedup guard in notifications-svc uses `(user_id=teacher_id, type=intervention_alert, metadata->>'aggregate_id'=student_id)` within 1h — semantically correct: no duplicate teacher alert per student per hour. Analytics-svc INSERT unchanged (no `.select()` refactor). Q-34.6 self-resolved per T3 hybrid clause in C-C-D-V: "tight implementation details = self-resolve permitted with documented defaults."
+
+### Q-34.5 — pipeline/create payload: how does notifications-svc know which notification_type to create?
+
+- Date raised: 2026-05-24 (Stage 34 implementation — mid-impl, during migration 0016 authoring)
+- Asked of: self (T3 self-resolve)
+- Source: `supabase/migrations/0010_outbox_dispatcher.sql:52` (`j_pay := jsonb_build_object('assignment_id', event.aggregate_id)` — no event_type key); `supabase/functions/jobs-worker/index.ts:87` (passes job.payload directly to target service, no enrichment); Q-34.1 resolution (event.payload = assignments-svc JSONB with assignment_id, student_id, tenant_id, published_at)
+- Question: `POST /notifications/pipeline/create` receives a job payload (JSONB). The handler must know which `notification_type` to create (assignment_assigned, plan_updated, or intervention_alert). The assignments-svc payload (from Q-34.1) does not include an explicit type key. fn_drain_outbox_batch knows `event.event_type` but was not forwarding it to j_pay in migration 0010. Options:
+  - **(A)** Enrich `j_pay` in fn_drain_outbox_batch: `j_pay := event.payload || jsonb_build_object('notification_type', event.event_type)`. Handler reads `notification_type` from payload. Clean; jobs-worker stays a transparent dispatcher.
+  - **(B)** Handler infers type from other payload keys (e.g., presence of `assignment_id` → `assignment_assigned`). Fragile; fails if keys overlap across types.
+  - **(C)** Add `event_type` column to `job_queue` table and pass through jobs-worker. Requires a new migration; cross-service schema change.
+- Why ambiguous: Migration 0010 j_pay used single-key construction without event_type threading. jobs-worker dispatch is a transparent forwarder.
+- Blocking? no — tight implementation detail; T3 self-resolve permitted
+- Assumed answer (if proceeding): **Option A** — enrich j_pay in fn_drain_outbox_batch
+- Code affected: `supabase/migrations/0016_notification_dispatcher.sql` (j_pay construction for all three notification branches)
+- Status: resolved
+- Resolution (2026-05-24, T3 self-resolve): **Option A**. `j_pay := event.payload || jsonb_build_object('notification_type', event.event_type)` for all three notification.create branches. Handler reads `payload.notification_type` and passes to `getNotificationCopy()`. T3 self-resolve per C-C-D-V hybrid clause: "tight implementation details (title/body copy per type, dedup window value, filter inclusivity) = self-resolve permitted with documented defaults." Surfaced mid-implementation, retroactively filed here.
+
 ### Q-34.4 — plan_updated + intervention_alert outbox writes: in Stage 34 or defer?
 
 - Date raised: 2026-05-24 (Stage 34 morning ritual)

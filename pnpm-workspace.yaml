@@ -8,3 +8,4 @@ packages:
   - "supabase/functions/analytics-svc"
   - "supabase/functions/orchestration-svc"
   - "supabase/functions/assignments-svc"
+  - "supabase/functions/notifications-svc"

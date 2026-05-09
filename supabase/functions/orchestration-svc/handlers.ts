@@ -706,6 +706,14 @@ export async function processOrchestratorReplan(
       );
     }
 
+    // Q-34.4: notify student of material plan update (ADR-0031 fourth amendment + ISSUE-0025 dedup guard).
+    await db.from('outbox_event').insert({
+      aggregate_type: 'plan',
+      aggregate_id: newPlanId,
+      event_type: 'plan_updated',
+      payload: { student_id: payload.student_id, tenant_id: payload.tenant_id, plan_id: newPlanId, session_count: sessions.length },
+    });
+
     return {
       student_id: payload.student_id,
       plan_type: 'weekly',
