@@ -5,6 +5,20 @@
 
 ## Open
 
+### ISSUE-0026 — useLearningPlan SDK hook path malformed: double-svc segment + missing {student_id}
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-26 (Stage 36 pre-read R7)
+- Area: frontend (packages/sdk)
+- Tags: sdk · orchestration-svc · carry-forward · v1.1
+
+**Summary.** `useLearningPlan` at `packages/sdk/src/hooks/orchestration.ts:19-28` calls `.get('/orchestration-svc/orchestration/plan', LearningPlanDTOSchema)`. Two issues: (1) the path may carry a double-svc routing prefix artefact; (2) the correct arch §4.6 endpoint is `GET /orchestration/plan/{student_id}/current` — `{student_id}` path parameter is absent. Stage 36 does not consume `useLearningPlan` (SCREEN_SPECS §15 API call list does not include `/orchestration/plan/current`), so there is no Stage 36 runtime impact. First consumer is likely Stage 40 (Student Dashboard v2).
+
+**Fix (first UI stage that consumes the hook — likely Stage 40).** Correct hook path to include `studentId` as a parameter: `.get(\`/orchestration-svc/orchestration/plan/${studentId}/current\`, LearningPlanDTOSchema)` with `?plan_type=weekly` default. Verify against arch §4.6 verbatim.
+
+**Tracking pointer.** Stage 36 pre-read R7. `packages/sdk/src/hooks/orchestration.ts:19-28`.
+
 ### ISSUE-0025 — Notification spam guard: soft dedup window production-tuning deferred
 
 - Status: open

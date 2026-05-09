@@ -9,6 +9,73 @@
 
 ## Resolved
 
+### Q-36.5 — ChildSwitcher placement in TopBar
+
+- Date raised: 2026-05-26 (Stage 36 prep — T2-tightened: filed before component code)
+- Asked of: self (T3 self-resolve)
+- Source: SCREEN_SPECS §15.1 — "dropdown in top nav (if >1 child linked)"
+- Question: Does `AppShell student-parent` variant `TopBar` have a dedicated slot for a child switcher, or must it be composed as a sibling child alongside `Brand`?
+- Why ambiguous: Prior stub uses `<TopBar><Brand .../></TopBar>` pattern; TopBar API not verified to have a named prop for switcher placement vs generic children composition.
+- Blocking? no — tight implementation detail; T3 self-resolve permitted
+- Assumed answer (if proceeding): Compose as TopBar sibling to Brand. Radix Select. Hide when `children.length ≤ 1`. `localStorage('lastViewedChildId')`.
+- Code affected: `apps/web/src/app/(parent)/parent/page.tsx`, new `ChildSwitcher` component
+- Status: resolved
+- Resolution (2026-05-26, T3 self-resolve): **Compose as TopBar sibling to Brand.** Pattern consistent with Stage 24/25 TopBar usage where multiple children are passed. No TopBar API changes needed. `localStorage('lastViewedChildId')` key pinned.
+
+### Q-36.4 — ReadinessRing: existing @mm/ui primitive or new creation?
+
+- Date raised: 2026-05-26 (Stage 36 prep — T2-tightened: filed before component code)
+- Asked of: self (T3 self-resolve)
+- Source: SCREEN_SPECS §15.2 — "readiness ring (composite of mastery across strands) + score band"
+- Question: Does an existing `@mm/ui` circular/donut progress primitive cover SCREEN_SPECS §15.2, or must a new one be created?
+- Why ambiguous: `@mm/ui` exports include `ProgressBar`, `SkillBar`, `StatTile` but no circular SVG ring component was confirmed in the pre-read of `packages/ui/src/index.ts`.
+- Blocking? no — tight implementation detail; T3 self-resolve permitted
+- Assumed answer (if proceeding): New `ReadinessRing` SVG component. Props: `value: number` (0–1), `label: string`, `size?: 'sm' | 'md' | 'lg'`. Zero new deps. Storybook story + jest-axe scan included.
+- Code affected: `packages/ui/src/ReadinessRing/ReadinessRing.tsx`, `ReadinessRing.stories.tsx`, `packages/ui/src/index.ts`
+- Status: resolved
+- Resolution (2026-05-26, T3 self-resolve): **Create `ReadinessRing` in packages/ui.** SVG `stroke-dasharray` approach. Props pinned: `value: number` (0–1), `label: string`, `size?: 'sm' | 'md' | 'lg'`. `role="img"` + `aria-label` for a11y. Storybook story + jest-axe scan required per UI_CONTRACT §13.1. No new package dependencies.
+
+### Q-36.3 — ExplanationDTO vs ExplanationCard: type location + copy-builder API
+
+- Date raised: 2026-05-26 (Stage 36 prep — T2-tightened: filed before component code)
+- Asked of: product owner / architect (T3 round-trip)
+- Source: DEV_PLAN Stage 36 line 341 — "composed from ExplanationDTO via `packages/core/src/explain-format.ts` versioned copy-builder"; SCREEN_SPECS §15.6 — "Observation → Interpretation → Suggestion structure"; arch §6.4 `ExplanationDTOSchema` (Stage 32, intelligence-svc API contract)
+- Question: (1) Is `ExplanationDTO` from arch §6.4 (structured factors/evidence, API contract) the same entity as the UI card shape in SCREEN_SPECS §15.6, or are they distinct? (2) Where should the UI card type live: `@mm/types` or `packages/core`? (3) What is the copy-builder input: `LearningDNADTO.active_misconceptions[]` or `CausalMapDTO` from `/intelligence/causal-map/{id}`?
+- Why ambiguous: DEV_PLAN uses "ExplanationDTO" loosely; arch §6.4 has a specific `ExplanationDTOSchema` (API contract). DEV_PLAN Stage 36 is the first use of `explain-format.ts` — no prior instance exists to reference.
+- Blocking? yes — type location + function signature must be pinned before implementation; T3 round-trip required
+- Assumed answer (if proceeding): Modified Option A — ExplanationCard in @mm/core (UI render concern, distinct from arch §6.4 ExplanationDTO)
+- Code affected: `packages/core/src/explain-format.ts`, `packages/core/src/index.ts`
+- Status: resolved
+- Resolution (2026-05-26, T3 round-trip discharged): **Modified Option A.** `ExplanationDTO` in DEV_PLAN is loose terminology; arch §6.4 `ExplanationDTO` (structured factors/evidence) is the Stage 32 API contract, distinct from the SCREEN_SPECS §15.6 UI card shape. Stage 36 introduces `ExplanationCard { id: string; observation: string; interpretation: string; suggestion: string }` in `packages/core/src/explain-format.ts` (UI render concern, NOT `@mm/types`). `buildExplanationCards()` takes `CausalMapDTO.active_misconceptions[]` from Stage 32 (arch §6.4) as input. Versioned via `const EXPLANATION_FORMATTER_VERSION = 'v1'`. Copy templates tiered by severity (`high` / `medium` / `low`), pinned as const map. Test asserts each severity tier produces a non-empty card.
+
+### Q-36.2 — LearningPlanDTO consumption in Stage 36
+
+- Date raised: 2026-05-26 (Stage 36 prep — T2-tightened: filed before component code)
+- Asked of: product owner / architect (T3 round-trip)
+- Source: PROJECT_STATE.md "Notes for next session" pre-read recommendation; SCREEN_SPECS §15 API call list (5 calls listed, none to `/orchestration/plan/{id}/current`)
+- Question: Is `LearningPlanDTO` (orchestration-svc `GET /orchestration/plan/{student_id}/current`) consumed in the Stage 36 parent dashboard? SCREEN_SPECS §15 lists 5 API calls with no orchestration plan endpoint. Does any of the 7 content blocks derive from the current learning plan rather than LearningDNADTO?
+- Why ambiguous: PROJECT_STATE.md pre-read list cited orchestration-svc `/plan/current` as a required Stage 36 pre-read, but SCREEN_SPECS §15 API call list does not include it.
+- Blocking? yes — determines whether a new SDK hook call + DTO consumption is required; T3 round-trip required
+- Assumed answer (if proceeding): No LearningPlanDTO consumption
+- Code affected: `apps/web/src/app/(parent)/parent/page.tsx`
+- Status: resolved
+- Resolution (2026-05-26, T3 round-trip discharged): **No LearningPlanDTO consumption in Stage 36.** SCREEN_SPECS §15 API call list is authoritative: 5 calls, none to `/orchestration/plan/current`. "What would help" cards derive from `LearningDNADTO.domain_profiles[strand].weakest_skills`. ISSUE-0026 (`useLearningPlan` path malformation) is a carry-forward bug, not a Stage 36 scope item.
+
+### Q-36.1 — UI testing strategy for Stage 36 (first Phase 2 UI stage)
+
+- Date raised: 2026-05-26 (Stage 36 prep — T2-tightened: filed before component code)
+- Asked of: product owner / architect (T3 round-trip)
+- Source: UI_CONTRACT §7.1 (axe-core zero serious/critical = merge blocker); UI_CONTRACT §13 (10-point DoD); DAILY_LOG Stage 13 (jest-axe CI gate established); DAILY_LOG Stages 22b–25 (Playwright test.skip() pattern established)
+- Question: Does Stage 36 adopt the same testing strategy as Stages 22b–25 exactly, or is there additional per-route axe-core wiring / CI integration / Storybook test gating not previously established?
+  - **(A)** Mirrors Stages 22b–25: (1) jest-axe at `@mm/ui` for new primitives + `apps/web` page test for parent dashboard route; (2) Playwright `test.skip()`-guarded on `E2E_WEB_URL` + `E2E_BASE_URL` + `E2E_SUPABASE_ANON`; (3) no new Storybook CI wiring.
+  - **(B)** Additional `@axe-core/playwright` per-route wiring (deferred at Stage 23 per DAILY_LOG — was Stage 26 target).
+- Why ambiguous: Stage 36 is the first Phase 2 UI stage — testing discipline pattern needs explicit pinning. Playwright CI integration was deferred at Stage 23 to Stage 26; Stage 26 entry may or may not have completed it.
+- Blocking? yes — determines test surface and verification gate for Stage 36 ship; T3 round-trip required
+- Assumed answer (if proceeding): Option A — mirrors Stages 22b–25
+- Code affected: `apps/web/playwright/e2e/parent-dashboard.spec.ts`, `apps/web/src/app/(parent)/parent/page.test.tsx`, `packages/ui/src/ReadinessRing/ReadinessRing.test.tsx`
+- Status: resolved
+- Resolution (2026-05-26, T3 round-trip discharged): **Option A confirmed.** Testing strategy mirrors Stages 22b–25: jest-axe at `packages/ui` (new primitives) + `apps/web` page test (parent dashboard route); Playwright `test.skip()`-guarded on `E2E_WEB_URL` + `E2E_BASE_URL` + `E2E_SUPABASE_ANON`. No `@axe-core/playwright` route-level wiring, no new Storybook CI wiring. Canonisation of UI-stage discipline deferred to Stage 36 evening retro — pending Stage 36 ship as evidence base.
+
 ### Q-35.4 — override_plan_item HTTP status: 400 or 501?
 
 - Date raised: 2026-05-25 (Stage 35 prep — T2-tightened: filed before handler code)
