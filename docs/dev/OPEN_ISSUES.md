@@ -122,7 +122,9 @@
 
 **Stage 33 update (2026-05-23).** `ASSESSMENT_SVC_URL` added to assignments-svc (Q-33.1 Option A — `POST /assignments/{id}/start` forwards student JWT to assessment-svc). Now 4 undocumented service URL vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`, `ASSESSMENT_SVC_URL`. Pattern: each falls back to `${SUPABASE_URL}/functions/v1/<service-name>` if not set, but fallback logic is not documented anywhere for deployers.
 
-**Fix (v1 close or Stage 36).** Add env var table to `docs/dev/deployment.md` (create if absent) listing all Edge Function env vars with default resolution logic. Or add `.env.example` at repo root. Vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`, `ASSESSMENT_SVC_URL`. Refs: `supabase/functions/jobs-worker/index.ts`, `supabase/functions/assignments-svc/index.ts`.
+**Stage 34 update (2026-05-24).** `NOTIFICATIONS_SVC_URL` added to jobs-worker dispatch path for `notification.create` job type. Now **5** undocumented service URL vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`, `ASSESSMENT_SVC_URL`, `NOTIFICATIONS_SVC_URL`. Ref: `supabase/functions/jobs-worker/index.ts`.
+
+**Fix (v1 close or Stage 36).** Add env var table to `docs/dev/deployment.md` (create if absent) listing all Edge Function env vars with default resolution logic. Or add `.env.example` at repo root. Vars: `INTELLIGENCE_SVC_URL`, `ANALYTICS_SVC_URL`, `ORCHESTRATION_SVC_URL`, `ASSESSMENT_SVC_URL`, `NOTIFICATIONS_SVC_URL`. Refs: `supabase/functions/jobs-worker/index.ts`, `supabase/functions/assignments-svc/index.ts`, `supabase/functions/notifications-svc/index.ts`.
 
 ### ISSUE-0013 — Evening ritual test count methodology (tail truncation drift)
 

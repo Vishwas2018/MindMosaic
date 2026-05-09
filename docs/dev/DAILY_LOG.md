@@ -2,6 +2,67 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 34 — 2026-05-24
+
+**Planned (from DEV_PLAN.md Stage 34):** Notifications Service — 15th workspace `notifications-svc` with 4 endpoints (GET /notifications/me, PATCH /notifications/{id}/read, POST /notifications/read-all, POST /notifications/pipeline/create); migration 0016 (fn_drain_outbox_batch fix + plan_updated + intervention_alert branches); Bell UI primitive; SDK getUnreadCount helper. Day 48, 1-day budget.
+
+**Actually delivered:**
+
+- Prep commit (8832559): Q-34.1–Q-34.4 resolved to QUESTIONS.md ## Resolved; DEV-20260524-1 appended to DEVIATIONS.md; ISSUE-0025 appended to OPEN_ISSUES.md; ADR-0031 fourth amendment (notification.create route added); C-C-D-V saved to docs/prompts/2026-05-24_stage-34.md.
+- Implementation commit (fcf69d2): 21 files, 1370 insertions, 1 deletion.
+  - `supabase/migrations/0016_notification_dispatcher.sql` (111 lines): `CREATE OR REPLACE FUNCTION fn_drain_outbox_batch` — replaces dead `assignment.published` branch with `assignment_assigned` (Q-34.1 Option A); adds `plan_updated` + `intervention_alert` branches; enriches `j_pay` with `notification_type` key (Q-34.5 self-resolve); down migration at `supabase/migrations/down/0016_notification_dispatcher.down.sql`.
+  - `supabase/functions/notifications-svc/` (new — 15th workspace): `handlers.ts` (~305 lines: `getMyNotifications`, `markRead`, `markAllRead`, `createNotification`; ISSUE-0025 soft dedup 1h window; spec §27.3 100-unread cap; inline validators; Pattern E ownership), `index.ts` (~150 lines: 4 routes; service-role gate before pipeline/create), `notification-copy.ts` (copy module for assignment_assigned / plan_updated / intervention_alert), `package.json`, `tsconfig.json`.
+  - `supabase/functions/notifications-svc/__tests__/contract.test.ts` (533 lines, 15 tests: 14 contract + 1 e2e chain).
+  - `supabase/functions/jobs-worker/index.ts` amended: 5th route `notification.create → NOTIFICATIONS_SVC_URL/notifications/pipeline/create` (ADR-0031 fourth amendment).
+  - `supabase/functions/orchestration-svc/handlers.ts` amended: `outbox_event` INSERT at replan completion (`event_type = 'plan_updated'`, handlers.ts:710) (Q-34.4).
+  - `supabase/functions/analytics-svc/handlers.ts` amended: `outbox_event` INSERT inside `alertsToInsert > 0` block (`event_type = 'intervention_alert'`, handlers.ts:372) (Q-34.4).
+  - `supabase/functions/analytics-svc/__tests__/contract.test.ts` + `supabase/functions/orchestration-svc/__tests__/contract.test.ts` amended: `outbox_event` stubs added to 4 analytics tests + baseStubs() in orchestration.
+  - `packages/types/src/engagement.ts` amended: `NotificationsListSchema`, `MarkAllReadResponseSchema`, `CreateNotificationResponseSchema` appended.
+  - `packages/ui/src/Bell/Bell.tsx` (new): forwardRef button, 99-cap badge, aria-label, design tokens matching IconButton pattern.
+  - `packages/ui/src/index.ts` amended: Bell + BellProps exported.
+  - `packages/sdk/src/notifications.ts` (new): `getUnreadCount(client)` helper.
+  - `packages/sdk/src/index.ts` amended: `getUnreadCount` exported.
+  - `pnpm-workspace.yaml` amended: `notifications-svc` added as 15th workspace entry.
+  - `docs/dev/QUESTIONS.md` amended: Q-34.5 + Q-34.6 retroactively filed in ## Resolved (mid-impl self-resolves; filing gap per T2 timing discipline).
+
+**Time spent:** 1 day (on 1-day budget — Day 48)
+
+**Surprises / departures:**
+
+1. **Q-34.1 (event_type mismatch — T3 round-trip prep)**: Stage 33 writes `assignment_assigned`; migration 0010's fn_drain_outbox_batch handled only `assignment.published` (speculative dead code) and would RAISE EXCEPTION on unknown types, crashing the entire drain batch. Option A applied at prep: migration 0016 OR REPLACE replaces the dead branch.
+2. **Q-34.5 (notification_type threading — T3 self-resolve mid-impl)**: The job payload forwarded by jobs-worker contained no explicit type key; pipeline/create handler had no way to know which notification_type to create. Option A: `j_pay := event.payload || jsonb_build_object('notification_type', event.event_type)` added in migration 0016. Self-resolved mid-implementation; filed retroactively to QUESTIONS.md at pre-push (T2 timing gap — see process retro).
+3. **Q-34.6 (aggregate_id UUID constraint — T3 self-resolve mid-impl)**: `outbox_event.aggregate_id uuid NOT NULL` — alert IDs not available from analytics-svc bulk INSERT without `.select('id')` refactor. Option A: `student_id` UUID used as aggregate_id. Dedup semantics `(teacher_id, intervention_alert, student_id)` within 1h correct for use case. Filed retroactively at pre-push (same T2 timing gap).
+4. **DEV-20260524-1 (5s wall-clock SLA sandbox gap)**: pg_cron fires every minute; worst-case ~120s. Contract tests exercise chain directly. Defer wall-clock measurement to Stage 41 deploy gate.
+
+**Decisions made (not in stage):**
+
+- none (ADR-0031 fourth amendment filed in prep commit)
+
+**Deviations logged:**
+
+- DEV-20260524-1 (5s wall-clock SLA not testable in sandbox)
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0025 opened (low): notification spam guard 1h dedup window — production tuning deferred to v1.1.
+- Q-34.1, Q-34.2, Q-34.3, Q-34.4, Q-34.5, Q-34.6 all resolved.
+
+**Quality gates at close:**
+
+- Lint ✅ (15 packages) · Typecheck ✅ (15 packages) · Tests ✅ (505 passed / 1 skipped) · Build ✅ (husky turbo 22/22 at commit) · RLS ✅ (migration 0016 amends function only — no new tables, no new policies)
+
+**Process retro:**
+
+(a) **STRUCTURAL: T2 timing gap — second occurrence.** Q-34.5 + Q-34.6 surfaced mid-impl but not filed to QUESTIONS.md until pre-push verification round forced surfacing. Same pattern as Stage 31 housekeeping (Q-31.5 filed in evening, not implementation commit). Recovery via same-commit retroactive filing acceptable, but pattern recurring. **Tightening now in force from Stage 35:** "When a self-resolve Q is identified mid-impl, file the QUESTIONS.md entry in the same work session that introduces the resolving code, before continuing to the next handler. Pre-push verification grep is a backstop, not the first surfacing." Candidate for canonisation in CLAUDE.md with T3 Option 3 at next audit day.
+
+(b) Q-34.5 + Q-34.6 both valid T3 self-resolves (tight implementation details: j_pay enrichment threading + outbox aggregate_id value selection). No round-trip violation; the gap was filing-timing, not classification.
+
+(c) Pre-read R5 / R7 / R8 (cross-service ownership + design conventions) prevented stale-comment copy-paste. Stage 31 retro (b) discipline working as intended.
+
+**Tomorrow — first thing:**
+
+Stage 35 morning ritual — Plan Overrides. Verify spec section number and confirm Stage 31 deferral handoff state before any code.
+
 ## Stage 33 — 2026-05-23
 
 **Planned (from DEV_PLAN.md Stage 33):** Assignments Service — new 14th workspace `assignments-svc` with 9 endpoints (create, get, update, publish, archive, for-student, for-class, tracking, start); migration 0015 (pathway_id ALTER + 2 pg_cron functions); contract tests + e2e. Days 46–47, 2-day budget.
