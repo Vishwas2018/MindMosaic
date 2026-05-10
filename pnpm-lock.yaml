@@ -296,6 +296,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/engines
 
+  supabase/functions/users-svc: {}
+
 packages:
 
   '@adobe/css-tools@4.4.4':

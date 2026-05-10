@@ -909,3 +909,219 @@ export async function generateAssignment(
     status: 200,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Stage 37 — GET /analytics/class-kpi/{class_id}
+//
+// Screen 18 Block 2 (Q-37.5 Option A): 4 aggregated class KPIs.
+// Role-gated teacher/admin; teacher must own class (checkTeacherOwnership).
+// No caching in v1 — returns fresh aggregates on every call.
+// ---------------------------------------------------------------------------
+
+export interface ClassKpiDTO {
+  active_students: number;
+  avg_class_score: number | null;
+  sessions_this_week: number;
+  assignments_active: number;
+  computed_at: string;
+  stale_since: null;
+}
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const LAST_N_SESSIONS = 5;
+
+export async function getClassKpi(
+  classId: string,
+  caller: Caller,
+  db: DbClient,
+): Promise<AnalyticsResult<ClassKpiDTO>> {
+  if (!isTeacherOrAdmin(caller)) return { data: null, status: 403, error: 'FORBIDDEN' };
+
+  if (caller.role === 'teacher' || caller.role === 'tutor') {
+    const gate = await checkTeacherOwnership(classId, caller, db);
+    if (gate.forbidden) return { data: null, status: 403, error: 'FORBIDDEN' };
+  }
+
+  // 1. active_students = COUNT(class_student) WHERE class_id
+  const { data: rosterRows, error: rosterErr } = (await db
+    .from('class_student')
+    .select('student_id')
+    .eq('class_id', classId)) as { data: Array<{ student_id: string }> | null; error: unknown };
+  if (rosterErr) return { data: null, status: 500, error: 'DB_ERROR' };
+
+  const studentIds = (rosterRows ?? []).map((r) => r.student_id);
+  const activeStudents = studentIds.length;
+
+  if (activeStudents === 0) {
+    return {
+      data: {
+        active_students: 0,
+        avg_class_score: null,
+        sessions_this_week: 0,
+        assignments_active: 0,
+        computed_at: new Date().toISOString(),
+        stale_since: null,
+      },
+      status: 200,
+    };
+  }
+
+  // 2 + 3: load processed sessions for all class students (raw_score + created_at)
+  const [sessionRes, targetRes] = await Promise.all([
+    db
+      .from('session_record')
+      .select('student_id,raw_score,submitted_at,created_at')
+      .in('student_id', studentIds)
+      .eq('status', 'processed') as unknown as Promise<{
+        data: Array<{ student_id: string; raw_score: number | null; submitted_at: string | null; created_at: string }> | null;
+        error: unknown;
+      }>,
+    db
+      .from('assignment_target')
+      .select('assignment_id')
+      .eq('class_id', classId) as unknown as Promise<{
+        data: Array<{ assignment_id: string }> | null;
+        error: unknown;
+      }>,
+  ]);
+
+  if (sessionRes.error) return { data: null, status: 500, error: 'DB_ERROR' };
+  if (targetRes.error) return { data: null, status: 500, error: 'DB_ERROR' };
+
+  const allSessions = sessionRes.data ?? [];
+  const now = Date.now();
+  const weekCutoff = new Date(now - SEVEN_DAYS_MS).toISOString();
+
+  // sessions_this_week: processed sessions with created_at within last 7 days
+  const sessionsThisWeek = allSessions.filter((s) => s.created_at >= weekCutoff).length;
+
+  // avg_class_score: last LAST_N_SESSIONS processed sessions per student → avg raw_score across class
+  const byStudent = new Map<string, Array<number | null>>();
+  for (const s of allSessions) {
+    const list = byStudent.get(s.student_id) ?? [];
+    list.push(s.raw_score);
+    byStudent.set(s.student_id, list);
+  }
+
+  const classScores: number[] = [];
+  for (const [, scores] of byStudent) {
+    const capped = scores.slice(0, LAST_N_SESSIONS);
+    const studentAvg =
+      capped.filter((v): v is number => v !== null).reduce((a, b) => a + b, 0) /
+      (capped.filter((v) => v !== null).length || 1);
+    if (capped.some((v) => v !== null)) classScores.push(studentAvg);
+  }
+  const avgClassScore =
+    classScores.length > 0
+      ? classScores.reduce((a, b) => a + b, 0) / classScores.length
+      : null;
+
+  // assignments_active: published + not archived assignments targeting this class
+  const assignmentIds = [...new Set((targetRes.data ?? []).map((t) => t.assignment_id))];
+  let assignmentsActive = 0;
+  if (assignmentIds.length > 0) {
+    const { data: asgRows, error: asgErr } = (await db
+      .from('assignment')
+      .select('id,status,archived_at')
+      .in('id', assignmentIds)) as {
+      data: Array<{ id: string; status: string; archived_at: string | null }> | null;
+      error: unknown;
+    };
+    if (asgErr) return { data: null, status: 500, error: 'DB_ERROR' };
+    assignmentsActive = (asgRows ?? []).filter(
+      (a) => a.status === 'published' && a.archived_at == null,
+    ).length;
+  }
+
+  return {
+    data: {
+      active_students: activeStudents,
+      avg_class_score: avgClassScore,
+      sessions_this_week: sessionsThisWeek,
+      assignments_active: assignmentsActive,
+      computed_at: new Date().toISOString(),
+      stale_since: null,
+    },
+    status: 200,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Stage 37 — PATCH /analytics/intervention-alerts/{id}
+//
+// Screen 18 Block 3 action buttons (SCREEN_SPECS:1026–1027).
+// Body: { dismissed: true } → status='dismissed'; { acknowledged: true } → status='acknowledged'.
+// Q-37.7 (self-resolve): ownership checked via alert.teacher_id = caller.userId directly
+// (class_id is nullable ON DELETE SET NULL; teacher_id is NOT NULL on the row).
+// ---------------------------------------------------------------------------
+
+interface AlertOwnerRow {
+  id: string;
+  student_id: string;
+  alert_type: string;
+  severity: string;
+  status: string;
+  detail: unknown;
+  created_at: string;
+  teacher_id: string;
+}
+
+export async function patchInterventionAlert(
+  alertId: string,
+  body: { dismissed?: boolean; acknowledged?: boolean },
+  caller: Caller,
+  db: DbClient,
+): Promise<AnalyticsResult<InterventionAlertRow>> {
+  if (!isTeacherOrAdmin(caller)) return { data: null, status: 403, error: 'FORBIDDEN' };
+
+  // Load alert to verify existence and ownership
+  const { data: rows, error: loadErr } = (await db
+    .from('intervention_alert')
+    .select('id,student_id,alert_type,severity,status,detail,created_at,teacher_id')
+    .eq('id', alertId)
+    .limit(1)) as { data: AlertOwnerRow[] | null; error: unknown };
+
+  if (loadErr) return { data: null, status: 500, error: 'DB_ERROR' };
+  const alert = rows?.[0];
+  if (!alert) return { data: null, status: 404, error: 'NOT_FOUND' };
+
+  // Teacher/tutor ownership: alert.teacher_id must match caller (Q-37.7)
+  if (caller.role === 'teacher' || caller.role === 'tutor') {
+    if (alert.teacher_id !== caller.userId) return { data: null, status: 403, error: 'FORBIDDEN' };
+  }
+
+  let newStatus: string;
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (body.dismissed === true) {
+    newStatus = 'dismissed';
+    patch['status'] = 'dismissed';
+  } else if (body.acknowledged === true) {
+    newStatus = 'acknowledged';
+    patch['status'] = 'acknowledged';
+    patch['acknowledged_at'] = new Date().toISOString();
+  } else {
+    return { data: null, status: 400, error: 'BAD_REQUEST: dismissed or acknowledged required' };
+  }
+
+  const { data: updated, error: updateErr } = (await db
+    .from('intervention_alert')
+    .update(patch)
+    .eq('id', alertId)
+    .select('id,student_id,alert_type,severity,status,detail,created_at')
+    .limit(1)) as { data: InterventionAlertRow[] | null; error: unknown };
+
+  if (updateErr) return { data: null, status: 500, error: 'DB_ERROR' };
+
+  // Return the updated row (fall back to constructed shape if select returns empty)
+  const result: InterventionAlertRow = updated?.[0] ?? {
+    id: alert.id,
+    student_id: alert.student_id,
+    alert_type: alert.alert_type,
+    severity: alert.severity,
+    status: newStatus,
+    detail: alert.detail,
+    created_at: alert.created_at,
+  };
+
+  return { data: result, status: 200 };
+}

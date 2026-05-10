@@ -9,3 +9,4 @@ packages:
   - "supabase/functions/orchestration-svc"
   - "supabase/functions/assignments-svc"
   - "supabase/functions/notifications-svc"
+  - "supabase/functions/users-svc"

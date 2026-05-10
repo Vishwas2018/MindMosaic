@@ -26,6 +26,8 @@ import {
   getCohort,
   getPathwayReadiness,
   generateAssignment,
+  getClassKpi,
+  patchInterventionAlert,
   type DbClient,
 } from '../handlers.ts';
 
@@ -74,6 +76,11 @@ function buildClient(stubs: Stubs): DbClient & { calls: CapturedCall[] } {
           prop === 'delete'
         ) {
           return (...args: unknown[]) => {
+            const writeOps = new Set(['insert', 'update', 'upsert', 'delete']);
+            // Don't let select overwrite a write op (.update().select() pattern)
+            if (prop === 'select' && writeOps.has(captured.op)) {
+              return new Proxy(target, handler);
+            }
             captured = { ...captured, op: prop as CapturedCall['op'], args: args[0] };
             return new Proxy(target, handler);
           };
@@ -700,6 +707,163 @@ describe('generateAssignment', () => {
       { userId: STUDENT_A, role: 'student' },
       db,
     );
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+  });
+});
+
+// ─── Stage 37 additions ──────────────────────────────────────────────────────
+
+const ALERT_ID = 'a0000000-0000-4000-8000-000000000001';
+
+describe('getClassKpi', () => {
+  it('getClassKpi: happy path returns ClassKpiDTO with all 4 aggregated stats', async () => {
+    const weekAgo = new Date(NOW.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(); // 3 days ago
+    const db = buildClient({
+      class_group: { data: [{ teacher_id: TEACHER_ID }], error: null },
+      class_student: {
+        data: [{ student_id: STUDENT_A }, { student_id: STUDENT_B }],
+        error: null,
+      },
+      session_record: {
+        data: [
+          { student_id: STUDENT_A, raw_score: 80, submitted_at: weekAgo, created_at: weekAgo },
+          { student_id: STUDENT_B, raw_score: 60, submitted_at: weekAgo, created_at: weekAgo },
+        ],
+        error: null,
+      },
+      assignment_target: {
+        data: [{ assignment_id: 'asg-001' }],
+        error: null,
+      },
+      assignment: {
+        data: [{ id: 'asg-001', status: 'published', archived_at: null }],
+        error: null,
+      },
+    });
+
+    const result = await getClassKpi(CLASS_ID, { userId: TEACHER_ID, role: 'teacher' }, db);
+
+    expect(result.status).toBe(200);
+    expect(result.data).not.toBeNull();
+    expect(result.data!.active_students).toBe(2);
+    expect(result.data!.sessions_this_week).toBe(2);
+    expect(result.data!.assignments_active).toBe(1);
+    expect(result.data!.avg_class_score).toBeCloseTo(70); // (80+60)/2
+    expect(result.data!.computed_at).toBeDefined();
+    expect(result.data!.stale_since).toBeNull();
+  });
+
+  it('getClassKpi: role-gate rejects student caller with 403', async () => {
+    const db = buildClient({});
+    const result = await getClassKpi(CLASS_ID, { userId: STUDENT_A, role: 'student' }, db);
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+  });
+
+  it('getClassKpi: empty class returns zeros for active_students and sessions_this_week', async () => {
+    const db = buildClient({
+      class_group: { data: [{ teacher_id: TEACHER_ID }], error: null },
+      class_student: { data: [], error: null },
+    });
+
+    const result = await getClassKpi(CLASS_ID, { userId: TEACHER_ID, role: 'teacher' }, db);
+
+    expect(result.status).toBe(200);
+    expect(result.data!.active_students).toBe(0);
+    expect(result.data!.sessions_this_week).toBe(0);
+    expect(result.data!.avg_class_score).toBeNull();
+    expect(result.data!.assignments_active).toBe(0);
+  });
+
+  it('getClassKpi: DB error returns 500', async () => {
+    const db = buildClient({
+      class_group: { data: [{ teacher_id: TEACHER_ID }], error: null },
+      class_student: { data: null, error: { message: 'connection refused' } },
+    });
+
+    const result = await getClassKpi(CLASS_ID, { userId: TEACHER_ID, role: 'teacher' }, db);
+
+    expect(result.status).toBe(500);
+    expect(result.error).toBe('DB_ERROR');
+  });
+});
+
+describe('patchInterventionAlert', () => {
+  const ALERT_ROW = {
+    id: ALERT_ID,
+    student_id: STUDENT_A,
+    alert_type: 'declining_performance',
+    severity: 'warning',
+    status: 'active',
+    detail: {},
+    created_at: NOW.toISOString(),
+    teacher_id: TEACHER_ID,
+  };
+
+  it('patchInterventionAlert: dismiss sets status to dismissed and returns updated row', async () => {
+    const db = buildClient({
+      intervention_alert: [
+        { data: [ALERT_ROW], error: null },                          // load for ownership
+        { data: [{ ...ALERT_ROW, status: 'dismissed' }], error: null }, // update + select
+      ],
+    });
+
+    const result = await patchInterventionAlert(
+      ALERT_ID,
+      { dismissed: true },
+      { userId: TEACHER_ID, role: 'teacher' },
+      db,
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.data?.status).toBe('dismissed');
+    const updateCall = db.calls.find((c) => c.table === 'intervention_alert' && c.op === 'update');
+    expect(updateCall).toBeDefined();
+    const patch = updateCall!.args as Record<string, unknown>;
+    expect(patch['status']).toBe('dismissed');
+  });
+
+  it('patchInterventionAlert: acknowledge sets status to acknowledged and sets acknowledged_at', async () => {
+    const db = buildClient({
+      intervention_alert: [
+        { data: [ALERT_ROW], error: null },
+        { data: [{ ...ALERT_ROW, status: 'acknowledged' }], error: null },
+      ],
+    });
+
+    const result = await patchInterventionAlert(
+      ALERT_ID,
+      { acknowledged: true },
+      { userId: TEACHER_ID, role: 'teacher' },
+      db,
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.data?.status).toBe('acknowledged');
+    const updateCall = db.calls.find((c) => c.table === 'intervention_alert' && c.op === 'update');
+    const patch = updateCall!.args as Record<string, unknown>;
+    expect(patch['status']).toBe('acknowledged');
+    expect(patch['acknowledged_at']).toBeDefined();
+  });
+
+  it('patchInterventionAlert: cross-class teacher receives 403', async () => {
+    const OTHER_TEACHER = 'u0000000-0000-4000-8000-999999999999';
+    const db = buildClient({
+      intervention_alert: {
+        // Alert belongs to TEACHER_ID, not OTHER_TEACHER
+        data: [ALERT_ROW],
+        error: null,
+      },
+    });
+
+    const result = await patchInterventionAlert(
+      ALERT_ID,
+      { dismissed: true },
+      { userId: OTHER_TEACHER, role: 'teacher' },
+      db,
+    );
+
     expect(result.status).toBe(403);
     expect(result.error).toBe('FORBIDDEN');
   });

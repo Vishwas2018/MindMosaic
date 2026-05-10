@@ -25,6 +25,8 @@ import {
   getCohort,
   getPathwayReadiness,
   generateAssignment,
+  getClassKpi,
+  patchInterventionAlert,
   type DbClient as HandlerDbClient,
   type Caller,
 } from './handlers.ts';
@@ -206,6 +208,50 @@ Deno.serve(async (req: Request) => {
       const result = await generateAssignment(rawBody, caller, db as unknown as HandlerDbClient);
       status = result.status;
       if (result.status === 403) return jsonError('FORBIDDEN', 'Teacher/admin only', traceId, 403);
+      if (result.status === 400) return jsonError('BAD_REQUEST', result.error ?? 'Invalid request body', traceId, 400);
+      if (result.status === 500) return jsonError('INTERNAL_ERROR', 'Database error', traceId, 500);
+      return jsonOk(result.data ?? null, traceId, 200);
+    }
+
+    // ------------------------------------------------------------------
+    // GET /analytics/class-kpi/{class_id} — role-gated (Stage 37, Screen 18 Block 2)
+    // ------------------------------------------------------------------
+    const classKpiMatch = path.match(/^\/analytics\/class-kpi\/([^/]+)$/);
+    if (method === 'GET' && classKpiMatch !== null) {
+      const classId = classKpiMatch[1]!;
+      const auth = await verifyBearer(req, db);
+      if (auth === null) {
+        status = 401;
+        return jsonError('UNAUTHENTICATED', 'Bearer token required', traceId, 401);
+      }
+      const role = (auth.user.app_metadata?.['role'] as string | undefined) ?? 'student';
+      const caller: Caller = { userId: auth.user.id, role };
+      const result = await getClassKpi(classId, caller, db as unknown as HandlerDbClient);
+      status = result.status;
+      if (result.status === 403) return jsonError('FORBIDDEN', 'Teacher access to own classes only', traceId, 403);
+      if (result.status === 500) return jsonError('INTERNAL_ERROR', 'Database error', traceId, 500);
+      return jsonOk(result.data ?? null, traceId, 200);
+    }
+
+    // ------------------------------------------------------------------
+    // PATCH /analytics/intervention-alerts/{id} — role-gated (Stage 37, Screen 18 Block 3)
+    // ------------------------------------------------------------------
+    const patchAlertMatch = path.match(/^\/analytics\/intervention-alerts\/([^/]+)$/);
+    if (method === 'PATCH' && patchAlertMatch !== null) {
+      const alertId = patchAlertMatch[1]!;
+      const auth = await verifyBearer(req, db);
+      if (auth === null) {
+        status = 401;
+        return jsonError('UNAUTHENTICATED', 'Bearer token required', traceId, 401);
+      }
+      const role = (auth.user.app_metadata?.['role'] as string | undefined) ?? 'student';
+      const caller: Caller = { userId: auth.user.id, role };
+      const rawBody: unknown = await req.json();
+      const body = rawBody as { dismissed?: boolean; acknowledged?: boolean };
+      const result = await patchInterventionAlert(alertId, body, caller, db as unknown as HandlerDbClient);
+      status = result.status;
+      if (result.status === 403) return jsonError('FORBIDDEN', 'Access denied', traceId, 403);
+      if (result.status === 404) return jsonError('NOT_FOUND', 'Alert not found', traceId, 404);
       if (result.status === 400) return jsonError('BAD_REQUEST', result.error ?? 'Invalid request body', traceId, 400);
       if (result.status === 500) return jsonError('INTERNAL_ERROR', 'Database error', traceId, 500);
       return jsonOk(result.data ?? null, traceId, 200);

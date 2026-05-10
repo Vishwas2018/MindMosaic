@@ -3,6 +3,7 @@ import { getTraceId } from "../_shared/trace-id.ts";
 import { jsonOk, jsonError } from "../_shared/error-envelope.ts";
 import { verifyBearer } from "../_shared/auth.ts";
 import { log } from "../_shared/logger.ts";
+import { handleGetMyClasses, handleGetClassStudents } from "./handlers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -54,6 +55,40 @@ Deno.serve(async (req: Request) => {
     }
     if (method === "GET" && path === "/users/me/children") {
       return await handleGetChildren(auth.user, db, traceId, (tid) => { tenantId = tid; });
+    }
+
+    // Stage 37: GET /users/me/classes — teacher's class list with student_count
+    if (method === "GET" && path === "/users/me/classes") {
+      const role = (auth.user.app_metadata?.["role"] as string | undefined) ?? "";
+      const result = await handleGetMyClasses(auth.user.id, role, db as unknown as Parameters<typeof handleGetMyClasses>[2]);
+      if (result.status === 403) {
+        status = 403;
+        return jsonError("FORBIDDEN", "Only teachers can list classes", traceId, 403);
+      }
+      if (result.status === 500) {
+        status = 500;
+        return jsonError("INTERNAL_ERROR", "Database error", traceId, 500);
+      }
+      return jsonOk(result.data ?? { classes: [] }, traceId);
+    }
+
+    // Stage 37: GET /users/classes/{class_id}/students — paginated roster
+    const classStudentsMatch = path.match(/^\/users\/classes\/([^/]+)\/students$/);
+    if (method === "GET" && classStudentsMatch !== null) {
+      const classId = classStudentsMatch[1]!;
+      const role = (auth.user.app_metadata?.["role"] as string | undefined) ?? "";
+      const pageParam = parseInt(url.searchParams.get("page") ?? "1", 10);
+      const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
+      const result = await handleGetClassStudents(classId, auth.user.id, role, page, db as unknown as Parameters<typeof handleGetClassStudents>[4]);
+      if (result.status === 403) {
+        status = 403;
+        return jsonError("FORBIDDEN", "Teacher access to own classes only", traceId, 403);
+      }
+      if (result.status === 500) {
+        status = 500;
+        return jsonError("INTERNAL_ERROR", "Database error", traceId, 500);
+      }
+      return jsonOk(result.data ?? { students: [], total: 0, page: 1, page_size: 50 }, traceId);
     }
     if (method === "POST" && path === "/users/me/children") {
       // Students created via invite flow only (Stage 14; full invite in later stage)

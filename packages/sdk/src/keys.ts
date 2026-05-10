@@ -4,6 +4,8 @@ export const mmKeys = {
     all: () => ['users'] as const,
     me: () => ['users', 'me'] as const,
     children: () => ['users', 'children'] as const,
+    classes: () => ['users', 'classes'] as const,
+    classStudents: (classId: string) => ['users', 'classes', classId, 'students'] as const,
   },
   tenants: {
     all: () => ['tenants'] as const,
@@ -37,5 +39,15 @@ export const mmKeys = {
     learningPlan: (studentId: string) => ['orchestration', 'learningPlan', studentId] as const,
     pathwayReadiness: (studentId: string, slug: string) =>
       ['orchestration', 'pathwayReadiness', studentId, slug] as const,
+  },
+  analytics: {
+    all: () => ['analytics'] as const,
+    classKpi: (classId: string) => ['analytics', 'classKpi', classId] as const,
+    interventionAlerts: (classId: string) => ['analytics', 'interventionAlerts', classId] as const,
+    interventionAlert: (id: string) => ['analytics', 'interventionAlert', id] as const,
+  },
+  assignments: {
+    all: () => ['assignments'] as const,
+    forClass: (classId: string) => ['assignments', 'forClass', classId] as const,
   },
 } as const;
