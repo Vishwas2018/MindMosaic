@@ -3,6 +3,18 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260527-1 — Stage 36 close report declared typecheck green via stale turbo cache; 2 failures found at Stage 37 prep time
+
+- Date: 2026-05-27
+- Stage: 36 (discovered at Stage 37 prep)
+- Type: scope-reduction (process gap)
+- What the stage said: Stage 36 close report (commit 4dc9a88) recorded "pnpm typecheck ✅ green (15 packages)".
+- What I actually did: Stage 37 prep-time check (2026-05-27, turbo cache cold) found 2 pre-existing typecheck failures on main: (1) `@mm/ui` Brand.tsx `error TS2307: Cannot find module 'next/image'`; (2) `@mm/orchestration-svc` handlers.ts `error TS2307: Cannot find module '@mm/engines'`. Root cause: node_modules symlinks missing — `packages/ui/node_modules/next` and `supabase/functions/orchestration-svc/node_modules/@mm` were absent. The pnpm lockfile was correct and unchanged. Running `pnpm install` restored the symlinks and returned all 15 packages to typecheck-green with zero code/config changes. The Stage 36 close report recorded a turbo-cached green result from a prior run when node_modules were correctly installed; the cache was cold at Stage 37 prep, so tsc ran against missing symlinks.
+- Why: Turbo caches typecheck results by input hash (source files + tsconfig). When source files are unchanged between the Stage 36 close run and the Stage 37 prep run, turbo returns cached green without re-running tsc — even if node_modules have since been invalidated. The Stage 36 close `pnpm -r run typecheck` (non-turbo sequential mode) is subject to the same risk: if turbo is invoked by the pre-commit hook and source files match cached inputs, the hook returns green from cache.
+- Impact on later stages: Process tightening required. Close-ritual typecheck must be cache-busted (e.g., `--force` flag or equivalent) to catch node_modules drift. ISSUE-0029 filed. No code regression; typecheck is green after `pnpm install`.
+- Linked: ISSUE-0029, commit 4dc9a88 (Stage 36 close)
+- Resolved by: `pnpm install` (2026-05-27, Stage 37 prep). No lockfile change. Typecheck green restored.
+
 ### DEV-20260526-1 — Parent dashboard ReadinessRing uses learner profile pathway_readiness rather than dedicated analytics-svc call
 
 - Date: 2026-05-26

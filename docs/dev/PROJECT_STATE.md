@@ -89,17 +89,17 @@ Stage 34 SLA note: outbox → notifications 5s wall-clock SLA (DEV-20260524-1) c
 
 ## Notes for next session
 
-Stage 37 — Teacher Dashboard (Days 52–53, 2-day budget). SCREEN_SPECS §16.
+Stage 37 — Teacher Dashboard (Days 52–53, 2-day budget). SCREEN_SPECS **Screen 18** (NOT §16; §16 = Parent: Child Management — §13/§14-style trap corrected at Stage 37 prep).
 
 **Pre-reads required (T1):**
 - `apps/web/src/app/(teacher)/` layout + existing stubs
-- SCREEN_SPECS §16 verbatim (teacher dashboard content blocks + API call list)
-- analytics-svc `handleGetAutoGroups` route shape — ISSUE-0021 + DEV-20260522-1 fix scope (query-vs-path-param migration)
+- SCREEN_SPECS Screen 18 verbatim (teacher dashboard content blocks + API call list)
+- analytics-svc `handleGetAutoGroups` route shape — ISSUE-0021 + DEV-20260522-1 (carries forward; Stage 37 does NOT consume auto-groups — Block 5 deferred per Q-37.6 + ISSUE-0027)
 - `packages/sdk/src/hooks/` inventory for teacher-specific hooks
-- SCREEN_SPECS §16 API calls → SDK hooks to add/fix
+- SCREEN_SPECS Screen 18 API calls → SDK hooks to add/fix
 
 **Open carry-forwards to check at Stage 37 start:**
-- ISSUE-0021 + DEV-20260522-1: auto-groups route fix expected at Stage 37 (first consumer).
-- ISSUE-0026 (useLearningPlan path) — check if Stage 37 teacher dashboard consumes it; if not, defer to Stage 40.
+- ISSUE-0021 + DEV-20260522-1: auto-groups carries forward; Stage 37 confirmed non-consumer (Block 5 deferred per Q-37.6 + ISSUE-0027). Next consumer = v1.1.
+- ISSUE-0026 (useLearningPlan path) — Stage 37 teacher dashboard does NOT consume it; defer to Stage 40. ✓ confirmed.
 - Phase 1 Exit Report at `docs/dev/phase-1-exit-report.md`. Git tag `v1-phase-1` created locally; **push pending approval**.
 - Q-28.8 deferral: `SkillGraphCache.adjacency` lacks `strength` + `dependency_class` fields. `// Q-28.8:` grep markers at two sites in `intelligence-svc/handlers.ts`. Address in v1.1.

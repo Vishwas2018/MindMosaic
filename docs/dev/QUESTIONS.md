@@ -9,6 +9,96 @@
 
 ## Resolved
 
+### Q-37.6 — Block 5 Topic Mastery Bars (Screen 18): class-strand-mastery data source absent
+
+- Date raised: 2026-05-27 (Stage 37 prep — T2-tightened: filed before any handler/component code)
+- Asked of: self (T3 round-trip discharged)
+- Source: SCREEN_SPECS Screen 18 Block 5; analytics-svc handlers.ts (getAutoGroups returns clustering, not mastery)
+- Question: Can Stage 37 deliver Block 5 "Topic mastery bars — class-wide per strand" given no class-strand-mastery aggregation endpoint exists?
+- Why ambiguous: `GET /analytics/auto-groups` returns k-means clustering groups keyed on `class:{class_id}:{skill_id}` — not per-strand mastery averages. Block 5 requires a distinct aggregation query. Building a new endpoint was borderline given 2-day budget + four other missing endpoints.
+- Blocking? yes (Block 5 cannot render without data)
+- Assumed answer: Defer Block 5 to v1.1. Ship placeholder card ("Topic mastery breakdown — available in a future release") in the Block 5 slot. File ISSUE-0027. ISSUE-0021 carry-forward annotated: next auto-groups consumer = v1.1 Block 5.
+- Code affected: `apps/web/src/app/(teacher)/teacher/page.tsx` (placeholder), `supabase/functions/analytics-svc/` (new endpoint in v1.1)
+- Status: resolved
+- Resolution: Block 5 deferred to v1.1 (ISSUE-0027). Placeholder card ships in Stage 37. 2026-05-27.
+
+---
+
+### Q-37.5 — Class KPI endpoint: Block 2 data source for Screen 18
+
+- Date raised: 2026-05-27 (Stage 37 morning ritual — T3 round-trip)
+- Asked of: self (T3 round-trip discharged)
+- Source: SCREEN_SPECS Screen 18 Block 2; analytics-svc handlers.ts getCohort (reads auto-groups, not KPIs)
+- Question: What provides the four Block 2 stat tiles — Active students / Avg class score / Sessions this week / Assignments active — for Screen 18?
+- Why ambiguous: SCREEN_SPECS Screen 18 API call `GET /analytics/cohort/{class_id}` implies a class-level KPI endpoint. Existing `getCohort` takes a composite group_id (`class:{class_id}:{skill_id}`) and returns auto-groups clustering data, not class KPIs. No existing endpoint aggregates the four required stats.
+- Blocking? yes (Block 2 is the first visible content strip on the teacher dashboard)
+- Assumed answer: Option A — add new `GET /analytics/class-kpi/{class_id}` endpoint to analytics-svc. Server-side aggregation: `active_students` = COUNT(class_student WHERE class_id=$1); `avg_class_score` = AVG of last 5 session raw_scores per student, averaged across class (skip students with 0 sessions); `sessions_this_week` = COUNT(session) joined via class_student WHERE created_at > now() - interval '7 days'; `assignments_active` = COUNT(assignment) joined via assignment_target WHERE class_id=$1 AND status='published' AND archived_at IS NULL. Returns `{ active_students, avg_class_score, sessions_this_week, assignments_active, computed_at, stale_since }`. SDK hook: `useClassKpi(classId)`. mmKeys.analytics.classKpi namespace added.
+- Code affected: `supabase/functions/analytics-svc/handlers.ts`, `supabase/functions/analytics-svc/index.ts`, `packages/sdk/src/hooks/analytics.ts`, `packages/sdk/src/keys.ts`
+- Status: resolved
+- Resolution: Option A — new GET /analytics/class-kpi/{class_id} endpoint in analytics-svc. 2026-05-27.
+
+---
+
+### Q-37.4 — Assignment completion progress visual in assignments widget
+
+- Date raised: 2026-05-27 (Stage 37 morning ritual — T3 self-resolve)
+- Asked of: self
+- Source: SCREEN_SPECS Screen 18 Block 6 ("assignments widget — active assignments list with completion %")
+- Question: Which visual to use for completion % in the assignments widget — ProgressBar, pie, or number-only?
+- Why ambiguous: Multiple options available in @mm/ui; screen spec says "completion %" without specifying visual type.
+- Blocking? no
+- Assumed answer: `ProgressBar` primitive from `@mm/ui` (exists, tested). Alongside numeric label (e.g., "7 / 10 students"). Consistent with completion patterns in other screens.
+- Code affected: `apps/web/src/app/(teacher)/teacher/page.tsx` (Block 6 AssignmentsWidget component)
+- Status: resolved
+- Resolution: ProgressBar + numeric label. 2026-05-27.
+
+---
+
+### Q-37.3 — Trend sparkline in Screen 18 student performance table
+
+- Date raised: 2026-05-27 (Stage 37 morning ritual — T3 self-resolve)
+- Asked of: self
+- Source: SCREEN_SPECS Screen 18 Block 4 ("trend sparkline")
+- Question: How to implement the trend sparkline column in the student performance table given no sparkline primitive exists in @mm/ui?
+- Why ambiguous: Adding charting dependency for one column exceeds budget; screen spec calls for sparkline but no @mm/ui primitive exists.
+- Blocking? no
+- Assumed answer: Omit sparkline for v1. Show static last-score value in the trend column slot. File ISSUE-0028. Add `{/* TODO: ISSUE-0028: trend sparkline — v1.1 */}` comment in column header slot.
+- Code affected: `apps/web/src/app/(teacher)/teacher/page.tsx` (Block 4 table)
+- Status: resolved
+- Resolution: Static last-score value in trend column; ISSUE-0028 filed for v1.1 sparkline primitive. 2026-05-27.
+
+---
+
+### Q-37.2 — UI-discipline canonisation: create docs/dev/ui-discipline.md in Stage 37 or defer?
+
+- Date raised: 2026-05-27 (Stage 37 morning ritual — T3 self-resolve)
+- Asked of: self
+- Source: CLAUDE.md decision-recording rule; absence of ui-discipline.md confirmed by glob
+- Question: Should Stage 37 canonise the dashboard-page architecture pattern (block components, 'use client' pages, server layout guards, Vitest + jest-axe testing) into docs/dev/ui-discipline.md?
+- Why ambiguous: Two stages of evidence (Stage 36 + Stages 22b–25) — pattern is stable but Stage 37 has significant backend scope (4 missing endpoints).
+- Blocking? no
+- Assumed answer: Defer to Stage 41 (Phase 2 Exit Review audit day). Spending Stage 37 budget on meta-documentation when 4 backend endpoints + 2 pages are outstanding inverts priorities. Stage 41 is the natural audit moment with full Phase 2 UI evidence.
+- Code affected: `docs/dev/ui-discipline.md` (to be created at Stage 41)
+- Status: resolved
+- Resolution: Deferred to Stage 41. 2026-05-27.
+
+---
+
+### Q-37.1 — GET /analytics/auto-groups route shape: three-way conflict resolution
+
+- Date raised: 2026-05-27 (Stage 37 morning ritual — T3 self-resolve REVISED)
+- Asked of: self
+- Source: ISSUE-0021; DEV-20260522-1; SCREEN_SPECS Screen 18 API calls; analytics-svc/index.ts:61–93
+- Question: Which shape should GET /analytics/auto-groups use for Stage 37 teacher dashboard? Three irreconcilable specs: (a) current impl = query params `?class_id=&skill_id=`; (b) arch §4.7 = path params `/{class_id}/{skill_id}`; (c) SCREEN_SPECS Screen 18 = path param `/{class_id}` only.
+- Why ambiguous: Q-37.6 changed the frame — Block 5 (Topic Mastery) is the only Screen 18 block that was going to consume auto-groups data. With Block 5 deferred to v1.1, Stage 37 has NO auto-groups consumer. The shape conflict is real but irrelevant to Stage 37 delivery.
+- Blocking? no (consumer deferred)
+- Assumed answer: Self-resolve. Stage 37 does NOT consume GET /analytics/auto-groups. ISSUE-0021 + DEV-20260522-1 carry forward unchanged. Next consumer = v1.1 Block 5; shape decision belongs to that stage's T3 Q&A. No analytics-svc auto-groups route changes in Stage 37.
+- Code affected: none (no auto-groups changes in Stage 37)
+- Status: resolved
+- Resolution: Stage 37 confirmed non-consumer of auto-groups (Block 5 deferred per Q-37.6). ISSUE-0021 carries forward to v1.1. 2026-05-27.
+
+---
+
 ### Q-36.8 — apps/web jest-axe test infrastructure absent
 
 - Date raised: 2026-05-26 (Stage 36 implementation T1 reads — T2-tightened: filed before component code)

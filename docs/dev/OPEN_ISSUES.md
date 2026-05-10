@@ -5,6 +5,62 @@
 
 ## Open
 
+### ISSUE-0029 — Stage close typecheck gate may return stale turbo-cached green when node_modules drift
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-27 (Stage 37 prep — DEV-20260527-1)
+- Area: tooling / process
+- Tags: typecheck · turbo-cache · close-ritual · node_modules · process
+
+**Summary.** The Stage 36 close report recorded "pnpm typecheck ✅ green (15 packages)" via a turbo-cached result. Two days later at Stage 37 prep-time, a cold turbo cache revealed 2 pre-existing typecheck failures (`@mm/ui` Brand.tsx `next/image`; `@mm/orchestration-svc` handlers.ts `@mm/engines`). Root cause: node_modules symlinks were missing; turbo returned cached green from a prior run when node_modules were correctly installed. Running `pnpm install` restored symlinks; typecheck returned green with zero code changes. The close-ritual process does not explicitly bust the turbo cache, so stale-green results can persist across node_modules invalidation events (git clean, partial reinstall, CI runner cache eviction).
+
+**Fix (process, Stage 37 or Stage 41 audit).** Two mitigations:
+
+1. **Close-ritual cache bust:** Replace `pnpm -r run typecheck` in the evening ritual with `pnpm turbo typecheck --force` (or equivalent) to bypass the turbo cache and force re-execution. Document in CLAUDE.md §Evening ritual as a mandatory step.
+
+2. **Pre-commit hook guard:** The `.githooks/commit-msg` hook (Stage 25) only enforces commit trailer prohibition. Add a pre-commit hook that runs `pnpm install --frozen-lockfile` before typecheck if `node_modules` state is suspect, or at minimum, documents that `pnpm install` must be run after any git clone/checkout before committing.
+
+**Tracking pointer.** DEV-20260527-1. `pnpm install` one-liner restores green state; no lockfile change needed.
+
+---
+
+### ISSUE-0028 — Screen 18 student performance table: trend sparkline column omitted in v1
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-27 (Stage 37 prep — Q-37.3)
+- Area: frontend (apps/web) + ui (@mm/ui)
+- Tags: teacher-dashboard · @mm/ui · v1.1 · sparkline · screen-18
+
+**Summary.** SCREEN_SPECS Screen 18 Block 4 ("student performance table") specifies a "trend sparkline" column showing recent score trajectory per student. No sparkline primitive exists in `@mm/ui` (71 tests green at Stage 37 start). Adding a charting dependency (Recharts) or a hand-rolled inline SVG for a single dashboard column exceeds Stage 37 budget. Stage 37 ships the column with a static last-score value instead of a sparkline.
+
+**Recommended fix (v1.1).** Add a `Sparkline` primitive to `@mm/ui`: accepts `data: number[]` (last N scores, e.g. last 5 session scores), renders a minimal inline SVG polyline (no axes, no labels). Wire into the student performance table as the trend column. Alternatively, leverage Recharts `LineChart` with `width/height` capped to column width.
+
+**Tracking pointer.** Stage 37 prep Q-37.3. Static value placeholder in student performance table trend column in `apps/web/src/app/(teacher)/teacher/page.tsx`.
+
+---
+
+### ISSUE-0027 — Block 5 Topic Mastery Bars (Screen 18) deferred: class-strand-mastery aggregation endpoint absent
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-27 (Stage 37 prep — Q-37.6)
+- Area: frontend (apps/web) + backend (analytics-svc)
+- Tags: teacher-dashboard · analytics-svc · v1.1 · screen-18 · topic-mastery
+
+**Summary.** SCREEN_SPECS Screen 18 Block 5 ("Topic mastery bars — class-wide per strand") requires a class-level aggregation of mastery by skill strand. No existing endpoint provides this: `GET /analytics/auto-groups?class_id=&skill_id=` returns k-means clustering groups keyed on a specific skill, not per-strand mastery averages. A dedicated endpoint is needed, returning `{ strand_slug: string; avg_mastery: number; student_count: number; computed_at: string }[]` aggregated from `skill_mastery` joined via `skill_node.parent_id` grouped by strand. Stage 37 ships a placeholder card ("Topic mastery breakdown — available in a future release") in the Block 5 slot with a `{/* TODO: ISSUE-0027 */}` comment.
+
+**Recommended fix (v1.1).**
+- Add `GET /analytics/class-mastery/{class_id}` endpoint to analytics-svc (teacher/admin role-gated, before service-role gate).
+- Aggregation query: `class_student JOIN skill_mastery USING(student_id) JOIN skill_node ON skill_mastery.skill_id = skill_node.id` → `GROUP BY skill_node.parent_id` → `AVG(mastery_level), COUNT(DISTINCT student_id)`. Resolve `parent_id` to strand name from `skill_node`.
+- Wire Block 5 in teacher dashboard: `useClassMastery(classId)` SDK hook + `SkillBar` row per strand (pattern exists from parent dashboard SubjectAreasSection).
+- Remove placeholder card and ISSUE-0027 comment.
+
+**Tracking pointer.** Stage 37 prep Q-37.6. Placeholder in `apps/web/src/app/(teacher)/teacher/page.tsx` Block 5 slot. ISSUE-0021 updated (Block 5 = next auto-groups consumer too; v1.1).
+
+---
+
 ### ISSUE-0026 — useLearningPlan SDK hook path malformed: double-svc segment + missing {student_id}
 
 - Status: open
@@ -93,6 +149,8 @@
 **Fix (v1.1 / Stage 37 coordinator).** Migrate analytics-svc route to `/analytics/auto-groups/{class_id}/{skill_id}` path params in the same commit that implements the Stage 37 Teacher Dashboard consumer. Zero-downtime: no external consumers until that stage.
 
 **Tracking pointer.** DEV-20260522-1. All new Stage 32 endpoints implement arch path-param shape — deviation not perpetuated.
+
+**Stage 37 update (2026-05-27).** Stage 37 confirmed: teacher dashboard does NOT consume `GET /analytics/auto-groups`. Block 5 (Topic Mastery Bars, Screen 18) is deferred to v1.1 per Q-37.6 + ISSUE-0027 — the auto-groups endpoint supplies k-means clustering groups, not strand mastery averages; Block 5 requires a separate `GET /analytics/class-mastery/{class_id}` endpoint. With Block 5 deferred there is no Stage 37 auto-groups consumer. ISSUE-0021 carries forward unchanged; next consumer = v1.1 Block 5 implementation (ISSUE-0027).
 
 ### ISSUE-0020 — POST /orchestration/generate-plan synchronous in v1; async upgrade deferred
 
