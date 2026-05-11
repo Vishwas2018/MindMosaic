@@ -9,6 +9,36 @@
 
 ## Resolved
 
+### Q-40.6 — Student dashboard greeting sub-line: copy value for dashboardSubheading
+
+- Date raised: 2026-05-11 (Stage 40 T5 checkpoint)
+- Asked of: operator
+- Source: `apps/web/src/app/(student)/dashboard/page.tsx`; `apps/web/src/copy/student.ts`; `docs/mockups/02-dashboard.html` hero text below h1
+- Question: What copy should the sub-heading below the greeting h1 display on the student dashboard?
+- Why ambiguous: Mockup shows a sub-line below the greeting but no verbatim string is specified in SCREEN_SPECS §7 or the C-C-D-V.
+- Blocking? no
+- Assumed answer: "Here's what's next in your learning journey."
+- Code affected: `apps/web/src/copy/student.ts` (`STUDENT_COPY.dashboardSubheading`), `apps/web/src/app/(student)/dashboard/page.tsx`
+- Status: resolved
+- Resolution: `STUDENT_COPY.dashboardSubheading = "Here's what's next in your learning journey."` — operator confirmed at T5 checkpoint. 2026-05-11.
+
+---
+
+### Q-40.5 — Student dashboard Mastery Snapshot: SkillBar orientation (vertical vs horizontal)
+
+- Date raised: 2026-05-11 (Stage 40 T5 checkpoint)
+- Asked of: operator
+- Source: `packages/ui/src/SkillBar/SkillBar.tsx`; `docs/mockups/02-dashboard.html` mastery snapshot section; C-C-D-V D7 spec
+- Question: C-C-D-V D7 specified "horizontal SkillBars" for the Mastery Snapshot section. The SkillBar primitive's default (no `layout` prop) renders vertical bars per the UI package implementation and mockup lines 530-538. Which orientation?
+- Why ambiguous: C-C-D-V contained architect drift — "horizontal" was written without checking the SkillBar default. The mockup clearly shows vertical bars (label top, fill bar below). SkillBar has no `layout="horizontal"` prop.
+- Blocking? no
+- Assumed answer: Vertical (default) — no `layout` prop passed.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx` (MasterySnapshotCard)
+- Status: resolved
+- Resolution: Vertical default confirmed by operator at T5 checkpoint. C-C-D-V "horizontal" was architect drift; retro noted in DAILY_LOG Stage 40. 2026-05-11.
+
+---
+
 ### Q-40.UI-6 — Completed assignment card: plain Review button vs SCREEN_SPECS §13 "View history dropdown"
 
 - Date raised: 2026-05-30 (Stage 40 prep — T2-tightened)

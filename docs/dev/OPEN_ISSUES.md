@@ -5,6 +5,24 @@
 
 ## Open
 
+### ISSUE-0031 — Student dashboard: NBA "Next Best Action" hero card omitted v1
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-11 (Stage 40 T5 checkpoint)
+- Area: frontend (apps/web)
+- Tags: student-dashboard · v1.1 · screen-7 · nba
+
+**Summary.** SCREEN_SPECS §7 (Student Dashboard v2) includes a "Next Best Action" hero card at the top of the dashboard — a prominently styled card showing the single highest-priority recommendation for the student (e.g., "Continue Fractions Practice", "Complete overdue diagnostic"). No `GET /orchestration/nba/{student_id}` endpoint or equivalent exists in v1 backend. Stage 40 ships the dashboard without the NBA card; the hero slot is vacant (no placeholder rendered).
+
+**Recommended fix (v1.1).**
+- Option A: Derive from existing data — compose NBA from `LearningPlanDTO.sessions` (first pending item) or `useLearningPlan` highest-priority item. No new endpoint; purely frontend computation.
+- Option B: New endpoint `GET /orchestration/nba/{student_id}` — orchestration-svc returns `{ label, mode, target_skill_names, rationale }` as a dedicated NBA DTO. Cleaner separation; adds backend work.
+
+**Tracking pointer.** Stage 40 T5 operator decision. `apps/web/src/app/(student)/dashboard/page.tsx` — hero slot absent. ISSUE-0031.
+
+---
+
 ### ISSUE-0030 — Pathway → strand mapping absent: teacher student detail ships NAPLAN tab only
 
 - Status: open
@@ -83,7 +101,7 @@ Either option unblocks ICAS and Selective tabs in Screen 20.
 
 ### ISSUE-0026 — useLearningPlan SDK hook path malformed: double-svc segment + missing {student_id}
 
-- Status: open
+- Status: **resolved** — 2026-05-11 (Stage 40 D1)
 - Severity: low
 - Reported: 2026-05-26 (Stage 36 pre-read R7)
 - Area: frontend (packages/sdk)
@@ -94,6 +112,8 @@ Either option unblocks ICAS and Selective tabs in Screen 20.
 **Fix (first UI stage that consumes the hook — likely Stage 40).** Correct hook path to include `studentId` as a parameter: `.get(\`/orchestration-svc/orchestration/plan/${studentId}/current\`, LearningPlanDTOSchema)` with `?plan_type=weekly` default. Verify against arch §4.6 verbatim.
 
 **Tracking pointer.** Stage 36 pre-read R7. `packages/sdk/src/hooks/orchestration.ts:19-28`.
+
+**Resolution (Stage 40 D1).** Path corrected to `/orchestration-svc/orchestration/plan/${encodeURIComponent(studentId)}/current`. Regression-guarded by `useLearningPlan — ISSUE-0026 path fix` test in `packages/sdk/src/__tests__/stage40.test.ts`. Commit: 0af5afb.
 
 ### ISSUE-0025 — Notification spam guard: soft dedup window production-tuning deferred
 

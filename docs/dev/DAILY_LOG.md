@@ -2,6 +2,63 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 40 — 2026-05-11 (Day 54, 2-day budget)
+
+**Planned (from DEV_PLAN.md Stage 40):** Student Assignments (Screen 13) + Student Dashboard v2 (Screen 7) — fix ISSUE-0026 (D1), notifications SDK (D2–D3), useStartAssignment (D4), copy/student.ts (D5), assignments page (D6), dashboard upgrade (D7), ≥10 tests (D8), Playwright spec (D9).
+
+**Actually delivered:**
+
+- Prep commit (7b03895): Q-40.1–4 + Q-40.UI-1/2/5/6 resolved; DEV-20260530-1 (tab labels) + DEV-20260530-2 (Review button) + DEV-20260511-2 (dashboard path typo) filed; C-C-D-V saved to `docs/prompts/2026-05-30_stage-40.md`.
+- Implementation (0af5afb): All D1–D9 delivered; 13 files changed, 1371 insertions.
+  - D1: `useLearningPlan` path fix — `/orchestration-svc/orchestration/plan/${studentId}/current` (ISSUE-0026 closed). `packages/sdk/src/hooks/orchestration.ts`.
+  - D2: `mmKeys.notifications` namespace — `.all()`, `.mine()`. `packages/sdk/src/keys.ts`.
+  - D3: `useMyNotifications(unreadOnly?)` hook — `/notifications-svc/notifications/me[?unread=true]`. `packages/sdk/src/hooks/notifications.ts` (new file) + `hooks/index.ts` re-export.
+  - D4: `useStartAssignment()` mutation — POST `/assignments-svc/assignments/{id}/start`, Idempotency-Key, invalidates `forStudent('')` + `byId(id)`. `packages/sdk/src/hooks/assignments.ts`.
+  - D5: `apps/web/src/copy/student.ts` (new file) — `MODE_ICON_MAP`, `getModeIcon`, full `STUDENT_COPY` const (assignments + dashboard + shared copy).
+  - D6: `apps/web/src/app/(student)/assignments/page.tsx` (new file) — Screen 13 with Assigned/In Progress/Completed tabs, overdue banner (`role="alert"`), `AssignedCard` (start flow via useStartAssignment), `InProgressCard` (continue to session), `CompletedCard` (review to /results), `SkeletonCard` loading states.
+  - D7: `apps/web/src/app/(student)/dashboard/page.tsx` (full rewrite) — Screen 7 v2: greeting + dashboardSubheading, KPI strip (sessions/mastery/weekly-progress/last-score), WeeklyPlanCard (useLearningPlan), MasterySnapshotCard (domain_profiles from useLearnerProfile, SkillBar vertical default), QuickInsightsCard (buildExplanationCards from causalMap.active_misconceptions, max 3), AssessmentShortcuts.
+  - D8: +12 Vitest tests across 4 files: `packages/sdk/src/__tests__/stage40.test.ts` (+5: notifications path, startAssignment POST + Idempotency-Key, learningPlan path regression), `apps/web/src/__tests__/student-copy.test.ts` (+3: MODE_ICON_MAP invariants), `packages/core/src/explain-format-causal.test.ts` (+1: causalMap shape integration), `packages/ui/src/__tests__/student-routes-axe.test.tsx` (+3: axe assignments card + empty state + dashboard KPI grid).
+  - D9: `apps/web/playwright/e2e/student-assignments.spec.ts` — 3 Playwright tests, `test.skip`-guarded.
+
+**Time spent:** 2 sessions (2026-05-11 continued from prior context). 2-day budget.
+
+**Surprises / departures:**
+
+- **Retro: C-C-D-V "horizontal" SkillBar drift.** D7 spec in C-C-D-V stated "horizontal SkillBars" for Mastery Snapshot. UI_CONTRACT §1.1 governs: mockup lines 530-538 clearly show vertical bars (label top, bar below). SkillBar has no `layout="horizontal"` prop. Correct orientation is vertical (default). Q-40.5 resolved at T5 checkpoint. Root cause: C-C-D-V architect wrote from memory, not from mockup + component inspection. Process fix: consult component props and mockup before specifying layout direction in C-C-D-V.
+- **Retro: T1 read defect — `explain-format.ts` morning ritual.** C-C-D-V cited `learnerProfile.skill_mastery` for Quick Insights, but `LearningDNADTO` has no `skill_mastery` field. Actual field: `domain_profiles: Record<strandName, {mastery, velocity, weakest_skills, strongest_skills}>`. Additionally, `buildExplanationCards` requires `MisconceptionInput` shape (`misconception_id, category, affected_skill_count`) which is absent from `LearningDNADTO.active_misconceptions` — must use `useCausalMap` data. Root cause: T1 file read did not verify DTO field names against schema before writing C-C-D-V. Process fix: read the Zod schema verbatim for every DTO cited in a C-C-D-V, not just the hook name.
+- **Retro: Push gate honored.** Operator enforced explicit "create the commit" gate: no push of impl or chore commit until operator approval. Two separate approvals: impl commit (after V11 cross-stage grep cleared) and chore commit (this message). Both gates honored — no premature push.
+- `buildExplanationCards` input: `useCausalMap` data used (has `category` + `affected_skill_count`), not `useLearnerProfile`. Q-40.4 resolved.
+- NBA hero card (SCREEN_SPECS §7): omitted v1 — no backend NBA endpoint. ISSUE-0031 filed.
+- Pre-commit hook blocks AI `Co-Authored-By` trailers (BUILD_CONTRACT §11.2) — removed from commit message.
+
+**Decisions made (not in stage):**
+
+- Q-40.5: SkillBar vertical default (mockup authority over C-C-D-V drift)
+- Q-40.6: `dashboardSubheading = "Here's what's next in your learning journey."`
+- ISSUE-0031: NBA hero card — omit v1, v1.1 option A (derive from plan items)
+
+**Deviations logged:**
+
+- DEV-20260530-2 (prep commit): Review button vs dropdown
+- DEV-20260530-1 (prep commit): Tab labels Assigned/In Progress/Completed vs To do/Completed/Overdue
+- DEV-20260511-2 (prep commit): Dashboard path typo
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0026 CLOSED: useLearningPlan path fix delivered in D1
+- ISSUE-0031 OPENED (low): NBA hero card omitted v1
+- Q-40.5 resolved: SkillBar layout vertical
+- Q-40.6 resolved: dashboardSubheading copy
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ · Tests ✅ (593 Vitest passed / 1 skipped + 3 Playwright test.skip-guarded) · Build ✅ (exit 0, 21 routes) · RLS ✅ (unchanged — no new tables)
+
+**Tomorrow — first thing:**
+Read PROJECT_STATE + DEV_PLAN Stage 41.
+
+---
+
 ## Stage 39 — 2026-05-11 (Day 54, 3-day budget, delivered in 1 day)
 
 **Planned (from DEV_PLAN.md Stage 39):** Teacher Assignment Engine (Screen 22) — SDK hooks D1–D4 (PathwayDTOSchema id fix, query keys, 6 CRUD+tracking hooks, useGenerateAssignment), list page D5 (tabs: All/Draft/Published/Archived), 5-step wizard D6 (Type→Target→Configure→Schedule→Review+Publish), tracking view D7 (3-stat grid + Archive dialog), ≥10 new tests D8, Playwright spec D9.
