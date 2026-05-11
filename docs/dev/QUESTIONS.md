@@ -9,6 +9,126 @@
 
 ## Resolved
 
+### Q-40.UI-6 — Completed assignment card: plain Review button vs SCREEN_SPECS §13 "View history dropdown"
+
+- Date raised: 2026-05-30 (Stage 40 prep — T2-tightened)
+- Asked of: self (T2 self-resolve)
+- Source: SCREEN_SPECS §13 "View history dropdown"; `StudentAssignmentDTO.my_session_id: string | null`; `/results/[id]/page.tsx` (existing route)
+- Question: Completed cards have one `my_session_id` per student. SCREEN_SPECS §13 specifies a dropdown implying multiple history entries. Use dropdown or plain navigate?
+- Why ambiguous: Dropdown implies multiple sessions per assignment (repeat-attempt flow). v1 has no repeat-attempt flow — one session ID per assignment per student.
+- Blocking? no
+- Assumed answer: Plain "Review" button → `/results/{my_session_id}`.
+- Code affected: `apps/web/src/app/(student)/assignments/page.tsx`
+- Status: resolved
+- Resolution: Plain "Review" button navigating to `/results/{my_session_id}`. No dropdown. Rationale: single session_id per student per assignment in v1; dropdown would have only one item and mislead. DEV-20260530-2 filed. v1.1 repeat-attempt flow can replace with dropdown. 2026-05-30.
+
+---
+
+### Q-40.UI-5 — Assignment mode icon mapping: which icon per mode value
+
+- Date raised: 2026-05-30 (Stage 40 prep — T2-tightened)
+- Asked of: self (T2 self-resolve)
+- Source: `StudentAssignmentDTO.mode`; `docs/mockups/10-student-assignments.html` card mode icon column
+- Question: Which icon should each mode value map to on assignment cards? No `MODE_ICON_MAP` exists in the codebase.
+- Why ambiguous: Mockup shows mode-specific icons without labelling which SVG path maps to which mode string.
+- Blocking? no
+- Assumed answer: `MODE_ICON_MAP` const in `apps/web/src/copy/student.ts`; `practice` → pencil, `diagnostic` → checklist, `exam` → clock. Generic fallback for unmapped modes.
+- Code affected: `apps/web/src/copy/student.ts`, `apps/web/src/app/(student)/assignments/page.tsx`
+- Status: resolved
+- Resolution: `MODE_ICON_MAP` exported from `apps/web/src/copy/student.ts`: `{ practice: PencilIcon, diagnostic: ClipboardListIcon, exam: ClockIcon }`. Generic `QuestionMarkCircleIcon` fallback. Single-consumer const — extract to shared location only when a second consumer appears. 2026-05-30.
+
+---
+
+### Q-40.UI-2 — Weekly Progress KPI tile: reuse StatTile or custom inline block
+
+- Date raised: 2026-05-30 (Stage 40 prep — T5 layout sketch)
+- Asked of: self (T5 operator decision)
+- Source: `docs/mockups/02-dashboard.html` KPI grid (Sessions / Mastery / Weekly Progress with progress bar / Last Score); `packages/ui/src/StatTile/StatTile.tsx`
+- Question: The Weekly Progress tile in the mockup contains a progress bar inside the tile body — structurally different from StatTile (number + label only). Reuse StatTile with a children prop or build an inline block?
+- Why ambiguous: StatTile has no children slot; extending it risks breaking parent dashboard and teacher page consumers.
+- Blocking? no
+- Assumed answer: Custom inline block — single consumer, no shared-primitive risk.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`
+- Status: resolved
+- Resolution: Inline custom block — `div` with Tailwind styling matching the KPI tile grid (rounded-2xl bg-white shadow-sm p-5). Contains label, fraction text, and `<progress>` element. Not a StatTile extension. Single-consumer rule: extract to shared primitive only when a second consumer appears. 2026-05-30.
+
+---
+
+### Q-40.UI-1 — Student TopBar nav items: which routes to include
+
+- Date raised: 2026-05-30 (Stage 40 prep — T5 layout sketch)
+- Asked of: self (T5 operator decision)
+- Source: `docs/mockups/02-dashboard.html` top nav; existing student routes (dashboard, results/[id], session-selection, session/[id]/*)
+- Question: The mockup shows a multi-item top nav. Which items are honest routes in Stage 40? `/learn` and `/practice` would be dead links if included.
+- Why ambiguous: Mockup nav includes items for routes that do not exist as named pages in v1.
+- Blocking? no
+- Assumed answer: 3-item nav: Dashboard / Assignments / Results. Omit `/learn` and `/practice`.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`, `apps/web/src/app/(student)/assignments/page.tsx`
+- Status: resolved
+- Resolution: TopBar nav = 3 items: Dashboard (`/dashboard`) / Assignments (`/assignments`) / Results (passive — links to individual sessions). `/learn` and `/practice` omitted — no distinct named pages exist; session-selection handles start-session flow via mode param. 2026-05-30.
+
+---
+
+### Q-40.4 — Quick Insights data source: buildExplanationCards or raw misconceptions list
+
+- Date raised: 2026-05-30 (Stage 40 prep — T2-tightened)
+- Asked of: self (T2 self-resolve)
+- Source: `packages/core/src/explain-format.ts` (`buildExplanationCards()`); `packages/sdk/src/hooks/intelligence.ts` (`useCausalMap(studentId)`); SCREEN_SPECS §7 Quick Insights block; `docs/mockups/02-dashboard.html` insights rows (3 icon+text items)
+- Question: Should Quick Insights rows be raw `active_misconceptions` strings from useCausalMap, or formatted via buildExplanationCards from @mm/core?
+- Why ambiguous: buildExplanationCards existence was not confirmed in morning ritual R7 (T1 read defect). Raw strings are simpler; buildExplanationCards adds consistent formatting and is already tested.
+- Blocking? no
+- Assumed answer: Reuse buildExplanationCards — consistent formatting, already tested (8 tests, Stage 36 commit 56b4a9a).
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`
+- Status: resolved
+- Resolution: `buildExplanationCards(useCausalMap(studentId).data?.active_misconceptions ?? [])` — returns `ExplanationCard[]` with `title`, `body`, `icon`. Render first 3. `EXPLANATION_FORMATTER_VERSION = 'v1'` already set in explain-format.ts. T1 read defect resolved: file confirmed present at `packages/core/src/explain-format.ts` via ls verification at Stage 40 session start. 2026-05-30.
+
+---
+
+### Q-40.3 — Learning plan item "Start" button navigation target
+
+- Date raised: 2026-05-30 (Stage 40 prep — T2-tightened)
+- Asked of: self (T2 self-resolve)
+- Source: `packages/types/src/orchestration.ts` `LearningPlanItemDTOSchema` (no `id` field); `apps/web/src/app/(student)/session-selection/page.tsx`; SCREEN_SPECS §7 Weekly Learning Plan card
+- Question: LearningPlanItemDTO has no `id` field. Where does "Start" navigate for each plan item?
+- Why ambiguous: Starting a specific session for a plan item requires a plan_item_id or skill_id. LearningPlanItemDTO has neither. Options range from mode-scoped session-selection to a full skill-param extension.
+- Blocking? no
+- Assumed answer: Option A — navigate to `/session-selection?mode={item.mode}`. Mode is the only safely-available discriminator.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`
+- Status: resolved
+- Resolution: Option A — `Start` button navigates to `/session-selection?mode={item.mode}`. Rationale: no `id` field on LearningPlanItemDTO; skill param extension out of scope (no skill routing in session-selection in v1). Limitation noted: pressing Start on any plan item of the same mode leads to the same session-selection screen — plan-specific routing deferred v1.1 when plan_item_id is exposed by orchestration-svc. 2026-05-30.
+
+---
+
+### Q-40.2 — Student assignments tab labels: 3-tab mockup vs SCREEN_SPECS §13 "To do/Completed/Overdue"
+
+- Date raised: 2026-05-30 (Stage 40 prep — T5 layout sketch)
+- Asked of: self (T5 operator decision)
+- Source: `docs/mockups/10-student-assignments.html` (3 tabs: Assigned / In Progress / Completed); SCREEN_SPECS §13 (tabs: To do / Completed / Overdue); `StudentAssignmentDTO.my_status`
+- Question: Should the assignments page use the mockup's 3-tab structure or SCREEN_SPECS §13's 3-tab structure (different labels + separate Overdue tab)?
+- Why ambiguous: UI_CONTRACT §1.1 makes mockup the visual authority; SCREEN_SPECS §13 is the content authority. Tab labels fall between the two.
+- Blocking? no — T5 operator decision
+- Assumed answer: 3 tabs: Assigned / In Progress / Completed. Overdue items in Assigned tab with red border + "Overdue" pill. Overdue banner above tabs when count > 0.
+- Code affected: `apps/web/src/app/(student)/assignments/page.tsx`
+- Status: resolved
+- Resolution: 3 tabs: Assigned / In Progress / Completed. Overdue items appear in Assigned tab as visually-distinct cards (red `border-l-4 border-l-red-500` + "Overdue" pill + "Was due..." line). Banner above tab strip shows overdue count when > 0. Separate Overdue tab rejected: it duplicates the same items already in Assigned — one item would appear in two tabs simultaneously. DEV-20260530-1 filed. 2026-05-30.
+
+---
+
+### Q-40.1 — Stage 40 DEV_PLAN student dashboard path typo: page.tsx vs dashboard/page.tsx
+
+- Date raised: 2026-05-30 (Stage 40 prep — T2-tightened)
+- Asked of: self (T2 self-resolve)
+- Source: DEV_PLAN.md Stage 40 deliverables (`apps/web/src/app/(student)/page.tsx`); DEV-20260515-1 (Stage 25 same-class typo); middleware + role-home routing layer
+- Question: DEV_PLAN Stage 40 lists `(student)/page.tsx` as the student dashboard file. Stage 25 established `dashboard/page.tsx` as the correct path. Same typo class?
+- Why ambiguous: DEV_PLAN is the authoritative plan document; creating a root-level page.tsx could be interpreted as the correct action.
+- Blocking? no
+- Assumed answer: Same typo class as DEV-20260515-1 — upgrade `dashboard/page.tsx`. Root-level page.tsx is unreachable via middleware.
+- Code affected: `apps/web/src/app/(student)/dashboard/page.tsx`
+- Status: resolved
+- Resolution: Upgrade `apps/web/src/app/(student)/dashboard/page.tsx`. Root-level `(student)/page.tsx` is unreachable — middleware routes all student traffic to `/dashboard` via role-home.ts. DEV-20260511-2 filed. 2026-05-30.
+
+---
+
 ### Q-39.9 — Draft assignment card: [Edit] action scope and navigation target
 
 - Date raised: 2026-05-29 (Stage 39 impl — T5 mid-impl checkpoint)

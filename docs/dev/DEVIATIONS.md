@@ -3,6 +3,48 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260530-2 — Student assignments "Review" button: plain navigate vs SCREEN_SPECS §13 "View history dropdown"
+
+- Date: 2026-05-30
+- Stage: 40
+- Type: substitution
+- What the stage said: SCREEN_SPECS §13 specifies a "View history dropdown" action on completed assignment cards.
+- What I actually did: Stage 40 ships a plain "Review" button that navigates to `/results/{my_session_id}`.
+- Why: `StudentAssignmentDTO.my_session_id` provides exactly one session ID per student per assignment in v1. A dropdown implies multiple history entries (multiple attempts), which requires a repeat-attempt flow that does not exist in v1. A plain button is honest — one result, one navigation target. Q-40.UI-6 resolved this at prep time.
+- Impact on later stages: v1.1 repeat-attempt feature (if scoped) would need to replace the Review button with a dropdown linked to all completed sessions for this assignment. No API change needed — `/results/{session_id}` route already exists from Stage 23.
+- Linked: Q-40.UI-6, SCREEN_SPECS §13, `apps/web/src/app/(student)/results/[id]/page.tsx`
+- Resolved by: ongoing (v1.1 if repeat-attempt ships)
+
+---
+
+### DEV-20260530-1 — Student assignments tab labels: Assigned/In Progress/Completed vs SCREEN_SPECS §13 "To do/Completed/Overdue"
+
+- Date: 2026-05-30
+- Stage: 40
+- Type: substitution
+- What the stage said: SCREEN_SPECS §13 (Student Assignments) specifies three tabs labelled "To do", "Completed", and "Overdue" as separate tabs.
+- What I actually did: Stage 40 ships three tabs labelled "Assigned", "In Progress", and "Completed". Overdue items appear within the "Assigned" tab as a visually-distinct card variant (red `border-l-4 border-l-red-500` + "Overdue" pill). An overdue-count banner appears above the tab strip when overdue items are present.
+- Why: T5 visual authority (`docs/mockups/10-student-assignments.html`) governs layout per UI_CONTRACT §1.1. The mockup uses Assigned/In Progress/Completed naming. A separate Overdue tab duplicates content (overdue items ARE assigned but past due); consolidating into the Assigned tab with visual decoration avoids showing the same item in two tabs and reduces confusion. Q-40.2 resolved this at prep time — operator approved.
+- Impact on later stages: v1.1 spec reconciliation required — update SCREEN_SPECS §13 to document the shipped tab structure, or revert to separate Overdue tab if stakeholders require it. No API or data model impact; `my_status` field on StudentAssignmentDTO drives tab filtering unchanged.
+- Linked: Q-40.2, SCREEN_SPECS §13, `docs/mockups/10-student-assignments.html`
+- Resolved by: ongoing (v1.1 spec reconciliation)
+
+---
+
+### DEV-20260511-2 — Stage 40 DEV_PLAN student dashboard file path typo: page.tsx vs dashboard/page.tsx
+
+- Date: 2026-05-11
+- Stage: 40
+- Type: substitution
+- What the stage said: DEV_PLAN.md Stage 40 deliverables list `apps/web/src/app/(student)/page.tsx` as the student dashboard file to upgrade.
+- What I actually did: Upgraded `apps/web/src/app/(student)/dashboard/page.tsx` — the existing file at the correct path, per DEV-20260515-1 (Stage 25 same-class typo precedent).
+- Why: `apps/web/src/lib/auth/role-home.ts` maps `student → '/dashboard'`; middleware routes authenticated students to `/dashboard`. A root-level `(student)/page.tsx` would be unreachable. The load-bearing entry point is `dashboard/page.tsx`. DEV_PLAN was authored before the middleware + role-home routing layer crystallised.
+- Impact on later stages: None. All dashboard references in DEV_PLAN Stages 41+ use `/dashboard` path language. No plan edit needed.
+- Linked: DEV-20260515-1, `apps/web/src/lib/auth/role-home.ts`, `apps/web/src/middleware.ts`
+- Resolved by: Stage 40 (self-resolving — correct file upgraded)
+
+---
+
 ### DEV-20260529-1 — Wizard step structure divergence: 5-step mockup vs 4-step SCREEN_SPECS §22
 
 - Date: 2026-05-29
