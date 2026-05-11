@@ -9,6 +9,21 @@
 
 ## Resolved
 
+### Q-42.7 — admin_action_log.actor_id NOT NULL vs actor_role='system' for system pipeline writes (self-resolve)
+
+- Date raised: 2026-06-01 (Stage 42 impl, T2-tightened)
+- Asked of: self (T3 Option 3 — self-resolve)
+- Source: Arch §2.13 (`admin_action_log.actor_id uuid NOT NULL REFERENCES user_profile(id)`); Spec §25.5 ("admin_action_log entry records the propagation with `actor_role='system'`")
+- Question: `admin_action_log.actor_id` is NOT NULL with a FK to `user_profile`. Spec §25.5 requires writing to `admin_action_log` with `actor_role='system'` for automated pipeline propagation. There is no sentinel system user in `user_profile`. How should `pipeline.feature_flag_propagate` write this entry?
+- Why ambiguous: The NOT NULL FK constraint prevents writing a system-actor entry without a valid `user_profile.id`. The spec only says `actor_role='system'` — it does not specify how to satisfy the FK.
+- Blocking? yes for full implementation; self-resolved for Stage 42 stub
+- Assumed answer: Stage 42 stub defers admin_action_log write. Stage 44 resolves.
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (handleFlagPropagateStub + Stage 44 implementation)
+- Status: resolved
+- Resolution: Stage 42 stub handler (`handleFlagPropagateStub`) does NOT write to `admin_action_log` — it logs the job receipt via structured logger with `// Stage 44 pending` marker. This satisfies the "not a silent no-op" requirement without violating the FK constraint. Stage 44 must resolve by choosing one of: (A) add a sentinel system `user_profile` row in seeds (simplest, deterministic UUID like `00000000-0000-0000-0000-000000000000`); (B) make `actor_id` nullable with a CHECK that either `actor_id IS NOT NULL OR actor_role = 'system'`; (C) use a dedicated `system_action_log` table for non-human actors. Option A recommended (precedent: most systems have a system user row). Self-resolved per T3 Option 3. Stage 44 round-trip if Option A not acceptable.
+
+---
+
 ### Q-42.6 — job_type name for ADR-0031 fifth amendment: pipeline.feature_flag_propagate vs pipeline.billing_event_apply
 
 - Date raised: 2026-06-01 (Stage 42 morning ritual)

@@ -2,6 +2,65 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 42 — 2026-06-01 (Day 58, 2-day budget, 1-day actual)
+
+**Planned (from DEV_PLAN.md Stage 42):** Stripe integration + webhook — migration 0018 (4 billing tables), billing-svc Edge Function (webhook handler + flag-propagate stub), jobs-worker fifth amendment, stripe-seed.sh, deployment.md billing section, contract tests.
+
+**Actually delivered:**
+
+- Prep commit (3a782fc): ADR-0034 (Stripe integration patterns, 6 decisions), ADR-0031 fifth amendment, ISSUE-0032 filed (low, webhook secret rotation), Q-42.1..6 resolved in QUESTIONS.md ## Resolved, C-C-D-V saved to `docs/prompts/2026-06-01_stage-42.md`, env files updated (`.env.example` root, `apps/web/.env.local.example` — placeholder values only per deployment.md policy).
+- Impl commit (65839d2): `supabase/migrations/0018_billing.sql` (4 tables: subscription, billing_customer, invoice, billing_event — Pattern G RLS, UNIQUE indexes); `supabase/functions/billing-svc/` (handlers.ts, index.ts, package.json, tsconfig.json, `__tests__/webhook.contract.test.ts` — 16 contract tests); `supabase/functions/jobs-worker/index.ts` (fifth amendment: BILLING_SVC_URL + pipeline.feature_flag_propagate route); `scripts/stripe-seed.sh`; `docs/dev/deployment.md` (Stripe env vars + migration 0018 deploy order + rollback strategy); `pnpm-workspace.yaml` (billing-svc added as 17th workspace).
+
+**Time spent:** 1 day (2026-06-01). 2-day budget. 1 day under budget.
+
+**Surprises / departures:**
+
+- Context compaction mid-session (after prep commit push); resumed cleanly from summary state. No information loss.
+- Q-42.7 surfaced mid-impl (T2-tightened): `admin_action_log.actor_id NOT NULL` FK prevents writing system-actor entries without a sentinel user. Stage 42 stub defers; Stage 44 resolves (Option A: sentinel system user recommended). Filed in QUESTIONS.md ## Resolved same session per T2-tightened discipline.
+- `apps/web/.env.local.example` had real-looking Supabase dev keys (`sb_publishable_…`, `sb_secret_…`); replaced with proper placeholder strings. Caught in prep commit review.
+- `env.example` (without dot) was untracked due to `.gitignore` mismatch; deleted and recreated as `.env.example` (with dot per `!.env.example` rule).
+
+**Decisions made (not in stage):**
+
+- ADR-0034: Stripe integration patterns (6 decisions: single STRIPE_SECRET_KEY, stripe-signature webhook auth, billing_event UNIQUE dedup distinct from ISSUE-0023, subscription + feature_flag entitlement model, SAQ A, pipeline.feature_flag_propagate job name)
+- ADR-0031 fifth amendment: pipeline.feature_flag_propagate → billing-svc route added to jobs-worker RouteMap
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0032 OPENED (low, billing-svc): Stripe webhook secret rotation — no dual-secret acceptance window. v1.1 fix. Inline comment at STRIPE_WEBHOOK_SECRET load site.
+- Q-42.1 resolved: Single STRIPE_SECRET_KEY (no per-env split in v1; mode via value prefix)
+- Q-42.2 resolved: stripe.webhooks.constructEvent for auth (not x-mm-service-role on webhook route)
+- Q-42.3 resolved: stripe-signature sole inbound auth; service-role Supabase client for DB writes
+- Q-42.4 resolved: billing_event UNIQUE dedup (distinct from ISSUE-0023 REST idempotency — ADR-0034)
+- Q-42.5 resolved: Stripe-hosted Checkout redirect (SAQ A — no card data in app)
+- Q-42.6 resolved: pipeline.feature_flag_propagate (arch §11.2 authoritative over DEV_PLAN shorthand)
+- Q-42.7 resolved (T2-tightened, mid-impl): admin_action_log.actor_id NOT NULL — Stage 42 stub defers; Stage 44 resolves with sentinel system user (Option A recommended); self-resolved per T3 Option 3
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17 packages, 0 turbo-cached — --force run per §Close-ritual) · Tests ✅ (609 passed / 1 skipped = 610 total Vitest) · Build ✅ · RLS ✅
+
+**Process retros:**
+
+(a) First Phase 4 stage with canonised T-discipline. Cold-start context loading across compacted session (prep + impl) confirmed working — T1/T2/T3/push-gate all honored without regression. CLAUDE.md investment paying dividends.
+
+(b) Stripe-specific patterns canonised in ADR-0034 — first external-dependency ADR. Provides pattern template for future third-party integrations: single-source env vars, auth-model rationale, idempotency strategy, PCI-scope documented.
+
+(c) Migration 0018 deferred-validation pattern re-applied (no Docker in sandbox). Rollback strategy documented in `deployment.md` with elevated-criticality note (financial records — 7-year retention arch §8.3). Template for future billing-adjacent migrations.
+
+(d) 50-event deterministic replay pattern (`evt_test_0001`…`evt_test_0050`) worked first attempt. Two-pass model (new → 200 without duplicate; duplicate → 200 + duplicate:true) is now the canonical webhook idempotency test pattern for v1.1 webhook integrations.
+
+(e) Push gate honored cleanly — separate approvals for prep commit and impl commit. T4 not triggered. No `--amend` over published commits.
+
+**Tomorrow — first thing:**
+Stage 43 — Billing Endpoints (Days 64–65, 2-day budget). Pre-read arch §4.9 verbatim. withIdempotency applies on POST /billing/checkout (ISSUE-0023 pattern distinct from Stage 42 webhook dedup). No new migration expected.
+
+---
+
 ## Stage 41 — 2026-05-31 (Day 57, 1-day budget)
 
 **Planned (from DEV_PLAN.md Stage 41):** Phase 2 Exit Review — audit only, no feature delivery. T-discipline canonisation, deployment docs, phase-2 exit report, OPEN_ISSUES.md triage, tag pushes.
