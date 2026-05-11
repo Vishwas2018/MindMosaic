@@ -27,8 +27,10 @@ import {
   generateAssignment,
   getClassKpi,
   patchInterventionAlert,
+  createInterventionAlert,
   type DbClient as HandlerDbClient,
   type Caller,
+  type CreateAlertBody,
 } from './handlers.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -255,6 +257,30 @@ Deno.serve(async (req: Request) => {
       if (result.status === 400) return jsonError('BAD_REQUEST', result.error ?? 'Invalid request body', traceId, 400);
       if (result.status === 500) return jsonError('INTERNAL_ERROR', 'Database error', traceId, 500);
       return jsonOk(result.data ?? null, traceId, 200);
+    }
+
+    // ------------------------------------------------------------------
+    // POST /analytics/intervention-alerts — manual flag (Stage 38, Q-38.5 Option A)
+    // ------------------------------------------------------------------
+    if (method === 'POST' && path === '/analytics/intervention-alerts') {
+      const auth = await verifyBearer(req, db);
+      if (auth === null) {
+        status = 401;
+        return jsonError('UNAUTHENTICATED', 'Bearer token required', traceId, 401);
+      }
+      const role = (auth.user.app_metadata?.['role'] as string | undefined) ?? 'student';
+      const caller: Caller = { userId: auth.user.id, role };
+      const rawBody: unknown = await req.json();
+      const body = rawBody as CreateAlertBody;
+      if (!body.student_id || !body.class_id || !body.reason) {
+        status = 400;
+        return jsonError('VALIDATION_ERROR', 'student_id, class_id, and reason are required', traceId, 400);
+      }
+      const result = await createInterventionAlert(body, caller, db as unknown as HandlerDbClient);
+      status = result.status;
+      if (result.status === 403) return jsonError('FORBIDDEN', 'Teacher access to own classes only', traceId, 403);
+      if (result.status === 500) return jsonError('INTERNAL_ERROR', 'Database error', traceId, 500);
+      return jsonOk(result.data ?? null, traceId, 201);
     }
 
     // ------------------------------------------------------------------

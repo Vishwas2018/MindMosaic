@@ -6,6 +6,7 @@ export const mmKeys = {
     children: () => ['users', 'children'] as const,
     classes: () => ['users', 'classes'] as const,
     classStudents: (classId: string) => ['users', 'classes', classId, 'students'] as const,
+    student: (id: string) => ['users', 'students', id] as const,
   },
   tenants: {
     all: () => ['tenants'] as const,
@@ -26,6 +27,7 @@ export const mmKeys = {
     summary: (id: string) => ['sessions', id, 'summary'] as const,
     recent: () => ['sessions', 'recent'] as const,
     childRecent: (studentId: string) => ['sessions', 'recent', studentId] as const,
+    teacherRecent: (studentId: string) => ['sessions', 'teacher-recent', studentId] as const,
   },
   intelligence: {
     all: () => ['intelligence'] as const,
@@ -49,5 +51,6 @@ export const mmKeys = {
   assignments: {
     all: () => ['assignments'] as const,
     forClass: (classId: string) => ['assignments', 'forClass', classId] as const,
+    forStudent: (studentId: string) => ['assignments', 'forStudent', studentId] as const,
   },
 } as const;

@@ -94,6 +94,33 @@ export function useClassStudents(classId: string, page = 1) {
   });
 }
 
+// Stage 38: student profile header for teacher student detail page (Screen 20, Q-38.2).
+const StudentProfileSchema = z.object({
+  id: z.string().uuid(),
+  display_name: z.string().nullable(),
+  year_level: z.number().nullable(),
+  class_id: z.string().nullable(),
+  class_name: z.string().nullable(),
+  last_session_at: z.string().nullable(),
+  avg_score: z.number().nullable(),
+});
+export type StudentProfileDTO = z.infer<typeof StudentProfileSchema>;
+
+export function useStudentProfile(studentId: string) {
+  const client = useMmClient();
+  return useQuery({
+    queryKey: mmKeys.users.student(studentId),
+    queryFn: async () => {
+      const res = await client.get(
+        `/users-svc/users/students/${encodeURIComponent(studentId)}`,
+        StudentProfileSchema,
+      );
+      return res.data;
+    },
+    enabled: studentId.length > 0,
+  });
+}
+
 // PHASE-2: not in v1 OWNERS.md — `/tenants/{id}` has no v1 dispatcher.
 // Prefix is set per UTA ownership (auth-svc/users-svc) for future-stage path stability.
 export function useTenant(tenantId: string) {

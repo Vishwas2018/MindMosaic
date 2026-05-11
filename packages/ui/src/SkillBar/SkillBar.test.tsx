@@ -15,4 +15,14 @@ describe('SkillBar', () => {
     expect(getByText('Fractions')).toBeTruthy();
     expect(getByText('72%')).toBeTruthy();
   });
+
+  it('horizontal layout renders label + pct in a row and passes axe', async () => {
+    const { getByText, container } = render(
+      <SkillBar label="Numeracy" value={68} layout="horizontal" />,
+    );
+    expect(getByText('Numeracy')).toBeTruthy();
+    expect(getByText('68%')).toBeTruthy();
+    const results = await axe(container);
+    expect(results).toHaveNoSeriousViolations();
+  });
 });

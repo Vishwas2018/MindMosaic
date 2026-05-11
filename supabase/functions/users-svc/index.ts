@@ -3,7 +3,7 @@ import { getTraceId } from "../_shared/trace-id.ts";
 import { jsonOk, jsonError } from "../_shared/error-envelope.ts";
 import { verifyBearer } from "../_shared/auth.ts";
 import { log } from "../_shared/logger.ts";
-import { handleGetMyClasses, handleGetClassStudents } from "./handlers.ts";
+import { handleGetMyClasses, handleGetClassStudents, handleGetStudentProfile } from "./handlers.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -90,6 +90,27 @@ Deno.serve(async (req: Request) => {
       }
       return jsonOk(result.data ?? { students: [], total: 0, page: 1, page_size: 50 }, traceId);
     }
+    // Stage 38: GET /users/students/{student_id} — student profile for teacher detail page (Screen 20)
+    const studentProfileMatch = path.match(/^\/users\/students\/([^/]+)$/);
+    if (method === "GET" && studentProfileMatch !== null) {
+      const studentId = studentProfileMatch[1]!;
+      const role = (auth.user.app_metadata?.["role"] as string | undefined) ?? "";
+      const result = await handleGetStudentProfile(studentId, auth.user.id, role, db as unknown as Parameters<typeof handleGetStudentProfile>[3]);
+      if (result.status === 403) {
+        status = 403;
+        return jsonError("FORBIDDEN", "Teacher access to own classes only", traceId, 403);
+      }
+      if (result.status === 404) {
+        status = 404;
+        return jsonError("NOT_FOUND", "Student not found", traceId, 404);
+      }
+      if (result.status === 500) {
+        status = 500;
+        return jsonError("INTERNAL_ERROR", "Database error", traceId, 500);
+      }
+      return jsonOk(result.data, traceId);
+    }
+
     if (method === "POST" && path === "/users/me/children") {
       // Students created via invite flow only (Stage 14; full invite in later stage)
       status = 422;

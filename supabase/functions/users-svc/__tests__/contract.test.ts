@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   handleGetMyClasses,
   handleGetClassStudents,
+  handleGetStudentProfile,
   type DbClient,
 } from '../handlers.ts';
 
@@ -220,6 +221,62 @@ describe('GET /users/classes/{class_id}/students: returns paginated student rost
     });
 
     const result = await handleGetClassStudents(CLASS_A, TEACHER_B, 'teacher', 1, db);
+
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+  });
+});
+
+// ─── handleGetStudentProfile — Stage 38 ─────────────────────────────────────
+
+describe('handleGetStudentProfile', () => {
+  it('happy path: returns student profile with avg_score and class_name', async () => {
+    const db = buildClient({
+      class_group: [
+        // Teacher's classes lookup
+        { data: [{ id: CLASS_A }], error: null },
+        // Class name lookup
+        { data: [{ id: CLASS_A, name: 'Year 5 Numeracy' }], error: null },
+      ],
+      class_student: [
+        // Student membership check
+        { data: [{ class_id: CLASS_A }], error: null },
+        // Student's first class (for class_name)
+        { data: [{ class_id: CLASS_A }], error: null },
+      ],
+      user_profile: {
+        data: [{ id: STUDENT_A, display_name: 'Alice Smith', year_level: 5 }],
+        error: null,
+      },
+      session_record: {
+        data: [
+          { student_id: STUDENT_A, raw_score: 80, submitted_at: '2026-05-20T09:00:00Z' },
+          { student_id: STUDENT_A, raw_score: 60, submitted_at: '2026-05-15T09:00:00Z' },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await handleGetStudentProfile(STUDENT_A, TEACHER, 'teacher', db);
+
+    expect(result.status).toBe(200);
+    expect(result.data?.display_name).toBe('Alice Smith');
+    expect(result.data?.year_level).toBe(5);
+    expect(result.data?.class_name).toBe('Year 5 Numeracy');
+    expect(result.data?.avg_score).toBeCloseTo(70); // (80+60)/2
+    expect(result.data?.last_session_at).toBe('2026-05-20T09:00:00Z');
+  });
+
+  it('handleGetStudentProfile: teacher not in student\'s class returns 403', async () => {
+    const db = buildClient({
+      class_group: {
+        // TEACHER_B owns no classes
+        data: [],
+        error: null,
+      },
+    });
+
+    const result = await handleGetStudentProfile(STUDENT_A, TEACHER_B, 'teacher', db);
 
     expect(result.status).toBe(403);
     expect(result.error).toBe('FORBIDDEN');

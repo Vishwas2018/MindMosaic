@@ -1,12 +1,14 @@
 /**
- * users-svc handlers — Stage 37.
+ * users-svc handlers — Stage 37 + Stage 38.
  *
- * Extracted handler functions for new teacher-facing endpoints.
+ * Extracted handler functions for teacher-facing endpoints.
  * Tested via __tests__/contract.test.ts (same mock-client harness as analytics-svc).
  *
  * Screen 18 + Screen 19 (SCREEN_SPECS):
- *   handleGetMyClasses    — GET /users/me/classes
- *   handleGetClassStudents — GET /users/classes/{class_id}/students
+ *   handleGetMyClasses      — GET /users/me/classes
+ *   handleGetClassStudents  — GET /users/classes/{class_id}/students
+ * Screen 20 (SCREEN_SPECS):
+ *   handleGetStudentProfile — GET /users/students/{student_id}
  */
 
 // ---------------------------------------------------------------------------
@@ -31,6 +33,16 @@ export type DbBuilder = {
 // ---------------------------------------------------------------------------
 // DTOs
 // ---------------------------------------------------------------------------
+
+export interface StudentProfileDTO {
+  id: string;
+  display_name: string | null;
+  year_level: number | null;
+  class_id: string | null;
+  class_name: string | null;
+  last_session_at: string | null;
+  avg_score: number | null;
+}
 
 export interface ClassGroupDTO {
   id: string;
@@ -265,6 +277,112 @@ export async function handleGetClassStudents(
 
   return {
     data: { students, total, page: safePage, page_size: PAGE_SIZE },
+    status: 200,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// handleGetStudentProfile — GET /users/students/{student_id}
+//
+// Returns profile header data for student detail page (Screen 20).
+// Teacher must own a class that contains the student.
+// ---------------------------------------------------------------------------
+
+interface StudentClassRow {
+  class_id: string;
+}
+
+interface ClassNameRow {
+  id: string;
+  name: string;
+}
+
+export async function handleGetStudentProfile(
+  studentId: string,
+  userId: string,
+  role: string,
+  db: DbClient,
+): Promise<HandlerResult<StudentProfileDTO>> {
+  if (role !== 'teacher' && role !== 'tutor' && role !== 'org_admin' && role !== 'platform_admin') {
+    return { data: null, status: 403, error: 'FORBIDDEN' };
+  }
+
+  // Teacher/tutor: verify student belongs to one of caller's classes.
+  if (role === 'teacher' || role === 'tutor') {
+    const { data: teacherClassRows } = (await db
+      .from('class_group')
+      .select('id')
+      .eq('teacher_id', userId)) as { data: Array<{ id: string }> | null; error: unknown };
+
+    const teacherClassIds = (teacherClassRows ?? []).map((r) => r.id);
+    if (teacherClassIds.length === 0) {
+      return { data: null, status: 403, error: 'FORBIDDEN' };
+    }
+
+    const { data: memberRows } = (await db
+      .from('class_student')
+      .select('class_id')
+      .eq('student_id', studentId)
+      .in('class_id', teacherClassIds)
+      .limit(1)) as { data: StudentClassRow[] | null; error: unknown };
+
+    if (!memberRows || memberRows.length === 0) {
+      return { data: null, status: 403, error: 'FORBIDDEN' };
+    }
+  }
+
+  const [profileRes, sessionRes, classRes] = await Promise.all([
+    db
+      .from('user_profile')
+      .select('id,display_name,year_level')
+      .eq('id', studentId)
+      .limit(1) as unknown as Promise<{ data: UserProfileRow[] | null; error: unknown }>,
+    db
+      .from('session_record')
+      .select('student_id,raw_score,submitted_at')
+      .eq('student_id', studentId)
+      .eq('status', 'processed')
+      .order('submitted_at', { ascending: false })
+      .limit(5) as unknown as Promise<{ data: SessionRow[] | null; error: unknown }>,
+    db
+      .from('class_student')
+      .select('class_id')
+      .eq('student_id', studentId)
+      .limit(1) as unknown as Promise<{ data: StudentClassRow[] | null; error: unknown }>,
+  ]);
+
+  if (profileRes.error) return { data: null, status: 500, error: 'DB_ERROR' };
+  if (sessionRes.error) return { data: null, status: 500, error: 'DB_ERROR' };
+
+  const profile = profileRes.data?.[0];
+  if (!profile) return { data: null, status: 404, error: 'NOT_FOUND' };
+
+  const sessions = sessionRes.data ?? [];
+  const scored = sessions.filter((s): s is SessionRow & { raw_score: number } => s.raw_score !== null);
+  const avgScore =
+    scored.length > 0 ? scored.reduce((acc, s) => acc + s.raw_score, 0) / scored.length : null;
+
+  let className: string | null = null;
+  const classId = classRes.data?.[0]?.class_id;
+  if (classId) {
+    const { data: classRows } = (await db
+      .from('class_group')
+      .select('id,name')
+      .eq('id', classId)
+      .limit(1)) as { data: ClassNameRow[] | null; error: unknown };
+    className = classRows?.[0]?.name ?? null;
+  }
+
+  return {
+    data: {
+      id: studentId,
+      display_name: profile.display_name ?? null,
+      year_level: profile.year_level ?? null,
+      class_id: classId ?? null,
+      class_name: className,
+      last_session_at: sessions[0]?.submitted_at ?? null,
+      avg_score: avgScore,
+    },
     status: 200,
   };
 }

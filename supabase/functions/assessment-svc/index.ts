@@ -339,11 +339,17 @@ Deno.serve(async (req: Request) => {
       return settle(traceId, result);
     }
 
-    // GET /sessions/recent
+    // GET /sessions/recent — own sessions; teacher/parent may pass ?student_id= for cross-user lookup
     if (method === 'GET' && path === '/sessions/recent') {
       const limitStr = url.searchParams.get('limit');
       const limit = limitStr !== null ? parseInt(limitStr, 10) : 10;
-      const result = await listRecentSessions(handlerClient, userId, limit);
+      const targetStudentId = url.searchParams.get('student_id');
+      const callerRole = (auth.user.app_metadata?.['role'] as string | undefined) ?? 'student';
+      const elevated = callerRole === 'teacher' || callerRole === 'tutor' ||
+        callerRole === 'org_admin' || callerRole === 'platform_admin' || callerRole === 'parent';
+      const resolvedStudentId =
+        targetStudentId !== null && elevated ? targetStudentId : userId;
+      const result = await listRecentSessions(handlerClient, resolvedStudentId!, limit);
       status = result.status;
       return settle(traceId, result);
     }

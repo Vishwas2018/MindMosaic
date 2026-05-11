@@ -1125,3 +1125,72 @@ export async function patchInterventionAlert(
 
   return { data: result, status: 200 };
 }
+
+// ---------------------------------------------------------------------------
+// Stage 38 — POST /analytics/intervention-alerts (Q-38.5 Option A)
+//
+// Teacher manually flags a student for review. Inserts alert_type='manual'
+// (migration 0017). Teacher must own the class (checkTeacherOwnership).
+// Body: { student_id, class_id, reason }
+// ---------------------------------------------------------------------------
+
+export interface CreateAlertBody {
+  student_id: string;
+  class_id: string;
+  reason: string;
+}
+
+interface TenantRow { tenant_id: string }
+interface InsertedAlertRow { id: string; created_at: string }
+
+export async function createInterventionAlert(
+  body: CreateAlertBody,
+  caller: Caller,
+  db: DbClient,
+): Promise<AnalyticsResult<InterventionAlertRow>> {
+  if (!isTeacherOrAdmin(caller)) return { data: null, status: 403, error: 'FORBIDDEN' };
+
+  const gate = await checkTeacherOwnership(body.class_id, caller, db);
+  if (gate.forbidden) return { data: null, status: 403, error: 'FORBIDDEN' };
+
+  const { data: profileRows } = (await db
+    .from('user_profile')
+    .select('tenant_id')
+    .eq('id', caller.userId)
+    .limit(1)) as { data: TenantRow[] | null; error: unknown };
+
+  const tenantId = profileRows?.[0]?.tenant_id;
+  if (!tenantId) return { data: null, status: 403, error: 'FORBIDDEN' };
+
+  const { data: inserted, error: insertErr } = (await db
+    .from('intervention_alert')
+    .insert({
+      student_id: body.student_id,
+      tenant_id: tenantId,
+      class_id: body.class_id,
+      teacher_id: caller.userId,
+      alert_type: 'manual',
+      severity: 'medium',
+      detail: { reason: body.reason },
+    })
+    .select('id,student_id,alert_type,severity,status,detail,created_at')
+    .limit(1)) as { data: InsertedAlertRow[] | null; error: unknown };
+
+  if (insertErr) return { data: null, status: 500, error: 'DB_ERROR' };
+
+  const row = inserted?.[0];
+  if (!row) return { data: null, status: 500, error: 'DB_ERROR' };
+
+  return {
+    data: {
+      id: row.id,
+      student_id: body.student_id,
+      alert_type: 'manual',
+      severity: 'medium',
+      status: 'active',
+      detail: { reason: body.reason },
+      created_at: row.created_at,
+    },
+    status: 201,
+  };
+}

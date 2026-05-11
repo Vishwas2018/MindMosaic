@@ -87,6 +87,23 @@ export function useChildRecentSessions(studentId: string, limit = 5) {
   });
 }
 
+/** Stage 38: teacher viewing a specific student's recent sessions (Screen 20, Q-38.1).
+ *  Uses ?student_id= with elevated role — dispatcher allows teacher/admin/parent. */
+export function useTeacherRecentSessions(studentId: string, limit = 5) {
+  const client = useMmClient();
+  return useQuery({
+    queryKey: mmKeys.sessions.teacherRecent(studentId),
+    queryFn: () =>
+      client
+        .get(
+          `/assessment-svc/sessions/recent?student_id=${encodeURIComponent(studentId)}&limit=${limit}`,
+          SessionSummaryListSchema,
+        )
+        .then((r) => r.data),
+    enabled: studentId.length > 0,
+  });
+}
+
 /** X3: idempotencyKey per-mount. Not retry-safe without stable key.
  *  ADR-0026: lock_token echoed via X-Session-Lock; rotates on each successful /respond.
  *  Call updateLockToken(token) after session create/resume to seed the initial token. */

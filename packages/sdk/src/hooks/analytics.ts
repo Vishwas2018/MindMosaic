@@ -64,6 +64,33 @@ export function useClassKpi(classId: string) {
   });
 }
 
+// Stage 38: POST /analytics/intervention-alerts — teacher manual flag (Screen 20, Q-38.5).
+export function useFlagForReview() {
+  const client = useMmClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      studentId,
+      classId,
+      reason,
+    }: {
+      studentId: string;
+      classId: string;
+      reason: string;
+    }) =>
+      client
+        .post(
+          '/analytics-svc/analytics/intervention-alerts',
+          InterventionAlertSchema,
+          { student_id: studentId, class_id: classId, reason },
+        )
+        .then((r) => r.data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: mmKeys.analytics.all() });
+    },
+  });
+}
+
 // Screen 18 Block 3: dismiss or acknowledge an intervention alert.
 export function useDismissAlert() {
   const client = useMmClient();

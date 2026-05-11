@@ -820,6 +820,47 @@ describe('assessment-svc — listRecentSessions', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data).toEqual([]);
   });
+
+  // Stage 38: index.ts dispatcher resolves student_id for elevated roles; handler is role-agnostic.
+  it('listRecentSessions: teacher can query another student (handler accepts any studentId)', async () => {
+    const OTHER_STUDENT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const db = client({
+      session_record: {
+        data: [
+          {
+            id: '55555555-5555-5555-5555-555555555555',
+            mode: 'naplan',
+            started_at: FROZEN_NOW,
+            submitted_at: FROZEN_NOW,
+            duration_ms: 60000,
+            active_duration_ms: 60000,
+            score_band: null,
+            raw_score: 8,
+            skills_touched: ['skill-x', 'skill-y'],
+            pathway_id: PATHWAY_ID,
+          },
+        ],
+        error: null,
+      },
+    });
+    const result = await listRecentSessions(db, OTHER_STUDENT, 5);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0]?.skills_touched_count).toBe(2);
+    }
+  });
+
+  it('listRecentSessions: student role cannot query others — dispatcher guard, handler returns own sessions only', async () => {
+    // The dispatcher in index.ts ignores ?student_id= for non-elevated callers.
+    // At the handler level, any studentId is accepted — isolation is enforced at dispatch.
+    // This test documents the handler's side of the contract (no role param, role-agnostic).
+    const db = client({ session_record: { data: [], error: null } });
+    const result = await listRecentSessions(db, STUDENT_ID, 5);
+    // handler always returns ok (the dispatcher is responsible for passing the correct studentId)
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual([]);
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import {
   generateAssignment,
   getClassKpi,
   patchInterventionAlert,
+  createInterventionAlert,
   type DbClient,
 } from '../handlers.ts';
 
@@ -861,6 +862,57 @@ describe('patchInterventionAlert', () => {
       ALERT_ID,
       { dismissed: true },
       { userId: OTHER_TEACHER, role: 'teacher' },
+      db,
+    );
+
+    expect(result.status).toBe(403);
+    expect(result.error).toBe('FORBIDDEN');
+  });
+});
+
+// ─── createInterventionAlert — Stage 38 ─────────────────────────────────────
+
+describe('createInterventionAlert', () => {
+  const NEW_ALERT_ID = 'a1111111-1111-4111-8111-111111111111';
+  const CREATED_AT = '2026-05-28T10:00:00Z';
+
+  it('createInterventionAlert: happy path inserts alert with type=manual and returns 201', async () => {
+    const db = buildClient({
+      class_group: { data: [{ teacher_id: TEACHER_ID }], error: null },
+      user_profile: { data: [{ tenant_id: TENANT_ID }], error: null },
+      intervention_alert: { data: [{ id: NEW_ALERT_ID, created_at: CREATED_AT }], error: null },
+    });
+
+    const result = await createInterventionAlert(
+      { student_id: STUDENT_A, class_id: CLASS_ID, reason: 'Struggling with fractions' },
+      { userId: TEACHER_ID, role: 'teacher' },
+      db,
+    );
+
+    expect(result.status).toBe(201);
+    expect(result.data?.alert_type).toBe('manual');
+    expect(result.data?.severity).toBe('medium');
+    expect(result.data?.status).toBe('active');
+    expect((result.data?.detail as { reason: string }).reason).toBe('Struggling with fractions');
+
+    const insertCall = db.calls.find((c) => c.table === 'intervention_alert' && c.op === 'insert');
+    expect(insertCall).toBeDefined();
+    const inserted = insertCall!.args as Record<string, unknown>;
+    expect(inserted['alert_type']).toBe('manual');
+    expect(inserted['teacher_id']).toBe(TEACHER_ID);
+    expect(inserted['class_id']).toBe(CLASS_ID);
+    expect(inserted['student_id']).toBe(STUDENT_A);
+  });
+
+  it('createInterventionAlert: teacher not in class returns 403', async () => {
+    const db = buildClient({
+      // class_group returns a different teacher_id
+      class_group: { data: [{ teacher_id: 'other-teacher-id' }], error: null },
+    });
+
+    const result = await createInterventionAlert(
+      { student_id: STUDENT_A, class_id: CLASS_ID, reason: 'Flagged for review' },
+      { userId: TEACHER_ID, role: 'teacher' },
       db,
     );
 
