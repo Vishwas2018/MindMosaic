@@ -9,6 +9,96 @@
 
 ## Resolved
 
+### Q-43.6 — Plan catalog data source: hardcoded const vs DB table (self-resolve)
+
+- Date raised: 2026-06-02 (Stage 43 prep, T2-tightened)
+- Asked of: self (T3 Option 3 — self-resolve)
+- Source: Arch §4.9 GET /billing/plans; `packages/types/src/billing.ts` `PlanCatalogDTOSchema`
+- Question: Does GET /billing/plans read plan catalog data from (A) a hardcoded `PLAN_CATALOG` const in billing-svc with Stripe Price IDs from env vars, or (B) a DB-stored plan config table?
+- Why ambiguous: No `plan_catalog` table in migration 0018. `PlanCatalogDTOSchema` exists in @mm/types but data source unspecified.
+- Blocking? no
+- Assumed answer: Option A — single `PLAN_CATALOG` const shared by `handleGetPlans` and `handleCreateCheckout`. Stripe Price IDs from env vars (`STRIPE_PRICE_ID_STANDARD_MONTHLY`, `STRIPE_PRICE_ID_STANDARD_YEARLY`, `STRIPE_PRICE_ID_PREMIUM_MONTHLY`, `STRIPE_PRICE_ID_PREMIUM_YEARLY`). One source of truth; grep enforces (catalog data appears exactly once in billing-svc tree). Avoids schema dependency for fixed v1 3-tier pricing.
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (PLAN_CATALOG const + handleGetPlans + handleCreateCheckout)
+- Status: resolved
+- Resolution: Option A confirmed per T3 Option 3. PLAN_CATALOG single source of truth. V1.1: if pricing becomes dynamic, migrate to DB-stored plan config.
+
+---
+
+### Q-43.5 — GET /billing/subscription response when no subscription row exists (self-resolve)
+
+- Date raised: 2026-06-02 (Stage 43 prep, T2-tightened)
+- Asked of: self (T3 Option 3 — self-resolve)
+- Source: Spec §25.3; SCREEN_SPECS §17 ("Empty: N/A (user always has at least a free tier row after signup)")
+- Question: What should GET /billing/subscription return when the caller's tenant has no `subscription` row (free-tier user who has never purchased)?
+- Why ambiguous: Migration 0018 creates no trigger to insert a free-tier subscription row on tenant creation. `handle_new_user()` (migration 0001) creates `user_profile` but not `subscription`. Free-tier users start with no row.
+- Blocking? no
+- Assumed answer: Return a synthetic free-tier `SubscriptionDTO`: `{ tier: 'free', is_active: true, started_at: new Date().toISOString(), current_period_end: null, cancel_at: null, canceled_at: null, stripe_subscription_id: null }`. SCREEN_SPECS §17 implies UI always receives a result ("Empty: N/A").
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (handleGetSubscription)
+- Status: resolved
+- Resolution: Synthetic free-tier response on missing row. Consistent with spec §25.3 (`stripe_subscription_id: null` for free tier). UI never receives 404 for this endpoint.
+
+---
+
+### Q-43.4 — GET /billing/plans: public, no Bearer required (self-resolve)
+
+- Date raised: 2026-06-02 (Stage 43 prep, T2-tightened)
+- Asked of: self (T3 Option 3 — self-resolve)
+- Source: Arch §4.9 (verbatim: "GET | /billing/plans | Public | Catalog (feature comparison)"); SCREEN_SPECS §17 ("GET /billing/plans (public catalog; includes Stripe price IDs server-side-resolved)")
+- Question: Is GET /billing/plans truly public (no Bearer token required)?
+- Why ambiguous: Both arch and SCREEN_SPECS say "public" — confirming no hidden auth requirement before implementation.
+- Blocking? no
+- Assumed answer: Public — no `verifyBearer` call. Route placed before Bearer-JWT block and before service-role gate in `billing-svc/index.ts`.
+- Code affected: `supabase/functions/billing-svc/index.ts` (GET /billing/plans route block position)
+- Status: resolved
+- Resolution: Arch §4.9 verbatim: "Public". No Bearer required. Route placed first in index.ts, before all auth gates.
+
+---
+
+### Q-43.3 — tenant_id resolution for Bearer-JWT callers in billing-svc (self-resolve)
+
+- Date raised: 2026-06-02 (Stage 43 prep, T2-tightened)
+- Asked of: self (T3 Option 3 — self-resolve)
+- Source: Arch §1.2 `handle_new_user()` trigger; migration 0001 G1 branching; analytics-svc auth pattern
+- Question: Is `auth.user.app_metadata?.['tenant_id']` the correct and complete source for `tenant_id` for all Bearer-JWT callers (parent, org_admin, student) on billing endpoints? Or does parent require a `parent_student_link` join?
+- Why ambiguous: Billing is tenant-scoped (not student-scoped); confirming parents have their own `tenant_id` in `app_metadata` without needing a join.
+- Blocking? no
+- Assumed answer: `auth.user.app_metadata?.['tenant_id'] as string` — set by `handle_new_user()` trigger (migration 0001) for all roles including parent. No `parent_student_link` join needed. Billing is scoped to the caller's tenant, not to a linked student.
+- Code affected: All Stage 43 handler functions extracting `tenantId` from JWT.
+- Status: resolved
+- Resolution: Established pattern across all services (analytics-svc, assignments-svc confirmed). Applicable to billing-svc. No schema change required.
+
+---
+
+### Q-43.2 — GET /billing/invoices pagination contract (T3 round-trip)
+
+- Date raised: 2026-06-02 (Stage 43 prep)
+- Asked of: operator (T3 round-trip — blocking)
+- Source: Arch §4.9 GET /billing/invoices; SCREEN_SPECS §17 ("Invoice history table")
+- Question: Does GET /billing/invoices return (A) simple array with LIMIT 50 + `truncated: boolean` flag, (B) cursor-based pagination `{ invoices, next_cursor }`, or (C) offset pagination?
+- Why ambiguous: SCREEN_SPECS §17 shows invoice history table with no pagination specification. Spec §25 doesn't define pagination. `InvoiceDTOSchema` exists but no paginated wrapper in billing.ts.
+- Blocking? yes
+- Assumed answer: Option A — LIMIT 50 + `truncated: boolean`. ISSUE-0022 (audit-log) precedent. Adequate for v1 invoice volume (12–24/year). `InvoicesResponseSchema = { invoices: InvoiceDTO[], truncated: boolean }`. `mmKeys.billing.invoices: () => ['billing', 'invoices'] as const` (no page param). Cursor pagination in v1.1 if volume grows (ISSUE-0033).
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (handleGetInvoices), `packages/types/src/billing.ts` (InvoicesResponseSchema), `packages/sdk/src/hooks/billing.ts` (useInvoices), `packages/sdk/src/keys.ts` (billing.invoices key).
+- Status: resolved
+- Resolution: Option A confirmed by operator. ISSUE-0033 filed to track v1.1 cursor migration if invoice volume grows.
+
+---
+
+### Q-43.1 — ISSUE-0023 scope: withIdempotency on billing-svc POST endpoints (self-resolve)
+
+- Date raised: 2026-06-02 (Stage 43 prep, T2-tightened)
+- Asked of: self (T3 Option 3 — self-resolve)
+- Source: Arch §1.8 (Idempotency-Key required on /billing/checkout); Arch §4.9 table (only checkout marked "(Idempotency-Key)"); ADR-0034 §Decision 3; ISSUE-0023 (assignments-svc parse-and-log)
+- Question: Does Stage 43 "promote" ISSUE-0023 (Idempotency-Key enforcement) from parse-and-log to full dedup for billing-svc POST endpoints? Or is this scoped to checkout only per arch §4.9?
+- Why ambiguous: ISSUE-0023 is about assignments-svc. Stage 43 is the first stage implementing full `withIdempotency` outside assessment-svc. Clarifying scope boundary.
+- Blocking? no
+- Assumed answer: POST /billing/checkout uses full `withIdempotency` (arch §1.8 explicit; money-critical). POST /billing/portal and POST /billing/subscription/cancel do NOT use `withIdempotency` — arch §4.9 does not mark them with "(Idempotency-Key)"; Stripe-level idempotency is sufficient for portal (harmless to recreate); cancel is idempotent at the Stripe API level. ISSUE-0023 stays open for assignments-svc (v1.1 Option B). Stage 43 does not expand scope to other services.
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (handleCreateCheckout uses `withIdempotency`; handleCreatePortalSession and handleCancelSubscription do not).
+- Status: resolved
+- Resolution: T3 self-resolve confirmed. ADR-0034 §Decision 3 distinction in effect: REST idempotency (`withIdempotency`) only where arch §1.8 mandates it. ISSUE-0023 remains open for assignments-svc independently.
+
+---
+
 ### Q-42.7 — admin_action_log.actor_id NOT NULL vs actor_role='system' for system pipeline writes (self-resolve)
 
 - Date raised: 2026-06-01 (Stage 42 impl, T2-tightened)

@@ -5,6 +5,22 @@
 
 ## Open
 
+### ISSUE-0033 — GET /billing/invoices uses LIMIT 50 + truncated flag; cursor pagination deferred
+
+- Status: open
+- Severity: low
+- Reported: 2026-06-02 (Stage 43 prep, Q-43.2 resolution)
+- Area: backend (billing-svc)
+- Tags: billing-svc · pagination · v1.1 · invoices
+
+**Summary.** `GET /billing/invoices` returns up to 50 invoice rows ordered by `invoiced_at DESC` with a `truncated: boolean` flag in the response envelope when the result count equals 50. No cursor or offset pagination is implemented in v1. For typical v1 tenant invoice volume (12–24 invoices/year for monthly/yearly billing), 50 rows covers 2–4 years of history — adequate for launch. Q-43.2 Option A resolution per ISSUE-0022 (audit-log) precedent.
+
+**Fix (v1.1).** Cursor-based pagination via `invoiced_at` watermark: `?before=<ISO8601 timestamp>` query param; response includes `next_cursor: string | null`. Removes LIMIT 50 ceiling. Consistent with ISSUE-0022 audit-log cursor proposal.
+
+**Tracking pointer.** Q-43.2 Option A selection. Inline comment at query site in `supabase/functions/billing-svc/handlers.ts`: `// ISSUE-0033: v1 LIMIT 50 + truncated flag; cursor pagination deferred to v1.1.`
+
+---
+
 ### ISSUE-0032 — Stripe webhook secret rotation: no dual-secret acceptance window
 
 - Status: open
