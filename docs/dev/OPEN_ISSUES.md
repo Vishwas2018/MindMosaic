@@ -5,6 +5,47 @@
 
 ## Open
 
+### ISSUE-0032 — Stripe webhook secret rotation: no dual-secret acceptance window
+
+- Status: open
+- Severity: low
+- Reported: 2026-06-01 (Stage 42 prep, Q-42.1 / ADR-0034)
+- Area: backend (billing-svc)
+- Tags: billing-svc · stripe · security · v1.1
+
+**Summary.** billing-svc loads a single `STRIPE_WEBHOOK_SECRET` at startup. Rotating
+this secret (e.g., for a security incident or routine rotation) requires redeploying
+billing-svc with the new secret. During the redeployment window, in-flight webhook
+events signed with the old secret will fail signature verification and return 400,
+causing Stripe to retry — which may succeed on the new secret after redeployment
+completes. However, the retry delay (typically minutes) means the window between
+old-secret billing_events succeeding and new-secret events succeeding creates a
+brief gap where webhooks may 400.
+
+Stripe best practice for zero-downtime rotation: accept both old and new secrets
+during the rotation window (`stripe.webhooks.constructEvent` called twice with
+different secrets; first success wins).
+
+**Fix (v1.1).** Accept array of webhook secrets during rotation:
+```ts
+// v1.1: try each secret in order; first success wins
+for (const secret of [STRIPE_WEBHOOK_SECRET_NEW, STRIPE_WEBHOOK_SECRET_OLD]) {
+  try { event = stripe.webhooks.constructEvent(rawBody, sig, secret); break; }
+  catch { continue; }
+}
+```
+Inline comment at `STRIPE_WEBHOOK_SECRET` load site in billing-svc/handlers.ts:
+`// ISSUE-0032: single-secret; v1.1 needs dual-secret rotation window`
+
+**Risk in v1.** Low. Secret rotation is a manual admin operation. Stripe's retry
+schedule (typically 5 attempts over 3 days) means delayed events will be replayed
+successfully after redeployment. No data loss; only delayed processing during
+rotation window.
+
+**Linked:** ADR-0034 (Stripe integration patterns — Decision 1 consequences).
+
+---
+
 ### ISSUE-0031 — Student dashboard: NBA "Next Best Action" hero card omitted v1
 
 - Status: open

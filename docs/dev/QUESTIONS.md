@@ -9,6 +9,96 @@
 
 ## Resolved
 
+### Q-42.6 — job_type name for ADR-0031 fifth amendment: pipeline.feature_flag_propagate vs pipeline.billing_event_apply
+
+- Date raised: 2026-06-01 (Stage 42 morning ritual)
+- Asked of: operator (T3 round-trip — blocking)
+- Source: DEV_PLAN Stage 42 ("processes via `pipeline.billing_event_apply` job") vs Arch §11.2 ("`pipeline.feature_flag_propagate` job propagates to `feature_flag`")
+- Question: Which job_type string for the ADR-0031 fifth amendment routing billing-svc? DEV_PLAN names `pipeline.billing_event_apply`; arch §11.2 names `pipeline.feature_flag_propagate`. Are they the same job with different names, or two different jobs?
+- Why ambiguous: DEV_PLAN Stage 42 appears to conflate synchronous subscription update (done in webhook handler) with async flag propagation (done by job). The arch only names one job.
+- Blocking? yes (jobs-worker amendment blocked on name)
+- Assumed answer: Option 1 — arch name `pipeline.feature_flag_propagate`.
+- Code affected: `supabase/functions/jobs-worker/index.ts`, `supabase/functions/billing-svc/handlers.ts`
+- Status: resolved
+- Resolution: Option 1. `pipeline.feature_flag_propagate` per arch §11.2 — arch is authoritative for job_type strings per ADR-0031 precedent. Webhook handler updates `subscription` + `billing_customer` synchronously, then enqueues `pipeline.feature_flag_propagate` for async flag propagation. DEV_PLAN's `pipeline.billing_event_apply` is planning-phase shorthand that conflates two operations; it must never appear as a job_type string in code. ADR-0031 fifth amendment uses arch name. Operator decision 2026-06-01.
+
+---
+
+### Q-42.5 — Checkout flow: Stripe-hosted Checkout vs Stripe Elements (self-resolve)
+
+- Date raised: 2026-06-01 (Stage 42 morning ritual)
+- Asked of: self (T3 Option 3 — self-resolve, not blocking)
+- Source: SCREEN_SPECS §17 ("redirect to Stripe Checkout (same tab)"); Arch §4.9 (Checkout session endpoint)
+- Question: Stripe-hosted Checkout (redirect) or embedded Stripe Elements (inline)?
+- Why ambiguous: Some billing UIs use Elements for inline card entry; SCREEN_SPECS needed confirmation.
+- Blocking? no
+- Assumed answer: Stripe-hosted Checkout.
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (Stage 43 checkout endpoint)
+- Status: resolved
+- Resolution: Stripe-hosted Checkout across all Phase 4 billing. SCREEN_SPECS §17 explicitly: "redirect to Stripe Checkout (same tab)". PCI scope = SAQ A (card data never touches MindMosaic servers). No Stripe Elements in v1. Stage 43 implements checkout endpoint; Stage 45 implements billing UI. Self-resolved per T3 Option 3, 2026-06-01.
+
+---
+
+### Q-42.4 — Billing webhook idempotency: billing_event UNIQUE vs withIdempotency middleware (self-resolve)
+
+- Date raised: 2026-06-01 (Stage 42 morning ritual)
+- Asked of: self (T3 Option 3 — self-resolve, not blocking)
+- Source: Arch §2.12 (`stripe_event_id text UNIQUE NOT NULL` on `billing_event`); ISSUE-0023 (REST idempotency via `withIdempotency`); DEV_PLAN Stage 42 ("duplicate stripe_event_id is no-op")
+- Question: Should billing-svc webhook use the shared `withIdempotency` middleware (from `_shared/idempotency.ts`) or a separate `billing_event.stripe_event_id` UNIQUE constraint?
+- Why ambiguous: `withIdempotency` exists and handles dedup for REST endpoints; question is whether it applies to webhook dedup.
+- Blocking? no
+- Assumed answer: `billing_event.stripe_event_id UNIQUE` + `ON CONFLICT DO NOTHING`.
+- Code affected: `supabase/functions/billing-svc/handlers.ts`, `supabase/migrations/0018_billing.sql`
+- Status: resolved
+- Resolution: `billing_event.stripe_event_id UNIQUE NOT NULL` + `INSERT ... ON CONFLICT (stripe_event_id) DO NOTHING` is the correct mechanism. The `withIdempotency` middleware handles REST endpoints with client-generated `Idempotency-Key` headers — a different dedup model. Webhook dedup: Stripe generates `stripe_event_id`; no cached response body needed; Stripe expects HTTP 200 on duplicate (non-2xx triggers retry). The divergence from ISSUE-0023 is architectural, not drift. ADR-0034 documents the contrast explicitly. Self-resolved per T3 Option 3, 2026-06-01.
+
+---
+
+### Q-42.3 — Webhook endpoint auth: stripe-signature only vs JWT (self-resolve)
+
+- Date raised: 2026-06-01 (Stage 42 morning ritual)
+- Asked of: self (T3 Option 3 — self-resolve, not blocking)
+- Source: Arch §4.9 (`POST /billing/webhook/stripe | Public + signature`); Arch §1.3 ("Stripe webhook signature verification required on every webhook call")
+- Question: How does billing-svc authenticate inbound webhook requests given Stripe cannot supply a MindMosaic JWT?
+- Why ambiguous: All other endpoints use Bearer JWT or x-mm-service-role; webhook endpoint is "Public + signature" per arch.
+- Blocking? no
+- Assumed answer: stripe-signature header is sole inbound auth; service-role Supabase client for DB writes.
+- Code affected: `supabase/functions/billing-svc/index.ts`, `supabase/functions/billing-svc/handlers.ts`
+- Status: resolved
+- Resolution: `stripe-signature` header sole inbound auth on `POST /billing/webhook/stripe`. Service-role Supabase client initialised from `SUPABASE_SERVICE_ROLE_KEY` env for internal DB writes. Mirrors `outbox-dispatcher` pattern (cron-invoked, no JWT, service-role DB). No MindMosaic JWT added to webhook. Self-resolved per T3 Option 3, 2026-06-01.
+
+---
+
+### Q-42.2 — Entitlement source of truth: tenant.tier vs subscription table vs feature_flag (self-resolve)
+
+- Date raised: 2026-06-01 (Stage 42 morning ritual)
+- Asked of: self (T3 Option 3 — self-resolve, not blocking)
+- Source: Arch §2.12 DDL; Arch §11.2; EntitlementsProvider.tsx (PHASE-2 stub)
+- Question: Where does the tenant's effective tier live? `tenant.tier` column, `subscription.tier` (active row), or `feature_flag` table?
+- Why ambiguous: The PHASE-2 stub hardcodes `tier: 'free'`; migration creates `subscription` table but not `tenant.tier`.
+- Blocking? no
+- Assumed answer: `subscription.tier` is the tier record; `feature_flag` is the entitlement resolution surface.
+- Code affected: `supabase/migrations/0018_billing.sql`, `supabase/functions/billing-svc/handlers.ts`
+- Status: resolved
+- Resolution: Arch DDL has no `tier` column on `tenant` table. `subscription` table holds `tier` with `idx_sub_active_per_tenant` partial unique (one active subscription per tenant). `feature_flag` is the entitlement surface applications read (tenant `admin_override` → tenant `subscription` → platform default). Arch §11.2: Stage 42+ Stripe webhook writes `subscription`; `pipeline.feature_flag_propagate` propagates to `feature_flag`. Self-resolved per T3 Option 3, 2026-06-01.
+
+---
+
+### Q-42.1 — Stripe key strategy: single STRIPE_SECRET_KEY vs split test/live vars
+
+- Date raised: 2026-06-01 (Stage 42 morning ritual)
+- Asked of: operator (T3 round-trip — non-blocking, default stated)
+- Source: DEV_PLAN Stage 42 ("Stripe products + prices configured"); PROJECT_STATE.md "Notes for next session" ("test-mode vs live-mode key strategy")
+- Question: Single `STRIPE_SECRET_KEY` env var (value prefix `sk_test_`/`sk_live_` determines mode) or split `STRIPE_SECRET_KEY_TEST` + `STRIPE_SECRET_KEY_LIVE` + `STRIPE_MODE` toggle?
+- Why ambiguous: DEV_PLAN silent on key split strategy; split vars allow parallel environment testing but add mode-branching in code.
+- Blocking? no (default stated)
+- Assumed answer: Option 1 — single `STRIPE_SECRET_KEY`.
+- Code affected: `supabase/functions/billing-svc/handlers.ts`, `apps/web/.env.local.example`, `.env.example`, `docs/dev/deployment.md`
+- Status: resolved
+- Resolution: Option 1 — single `STRIPE_SECRET_KEY`; value prefix determines mode at deploy time. Separate `STRIPE_WEBHOOK_SECRET` per environment (Stripe always generates different webhook secrets per endpoint). No `STRIPE_MODE` branching in code. Stripe's recommendation for simple integrations. Code that detects `sk_test_` vs `sk_live_` at runtime is a maintenance footgun — a misconfigured `STRIPE_MODE` could cause live-mode writes from staging. Mode separation enforced at deployment config level. Operator decision 2026-06-01.
+
+---
+
 ### Q-41.3 — T-discipline canonisation format: CLAUDE.md inline vs standalone file vs both
 
 - Date raised: 2026-05-31 (Stage 41 morning ritual)

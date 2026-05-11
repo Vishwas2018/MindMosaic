@@ -5,6 +5,7 @@
 - Amended: 2026-05-20 (Stage 30) — `pipeline.teacher_refresh` → `analytics-svc` added (concrete); speculative `pipeline.l7.* → orchestration-svc` entry replaced; `pipeline.l9.* → orchestration-svc` retained as still speculative. Q-30.1 resolved. ADR-0033 filed for location decision.
 - Amended: 2026-05-21 (Stage 31) — `pipeline.l9.*` wildcard replaced with concrete `pipeline.orchestration_replan → orchestration-svc → POST /orchestration/pipeline/orchestration-replan`. orchestration-svc confirmed as correct owner per arch §4.6 + §1.2. Q-31.1–Q-31.4 resolved. Third amendment.
 - Amended: 2026-05-24 (Stage 34) — `notification.create → notifications-svc → POST /notifications/pipeline/create` added (concrete). Q-34.1 resolved: outbox event_type `assignment_assigned` (Stage 33) → `notification.create` job; migration 0016 fixes fn_drain_outbox_batch alignment. Q-34.4 resolved: `plan_updated` + `intervention_alert` outbox events added to orchestration-svc replan + analytics-svc post-alert-INSERT paths respectively; migration 0016 adds both branches. Fourth amendment.
+- Amended: 2026-06-01 (Stage 42) — `pipeline.feature_flag_propagate → billing-svc → POST /billing/pipeline/flag-propagate` added. `BILLING_SVC_URL` env var added. Fifth amendment. Q-42.6 resolved. ADR-0034 filed.
 - Date: 2026-05-18
 - Stage: 28
 - Tags: backend | architecture | async-pipeline
@@ -67,6 +68,7 @@ Each `job_type` maps to an owning service URL:
 | `pipeline.teacher_refresh` | `analytics-svc` | `POST /analytics/pipeline/teacher-refresh` |
 | `pipeline.orchestration_replan` | `orchestration-svc` | `POST /orchestration/pipeline/orchestration-replan` |
 | `notification.create` | `notifications-svc` | `POST /notifications/pipeline/create` |
+| `pipeline.feature_flag_propagate` | `billing-svc` | `POST /billing/pipeline/flag-propagate` |
 
 HTTP call uses `SUPABASE_SERVICE_ROLE_KEY` (`x-mm-service-role` header) and propagates
 `x-mm-trace-id`. The owning service is responsible for idempotency (audit-log dedup
@@ -127,3 +129,12 @@ adds `plan_updated` + `intervention_alert` branches. orchestration-svc replan
 completion + analytics-svc post-alert-INSERT write outbox_event rows for the
 two new event types. Q-34.1 and Q-34.4 resolved. ISSUE-0025 filed for
 spam-guard dedup window tuning.
+
+Amended 2026-06-01 (Stage 42, fifth amendment): `pipeline.feature_flag_propagate →
+billing-svc POST /billing/pipeline/flag-propagate` added to jobs-worker route map.
+`BILLING_SVC_URL` env var added (default: `${SUPABASE_URL}/functions/v1/billing-svc`).
+Stage 42 stubs the handler body in billing-svc with 200 + audit log + explicit
+`// Stage 44 pending` marker; Stage 44 implements the full feature_flag propagation
+logic. ADR-0034 documents why the job name is `pipeline.feature_flag_propagate`
+(arch §11.2 authoritative) and not `pipeline.billing_event_apply` (DEV_PLAN planning
+shorthand). Q-42.6 resolved.
