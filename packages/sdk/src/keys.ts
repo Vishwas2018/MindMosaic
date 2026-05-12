@@ -59,4 +59,10 @@ export const mmKeys = {
     all: () => ['notifications'] as const,
     mine: () => ['notifications', 'mine'] as const,
   },
+  billing: {
+    all: () => ['billing'] as const,
+    plans: () => ['billing', 'plans'] as const,
+    subscription: () => ['billing', 'subscription'] as const,
+    invoices: () => ['billing', 'invoices'] as const,
+  },
 } as const;

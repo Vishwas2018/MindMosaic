@@ -55,3 +55,20 @@ export const InvoiceDTOSchema = z.object({
   invoice_pdf_url: z.string().url().nullable(),
 });
 export type InvoiceDTO = z.infer<typeof InvoiceDTOSchema>;
+
+export const PortalResponseSchema = z.object({
+  portal_url: z.string().url(),
+});
+export type PortalResponse = z.infer<typeof PortalResponseSchema>;
+
+export const InvoicesResponseSchema = z.object({
+  invoices: z.array(InvoiceDTOSchema),
+  truncated: z.boolean(),
+});
+export type InvoicesResponse = z.infer<typeof InvoicesResponseSchema>;
+
+export const CancelResponseSchema = z.object({
+  cancel_at: z.string().datetime().nullable(),
+  is_active: z.boolean(),
+});
+export type CancelResponse = z.infer<typeof CancelResponseSchema>;

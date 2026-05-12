@@ -1,5 +1,7 @@
+import { withIdempotency, type IdempotencyDbClient } from '../_shared/idempotency.ts';
+
 /**
- * billing-svc handlers — Stage 42 (Phase 4 slice).
+ * billing-svc handlers — Stage 42–43 (Phase 4 slice).
  *
  * Implements:
  *   handleStripeWebhook  — POST /billing/webhook/stripe
@@ -33,6 +35,9 @@ export interface BillingDbClient {
     select(cols: string): {
       eq(col: string, val: unknown): {
         maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+        order(col: string, opts: { ascending: boolean }): {
+          limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+        };
       };
     };
   };
@@ -45,6 +50,19 @@ export interface StripeClient {
       sig: string,
       secret: string,
     ): { id: string; type: string; data: { object: Record<string, unknown> } };
+  };
+  checkout: {
+    sessions: {
+      create(params: Record<string, unknown>): Promise<{ id: string; url: string | null }>;
+    };
+  };
+  billingPortal: {
+    sessions: {
+      create(params: Record<string, unknown>): Promise<{ url: string }>;
+    };
+  };
+  subscriptions: {
+    update(id: string, params: Record<string, unknown>): Promise<{ cancel_at: number | null; status: string }>;
   };
 }
 
@@ -323,6 +341,257 @@ async function writeBillingEvent(
     processing_error: row.processing_error ?? null,
     processed_at: new Date().toISOString(),
   }).select('id');
+}
+
+// ─── Stage 43: Billing endpoint handlers ──────────────────────────────────────
+
+export interface StripePriceIds {
+  standard_monthly: string;
+  standard_yearly: string;
+  premium_monthly: string;
+  premium_yearly: string;
+}
+
+// PLAN_CATALOG: single source of truth shared by handleGetPlans + handleCreateCheckout.
+// Stripe Price IDs injected from env vars (STRIPE_PRICE_*) at call site in index.ts.
+const PLAN_CATALOG = [
+  {
+    tier: 'standard' as const,
+    display_name: 'Standard',
+    price_monthly_cents: 1900,
+    price_yearly_cents: 19000,
+    currency: 'AUD',
+    features: [
+      'Adaptive NAPLAN Y5 Numeracy practice',
+      'ICAS Math Paper C practice',
+      'Student progress dashboard',
+      'Parent progress view',
+      'Unlimited practice sessions',
+    ],
+    popular: true,
+  },
+  {
+    tier: 'premium' as const,
+    display_name: 'Premium',
+    price_monthly_cents: 3900,
+    price_yearly_cents: 39000,
+    currency: 'AUD',
+    features: [
+      'Everything in Standard',
+      'AI-powered learning insights',
+      'Teacher class dashboard',
+      'Class management & assignments',
+      'Priority support',
+    ],
+    popular: false,
+  },
+];
+
+// GET /billing/plans — public; no auth required (Q-43.4).
+export function handleGetPlans(opts: { stripePriceIds: StripePriceIds }): WebhookHandlerResult {
+  const plans = PLAN_CATALOG.map((p) => ({
+    ...p,
+    stripe_price_monthly: opts.stripePriceIds[`${p.tier}_monthly` as keyof StripePriceIds],
+    stripe_price_yearly: opts.stripePriceIds[`${p.tier}_yearly` as keyof StripePriceIds],
+  }));
+  return { status: 200, data: { plans } };
+}
+
+export interface CreateCheckoutOpts {
+  body: { tier: string; billing_interval: 'monthly' | 'yearly'; success_url: string; cancel_url: string };
+  idempotencyKey: string;
+  tenantId: string;
+  stripe: StripeClient;
+  client: BillingDbClient;
+  traceId: string;
+  stripePriceIds: StripePriceIds;
+}
+
+// POST /billing/checkout — Stripe-hosted Checkout (ADR-0034 Decision 5, Q-43.1).
+// withIdempotency applied per ISSUE-0023 pattern; distinct from webhook billing_event dedup.
+export async function handleCreateCheckout(
+  opts: CreateCheckoutOpts,
+): Promise<WebhookHandlerResult> {
+  const { body, idempotencyKey, tenantId, stripe, client, traceId, stripePriceIds } = opts;
+
+  const planEntry = PLAN_CATALOG.find((p) => p.tier === body.tier);
+  if (planEntry === undefined) {
+    return { status: 400, data: { error: { code: 'INVALID_PLAN', message: 'Unknown tier', trace_id: traceId } } };
+  }
+
+  const priceKey = `${body.tier}_${body.billing_interval}` as keyof StripePriceIds;
+  const priceId = stripePriceIds[priceKey];
+  if (!priceId) {
+    return { status: 400, data: { error: { code: 'INVALID_PLAN', message: 'Unknown billing interval', trace_id: traceId } } };
+  }
+
+  const bcResult = await client
+    .from('billing_customer')
+    .select('stripe_customer_id')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  const existingCustomerId = (bcResult.data?.['stripe_customer_id'] as string | undefined) ?? null;
+
+  const result = await withIdempotency<{ checkout_url: string; session_id: string }>({
+    client: client as unknown as IdempotencyDbClient,
+    idempotencyKey,
+    tenantId,
+    endpoint: '/billing/checkout',
+    bodyText: JSON.stringify(body),
+    handler: async () => {
+      const params: Record<string, unknown> = {
+        mode: 'subscription',
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: body.success_url,
+        cancel_url: body.cancel_url,
+        metadata: { tenant_id: tenantId, tier: body.tier },
+      };
+      if (existingCustomerId !== null) params['customer'] = existingCustomerId;
+      const session = await stripe.checkout.sessions.create(params);
+      return { status: 200, data: { checkout_url: session.url ?? '', session_id: session.id } };
+    },
+  });
+
+  if (!result.ok) {
+    return { status: result.status, data: { error: { code: result.code, message: result.message, trace_id: traceId } } };
+  }
+  return { status: result.status, data: result.data };
+}
+
+export interface CreatePortalSessionOpts {
+  tenantId: string;
+  stripe: StripeClient;
+  client: BillingDbClient;
+  traceId: string;
+  returnUrl: string;
+}
+
+// POST /billing/portal — Stripe Customer Portal session (SAQ A; no card data in app).
+export async function handleCreatePortalSession(
+  opts: CreatePortalSessionOpts,
+): Promise<WebhookHandlerResult> {
+  const { tenantId, stripe, client, traceId, returnUrl } = opts;
+
+  const bcResult = await client
+    .from('billing_customer')
+    .select('stripe_customer_id')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  if (bcResult.error !== null) {
+    return { status: 500, data: { error: { code: 'INTERNAL_ERROR', message: bcResult.error.message, trace_id: traceId } } };
+  }
+  const stripeCustomerId = bcResult.data?.['stripe_customer_id'] as string | undefined;
+  if (!stripeCustomerId) {
+    return { status: 404, data: { error: { code: 'NO_BILLING_CUSTOMER', message: 'No billing customer found for tenant', trace_id: traceId } } };
+  }
+
+  const session = await stripe.billingPortal.sessions.create({ customer: stripeCustomerId, return_url: returnUrl });
+  return { status: 200, data: { portal_url: session.url } };
+}
+
+export interface GetSubscriptionOpts {
+  tenantId: string;
+  client: BillingDbClient;
+  traceId: string;
+}
+
+// GET /billing/subscription — synthetic free-tier returned when no row exists (Q-43.5).
+export async function handleGetSubscription(
+  opts: GetSubscriptionOpts,
+): Promise<WebhookHandlerResult> {
+  const { tenantId, client, traceId } = opts;
+
+  const result = await client
+    .from('subscription')
+    .select('tier, is_active, started_at, current_period_end, cancel_at, canceled_at, stripe_subscription_id')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  if (result.error !== null) {
+    return { status: 500, data: { error: { code: 'INTERNAL_ERROR', message: result.error.message, trace_id: traceId } } };
+  }
+
+  const subscription = result.data ?? {
+    tier: 'free',
+    is_active: true,
+    started_at: new Date().toISOString(),
+    current_period_end: null,
+    cancel_at: null,
+    canceled_at: null,
+    stripe_subscription_id: null,
+  };
+  return { status: 200, data: subscription };
+}
+
+export interface CancelSubscriptionOpts {
+  tenantId: string;
+  undo: boolean;
+  stripe: StripeClient;
+  client: BillingDbClient;
+  traceId: string;
+}
+
+// POST /billing/cancel — schedule or undo subscription cancellation at period end.
+export async function handleCancelSubscription(
+  opts: CancelSubscriptionOpts,
+): Promise<WebhookHandlerResult> {
+  const { tenantId, undo, stripe, client, traceId } = opts;
+
+  const subResult = await client
+    .from('subscription')
+    .select('stripe_subscription_id, is_active')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  if (subResult.error !== null) {
+    return { status: 500, data: { error: { code: 'INTERNAL_ERROR', message: subResult.error.message, trace_id: traceId } } };
+  }
+  if (subResult.data === null) {
+    return { status: 404, data: { error: { code: 'NO_SUBSCRIPTION', message: 'No subscription found', trace_id: traceId } } };
+  }
+  const stripeSubscriptionId = subResult.data['stripe_subscription_id'] as string | null;
+  if (!stripeSubscriptionId) {
+    return { status: 400, data: { error: { code: 'NO_STRIPE_SUBSCRIPTION', message: 'Subscription has no Stripe subscription ID', trace_id: traceId } } };
+  }
+
+  const updated = await stripe.subscriptions.update(stripeSubscriptionId, { cancel_at_period_end: !undo });
+  const cancelAt = updated.cancel_at !== null ? new Date(updated.cancel_at * 1000).toISOString() : null;
+  const isActive = updated.status !== 'canceled';
+
+  await client.from('subscription').update({ cancel_at: cancelAt, is_active: isActive }).eq('tenant_id', tenantId);
+
+  return { status: 200, data: { cancel_at: cancelAt, is_active: isActive } };
+}
+
+export interface GetInvoicesOpts {
+  tenantId: string;
+  client: BillingDbClient;
+  traceId: string;
+}
+
+// GET /billing/invoices — LIMIT 50 + truncated flag (Q-43.2, ISSUE-0033).
+export async function handleGetInvoices(
+  opts: GetInvoicesOpts,
+): Promise<WebhookHandlerResult> {
+  const { tenantId, client, traceId } = opts;
+
+  // ISSUE-0033: v1 LIMIT 50 + truncated:boolean; cursor pagination deferred to v1.1.
+  const result = await client
+    .from('invoice')
+    .select('id, stripe_invoice_id, amount_cents, currency, status, invoiced_at, paid_at, hosted_invoice_url, invoice_pdf_url')
+    .eq('tenant_id', tenantId)
+    .order('invoiced_at', { ascending: false })
+    .limit(51);
+
+  if (result.error !== null) {
+    return { status: 500, data: { error: { code: 'INTERNAL_ERROR', message: result.error.message, trace_id: traceId } } };
+  }
+
+  const rows = result.data ?? [];
+  const truncated = rows.length === 51;
+  const invoices = rows.slice(0, 50);
+  return { status: 200, data: { invoices, truncated } };
 }
 
 async function upsertInvoice(

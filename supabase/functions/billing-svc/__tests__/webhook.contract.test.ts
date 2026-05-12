@@ -126,6 +126,9 @@ function buildStripe(opts: {
         return opts.event ?? makeEvent('evt_test_0001', 'customer.updated', {});
       },
     },
+    checkout: { sessions: { create: async () => ({ id: '', url: null }) } },
+    billingPortal: { sessions: { create: async () => ({ url: '' }) } },
+    subscriptions: { update: async () => ({ cancel_at: null, status: 'active' }) },
   };
 }
 
@@ -479,6 +482,9 @@ describe('handleStripeWebhook — edge cases', () => {
           return makeEvent('evt_test_0011', 'customer.updated', {});
         },
       },
+      checkout: { sessions: { create: async () => ({ id: '', url: null }) } },
+      billingPortal: { sessions: { create: async () => ({ url: '' }) } },
+      subscriptions: { update: async () => ({ cancel_at: null, status: 'active' }) },
     };
     const client = buildClient({
       billing_event: [
