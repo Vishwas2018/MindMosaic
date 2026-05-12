@@ -2,6 +2,56 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 43 — 2026-06-02 (Day 59, 2-day budget, 1-day actual)
+
+**Planned (from DEV_PLAN.md Stage 43):** 6 user-facing billing endpoints (plans, checkout, portal, subscription, cancel, invoices) + 6 SDK hooks + types + contract tests.
+
+**Actually delivered:**
+
+- Prep commit (cfc24e6): Q-43.1..6 resolved in QUESTIONS.md ## Resolved; ISSUE-0033 filed (low, GET /billing/invoices LIMIT 50 + truncated pagination deferred); C-C-D-V saved to `docs/prompts/2026-06-02_stage-43.md`.
+- Impl commit (8b40a26): `packages/types/src/billing.ts` (+PortalResponseSchema, InvoicesResponseSchema, CancelResponseSchema + types); `packages/sdk/src/keys.ts` (billing namespace); `packages/sdk/src/hooks/billing.ts` (NEW — usePlanCatalog, useSubscription, useInvoices, useCreateCheckout, useCreatePortalSession, useCancelSubscription); `packages/sdk/src/hooks/index.ts` (+billing export); `supabase/functions/billing-svc/handlers.ts` (+withIdempotency import, StripeClient/BillingDbClient extensions, PLAN_CATALOG const, 6 new handlers); `supabase/functions/billing-svc/index.ts` (+6 env vars, +6 route blocks with auth gates); `supabase/functions/billing-svc/__tests__/stage43.contract.test.ts` (NEW — 21 tests); `supabase/functions/billing-svc/__tests__/webhook.contract.test.ts` (buildStripe extended at 2 sites for new StripeClient fields); `packages/sdk/src/__tests__/billing.test.ts` (NEW — 10 tests).
+
+**Time spent:** 1 day (2026-06-02). 2-day budget. 1 day under.
+
+**Surprises / departures:**
+
+- Context compaction mid-session (after Q-43.1..6 pre-read); resumed cleanly from generated summary — T1 pre-reads re-derived from summary state, all implementation proceeded without information loss.
+- `buildStripe()` in `webhook.contract.test.ts` needed extending for new StripeClient fields (checkout, billingPortal, subscriptions) — caught at typecheck, fixed before push.
+
+**Decisions made (not in stage):**
+
+- none (all billing patterns pre-canonised in ADR-0034; no new ADR required)
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0033 OPENED at prep (low, billing-svc): GET /billing/invoices uses LIMIT 50 + truncated flag; cursor pagination deferred to v1.1. Q-43.2 Option A resolution per ISSUE-0022 precedent.
+- Q-43.1 resolved: withIdempotency on POST /billing/checkout only; portal/cancel don't use it. ISSUE-0023 stays open (assignments-svc idempotency enforcement v1.1 unrelated).
+- Q-43.2 resolved: Option A — LIMIT 50 + truncated:boolean; ISSUE-0033 filed. Operator round-trip discharged.
+- Q-43.3 resolved: tenant_id from JWT app_metadata.tenant_id; no parent_student_link join.
+- Q-43.4 resolved: GET /billing/plans is public; no Bearer required (arch §4.9 verbatim).
+- Q-43.5 resolved: synthetic free-tier SubscriptionDTO (tier='free', is_active=true) returned when no subscription row exists for tenant.
+- Q-43.6 resolved: PLAN_CATALOG const in handlers.ts; Stripe Price IDs from env vars via StripePriceIds struct passed as handler opts.
+- Q-43.7+ none — T2-tightened clean.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17 packages, 0 turbo-cached — --force run per §Close-ritual) · Tests ✅ (643 passed / 1 skipped = 644 total Vitest) · Build n/a (no new Next.js routes) · RLS n/a (no new migration)
+
+**Process retros:**
+
+(a) ADR-0034 dedup distinction first concrete consumer: POST /billing/checkout uses withIdempotency (REST layer); webhook uses billing_event UNIQUE + ON CONFLICT (DB layer). Pattern catalogue validated end-to-end — the two dedup mechanisms stayed cleanly separate across both stages.
+(b) PLAN_CATALOG single-source-of-truth grep discipline (Q-43.6 tightening) caught no drift; pattern works cleanly for future shared consts. 3 occurrences (1 declaration + 2 consumer sites: handleGetPlans + handleCreateCheckout).
+(c) Zero Q-43.7+ filings — T2-tightened working cleanly for billing-svc stage. All questions resolved at prep via 6 Q-43.* round-trips.
+(d) Pre-push verification round honored; push gate protocol followed. Typecheck failure (buildStripe missing new StripeClient fields) surfaced by pre-push --force run and fixed before commit.
+
+**Tomorrow — first thing:**
+
+Stage 44: read arch §11.2 verbatim + DEV_PLAN Stage 44; replace handleFlagPropagateStub with real feature_flag propagation body; wire admin_action_log (Q-42.7 sentinel system user, Option A).
+
 ## Stage 42 — 2026-06-01 (Day 58, 2-day budget, 1-day actual)
 
 **Planned (from DEV_PLAN.md Stage 42):** Stripe integration + webhook — migration 0018 (4 billing tables), billing-svc Edge Function (webhook handler + flag-propagate stub), jobs-worker fifth amendment, stripe-seed.sh, deployment.md billing section, contract tests.
