@@ -2,6 +2,53 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 44 — 2026-06-03 (Day 60, 1-day budget, 1-day actual)
+
+**Planned (from DEV_PLAN.md Stage 44):** Replace `handleFlagPropagateStub` with full feature flag propagation body; wire `admin_action_log` with sentinel system user (Q-42.7 deferral); migration 0019 (`user_role` 'system' enum value + sentinel rows); ≥15 contract tests.
+
+**Actually delivered:**
+
+- Prep commit (46a16b2): Q-44.1–4 filed and resolved in QUESTIONS.md ## Resolved; Q-42.7 resolution updated to reflect Stage 44 closure; C-C-D-V saved to `docs/prompts/2026-06-03_stage-44.md`; `docs/dev/deployment.md` migration 0019 section added (one-way DDL warning + deploy-order requirement).
+- Impl commit (d1aa372): `supabase/migrations/0019_user_role_system.sql` (NEW — `ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'system'`; sentinel tenant row `id='00000000-0000-0000-0000-000000000000'`; sentinel user_profile row `id='00000000-0000-0000-0000-000000000001'` — both `ON CONFLICT (id) DO NOTHING`); `supabase/functions/billing-svc/handlers.ts` (stub block replaced with `SENTINEL_SYSTEM_USER_ID` const, `FEATURE_REGISTRY` const, `FlagPropagateOpts` interface, async `handleFlagPropagate` — 17-entry registry × 4 tiers, admin_override preservation via application-layer SELECT-then-filter, `admin_action_log` write with sentinel actor_id); `supabase/functions/billing-svc/index.ts` (`handleFlagPropagateStub` → `handleFlagPropagate`, import + route call updated to `await` + pass `client`); `supabase/functions/billing-svc/__tests__/stage44.contract.test.ts` (NEW — 18 tests); `supabase/functions/billing-svc/__tests__/webhook.contract.test.ts` (`handleFlagPropagateStub` import + 2 stub tests removed, jsdoc updated).
+
+**Time spent:** 1 day (2026-06-03). 1-day budget. On budget.
+
+**Surprises / departures:**
+
+- Q-44.5 filed mid-impl (T2-tightened): `user_profile.tenant_id uuid NOT NULL` means sentinel user_profile requires a valid tenant FK — not anticipated at prep. Filed in QUESTIONS.md ## Open immediately; T3 round-trip same session; operator confirmed Option A (sentinel tenant row alongside sentinel user_profile in migration 0019). Q-44.5 moved ## Open → ## Resolved as part of impl commit.
+- `webhook.contract.test.ts` had 2 tests directly calling `handleFlagPropagateStub` — both removed (replaced by 18 stage44 tests). Net: −2 stub + 18 new = +16 net-new tests. Total: 643 → 659 passed / 1 skipped.
+
+**Decisions made (not in stage):**
+
+- none (admin_override application-layer filter approach is a known Stage 47 optimization candidate; no ADR required — rationale documented in handlers.ts)
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- Q-44.1 resolved: Migration 0019 `ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'system'`; sentinel user_profile `id='00000000-0000-0000-0000-000000000001'`, `role='system'`. Closes Q-42.7 Stage 42 deferral.
+- Q-44.2 resolved: spec §20.3.1 is authoritative FEATURE_REGISTRY source; 17 entries × 4 tiers.
+- Q-44.3 resolved: Option A — `pathway.*` is a single literal feature_key with `config.max_pathways: 1/2/null`.
+- Q-44.4 resolved: `sessions.monthly_limit` enabled=true, `config: {max_sessions_per_month: 10}` for Free; `config: null` for Standard/Premium.
+- Q-44.5 resolved (T2-tightened mid-impl): Option A — sentinel tenant row `id='00000000-0000-0000-0000-000000000000'`, `slug='__system__'`, `type='family'` (SQL comment: "type='family' arbitrary; slug '__system__' is the sentinel identifier").
+- Q-42.7 CLOSED: Stage 42 deferral fully resolved — sentinel system user delivered exactly as queued in Option A recommendation.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17 packages, 0 turbo-cached — --force run per §Close-ritual) · Tests ✅ (659 passed / 1 skipped — net +16) · Build n/a (no new Next.js routes) · RLS n/a (migration 0019 DDL-only — no new tables)
+
+**Process retros:**
+
+(a) T2-tightened discipline validated end-to-end under real mid-impl discovery pressure: Q-44.5 filed in QUESTIONS.md ## Open the moment `tenant_id NOT NULL` was found in the T1 pre-read, T3 round-trip discharged same session, resolution text in ## Resolved as part of impl commit. No mid-impl state leaked to next session.
+(b) Q-42.7 closed exactly as queued in Stage 42: Option A (sentinel user_profile with fixed UUID, `role='system'`) was the default recommendation at time of deferral; operator confirmed, implementation matched the filed resolution verbatim. Deferral → resolution pipeline working.
+(c) admin_override preservation implemented via application-layer SELECT-then-filter (not SQL conditional WHERE on DO UPDATE SET, which Supabase JS upsert does not support natively). Semantically correct per arch §11.2 resolution order. Approach is an O(n) loop but n≤17 per tier; Stage 47 optimization candidate if batch-upsert with conditional WHERE becomes available.
+
+**Tomorrow — first thing:**
+
+Stage 45: Billing UI — Screen 17 EntitlementsProvider + billing settings page. T5 reactivates: layout sketch mandatory before component code. Read `docs/dev/mockups/04-billing.html` (CLAUDE_DESIGN_PROMPTS.md reference).
+
 ## Stage 43 — 2026-06-02 (Day 59, 2-day budget, 1-day actual)
 
 **Planned (from DEV_PLAN.md Stage 43):** 6 user-facing billing endpoints (plans, checkout, portal, subscription, cancel, invoices) + 6 SDK hooks + types + contract tests.
