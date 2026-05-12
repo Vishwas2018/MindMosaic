@@ -2,6 +2,50 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 45 — 2026-06-04 (Days 61–62, 2-day budget, 2-day actual)
+
+**Planned (from DEV_PLAN.md Stage 45):** Screen 17 billing UI (3-tab Plans/Compare/Billing page); EntitlementsProvider live wiring; format.ts + BILLING_COPY utilities; ≥12 tests.
+
+**Actually delivered:**
+
+- `apps/web/src/app/(parent)/billing/page.tsx` (NEW) — 3-tab billing page: Plans (plan cards, BillingToggle, intent banner, trust strip, FAQ), Compare (dynamic price row + static feature rows from BILLING_COPY), Billing (subscription card with cancel/undo, payment method portal, invoice history with ISSUE-0033 truncation notice). Stripe-hosted Checkout + Portal redirects per ADR-0034 SAQ A. Cancel dialog via Radix Dialog (focus-trapped). useSearchParams on mount: `?status=success/cancelled` toasts + invalidation, `?intent=upgrade` tab switch, `?pathway={slug}` intent banner.
+- `apps/web/src/copy/billing.ts` (NEW) — `BILLING_COPY` const: faq (6 Q&As), compareRows (10 rows), trustBullets (3), paymentMethodNote, cancelDialog (title/body/confirm/keep), pathways slug→name map.
+- `apps/web/src/lib/format.ts` (NEW) — `formatAud(cents)` + `formatDate(iso)` reusable formatters (en-AU locale, AUD currency).
+- `apps/web/src/app/(parent)/layout.tsx` (MODIFIED) — guard extended to `parent || org_admin` (Q-45.5); redirect `/login` → `/dashboard` (Q-45.4); inline comments at both change sites.
+- `apps/web/src/providers/EntitlementsProvider.tsx` (MODIFIED) — Stage 14 PHASE-2 stub replaced with live `useSubscription().data?.tier ?? 'free'`; `tier` type widened to full `SubscriptionTier` (Q-45.8); PHASE-2 comment removed.
+- `apps/web/src/__tests__/billing.page.test.tsx` (NEW) — 29 Vitest tests: formatAud (6), formatDate (3), BILLING_COPY.faq (3), compareRows (4), trustBullets (2), paymentMethodNote (2), cancelDialog (6), pathways (3).
+- Prep commit SHA `915617e`; impl commit SHA `d7f530c`.
+
+**Time spent:** 2d (Days 61–62)
+
+**Surprises / departures:**
+
+- Q-45.9 mid-impl: `InvoiceDTO` has no `tier` field — T3 self-resolve: show current subscription tier as plan name for all invoice rows. V1.1 will add `tier_snapshot` to InvoiceDTO.
+- V14 false-positive risk: FAQ strings initially contained "any" word; reworded to avoid conflicts with `grep 'any'` TypeScript-any check.
+
+**Decisions made (not in stage):**
+
+- Q-45.9: InvoiceDTO no tier field → self-resolved: use currentPlanName for all rows (logged in QUESTIONS.md).
+
+**Deviations logged:**
+
+- DEV-20260604-1 (filed at prep): spec §25.6 cancel path `/billing/subscription/cancel` vs SDK `/billing/cancel`.
+
+**Issues opened / closed / questions raised:**
+
+- Q-45.1..8: all resolved at prep (2026-06-04)
+- Q-45.9: raised and self-resolved mid-impl (T2-tightened) (2026-06-04)
+- ISSUE-0033: handled in UI (truncation notice in invoice history)
+- EntitlementsProvider PHASE-2 stub closed (Stage 14 placeholder removed)
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17/17 packages, 0 cached --force run) · Tests ✅ (688/689 — 688 passed / 1 skipped) · Build n/a (not run this stage) · RLS ✅ (no schema changes)
+
+**Tomorrow — first thing:**
+
+Stage 46 — Cancellation + Access Preservation UI (Day 63, 1-day budget). `useCancelSubscription` already live; verify access preservation through `current_period_end`, add Playwright opt-in E2e spec, refine cancel dialog copy.
+
 ## Stage 44 — 2026-06-03 (Day 60, 1-day budget, 1-day actual)
 
 **Planned (from DEV_PLAN.md Stage 44):** Replace `handleFlagPropagateStub` with full feature flag propagation body; wire `admin_action_log` with sentinel system user (Q-42.7 deferral); migration 0019 (`user_role` 'system' enum value + sentinel rows); ≥15 contract tests.

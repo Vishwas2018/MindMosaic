@@ -9,6 +9,19 @@
 
 ## Resolved
 
+### Q-45.9 — InvoiceDTO has no `tier` field: how to look up plan name in invoice history table?
+
+- Date raised: 2026-06-04 (Stage 45 impl)
+- Asked of: self
+- Source: Stage 45 C-C-D-V T5 sketch ("id | plan name from PLAN_CATALOG lookup")
+- Question: `InvoiceDTOSchema` has no `tier` field. The T5 sketch implies per-invoice plan name lookup from the plan catalog. How do we display the plan name?
+- Why ambiguous: InvoiceDTO only has `stripe_invoice_id`, `amount_cents`, `status`, `invoiced_at`, `invoice_pdf_url`. No tier snapshot.
+- Blocking? no
+- Assumed answer: Use current subscription tier looked up from `usePlanCatalog` as display name for all invoices. Acceptable v1 approximation; v1.1 can add a `tier_snapshot` field to InvoiceDTO.
+- Code affected: `apps/web/src/app/(parent)/billing/page.tsx` (`currentPlanName`)
+- Status: resolved
+- Resolution: T3 Option 3 self-resolve — show `currentPlanName` (current subscription tier mapped via plan catalog) for all invoice rows. Filed 2026-06-04. V1.1: add `tier` snapshot to InvoiceDTO.
+
 ### Q-45.8 — `EntitlementsContextValue` type: include `'institutional'` tier?
 
 - Date raised: 2026-06-04 (Stage 45 prep, T1 pre-read)
