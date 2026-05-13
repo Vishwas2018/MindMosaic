@@ -9,6 +9,51 @@
 
 ## Resolved
 
+### Q-46.3 — `access_downgraded` notification: who is the recipient `user_id`?
+
+- Date raised: 2026-06-05 (Stage 46 prep, §2A pre-read)
+- Asked of: operator
+- Source: `supabase/functions/notifications-svc/handlers.ts:219–246` (`createNotification` requires caller-supplied `user_id`); `supabase/functions/billing-svc/handlers.ts:252–259` (`customer.subscription.deleted` case — knows `tenant_id` only)
+- Question: billing-svc `customer.subscription.deleted` knows `tenant_id` but not the parent `user_id`. `createNotification` follows the pattern where the caller provides the specific recipient (e.g., `student_id` for `assignment_assigned`, `teacher_id` for `intervention_alert`). How does billing-svc identify the notification recipient?
+- Why ambiguous: Multi-parent tenants complicate fanout. v1 budget allows one lookup; v1.1 must fan out to all parents.
+- Blocking? no
+- Assumed answer: Option A — billing-svc queries `SELECT id FROM user_profile WHERE tenant_id = $1 AND role = 'parent' ORDER BY created_at ASC LIMIT 1` and includes `parent_id` in the `notification.create` job payload. If lookup returns null, log warning + skip notification (do not fail webhook — Stripe retries are expensive). `// ISSUE-0034` inline comment at lookup site.
+- Code affected: `supabase/functions/billing-svc/handlers.ts` (`customer.subscription.deleted` case); `supabase/functions/notifications-svc/handlers.ts` (`CreateNotificationPayload` + `createNotification` `access_downgraded` branch)
+- Status: resolved
+- Resolution: Option A confirmed by operator 2026-06-05. First-parent lookup `ORDER BY created_at ASC LIMIT 1`. Null → log warning + skip. ISSUE-0034 (low, v1.1) tracks multi-parent fanout.
+
+---
+
+### Q-46.2 — `access_downgraded` notification wire-up: 4-file scope within 1-day budget?
+
+- Date raised: 2026-06-05 (Stage 46 prep, §2A pre-read)
+- Asked of: operator
+- Source: `supabase/functions/billing-svc/handlers.ts:252–259` (no notification step); `supabase/functions/notifications-svc/handlers.ts:219–246` (no `access_downgraded` branch); `supabase/functions/jobs-worker/index.ts:66` (`notification.create` job type already registered)
+- Question: R1/R2/R6 are complete from Stages 43/45. Stage 46 scope shrinks to backend notification wire-up only. Is the 4-file additive scope (migration 0020 + billing-svc handler + notifications-svc handler + contract tests) within the 1-day budget?
+- Why ambiguous: Scope assessment needed given that UI work was pre-built.
+- Blocking? no
+- Assumed answer: Additive 4-file scope is within 1-day budget. No existing working code modified except `customer.subscription.deleted` case and notifications-svc `createNotification` switch. ≥8 new contract tests + Playwright opt-in spec (test.skip-guarded, not counted in 688 baseline).
+- Code affected: `supabase/migrations/0020_notification_type_access_downgraded.sql` (new); `supabase/functions/billing-svc/handlers.ts`; `supabase/functions/notifications-svc/handlers.ts`; `supabase/functions/billing-svc/__tests__/stage46.contract.test.ts` (new); `supabase/functions/notifications-svc/__tests__/contract.test.ts` (extended); `apps/web/playwright/e2e/billing-cancel.spec.ts` (new, test.skip-guarded)
+- Status: resolved
+- Resolution: Operator confirmed 2026-06-05. 4-file additive scope within 1-day budget. No UI work (R6 ✅ from Stage 45). Playwright spec opt-in (test.skip-guarded).
+
+---
+
+### Q-46.1 — `notification_type` enum missing `access_downgraded`; migration 0020 required
+
+- Date raised: 2026-06-05 (Stage 46 prep, §2A pre-read R4)
+- Asked of: operator
+- Source: `supabase/migrations/0001_enums_tenancy_auth.sql:147–151` — `notification_type` ENUM has 8 values (`assignment_assigned`, `assignment_due_soon`, `assignment_overdue`, `repair_ready`, `plan_updated`, `achievement_earned`, `intervention_alert`, `system`); `access_downgraded` is absent
+- Question: `customer.subscription.deleted` must send an `access_downgraded` notification. `notification_type` ENUM is missing this value. New migration required. Which approach?
+- Why ambiguous: Two options: A) migration 0020 `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'access_downgraded'`; B) reuse existing `'system'` type with metadata payload (semantic mismatch).
+- Blocking? no
+- Assumed answer: Option A — `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'access_downgraded'`. Same pattern as migration 0017 (`alert_type`) and 0019 (`user_role`). Idempotent, deferred-validation, documented in deployment.md alongside 0017/0019.
+- Code affected: `supabase/migrations/0020_notification_type_access_downgraded.sql` (new); `supabase/functions/notifications-svc/handlers.ts` (INSERT row with `type = 'access_downgraded'`); `docs/dev/deployment.md` (migration 0020 note)
+- Status: resolved
+- Resolution: Option A confirmed by operator 2026-06-05. Migration 0020 `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'access_downgraded'`. Noted in deployment.md alongside 0017/0019.
+
+---
+
 ### Q-45.9 — InvoiceDTO has no `tier` field: how to look up plan name in invoice history table?
 
 - Date raised: 2026-06-04 (Stage 45 impl)

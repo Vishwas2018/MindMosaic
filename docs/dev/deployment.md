@@ -194,6 +194,23 @@ dispatch, returning 500 and causing the jobs-worker to dead-letter the job.
 
 **Linked:** Stage 44 DAILY_LOG; Q-44.1; Q-42.7.
 
+### Migration 0020 — `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'access_downgraded'`
+
+**File:** `supabase/migrations/0020_notification_type_access_downgraded.sql`
+
+**Constraint:** `ALTER TYPE ... ADD VALUE` is non-transactional in PostgreSQL 12+. It cannot be rolled back inside a transaction (same class as migrations 0017 and 0019). Once applied, removing the value requires `DROP TYPE ... CASCADE` + `CREATE TYPE` + re-adding all dependent columns — a destructive operation. Use `IF NOT EXISTS` for idempotent replay.
+
+**Deploy order requirement:**
+1. Run migration 0020 against the production database.
+2. Wait for migration to commit (verify with `SELECT enum_range(NULL::notification_type)` — must include `'access_downgraded'`).
+3. THEN deploy `billing-svc` and `notifications-svc` code that references `'access_downgraded'` (`supabase/functions/billing-svc/handlers.ts` — `customer.subscription.deleted` enqueues `notification.create` with `notification_type: 'access_downgraded'`; `supabase/functions/notifications-svc/handlers.ts` — `createNotification` inserts row with `type = 'access_downgraded'`).
+
+**If billing-svc/notifications-svc are deployed BEFORE migration 0020:** the `notification.create` job will fail with a PostgreSQL enum constraint violation when notifications-svc attempts to INSERT a row with `type = 'access_downgraded'`, returning 500 and causing the jobs-worker to dead-letter the job. Flag propagation (`pipeline.feature_flag_propagate`) is a separate job and is unaffected.
+
+**Deferred validation:** Migration 0020 has not been run against a real PostgreSQL instance in this sandbox (no Docker available). Same validation requirement as migrations 0012–0019.
+
+**Linked:** Stage 46; Q-46.1; ISSUE-0034.
+
 ### Migrations 0012–0017 — Docker integration test required
 
 Migrations 0012 through 0017 have not been run against a real PostgreSQL

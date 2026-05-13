@@ -5,6 +5,22 @@
 
 ## Open
 
+### ISSUE-0034 — `access_downgraded` notification: single-parent fanout only in v1
+
+- Status: open
+- Severity: low
+- Reported: 2026-06-05 (Stage 46 prep, Q-46.3 resolution)
+- Area: backend (billing-svc, notifications-svc)
+- Tags: billing-svc · notifications-svc · notification · v1.1 · multi-parent
+
+**Summary.** The `customer.subscription.deleted` webhook handler in billing-svc identifies the `access_downgraded` notification recipient by querying `user_profile WHERE tenant_id = $1 AND role = 'parent' ORDER BY created_at ASC LIMIT 1`. This returns the single earliest-created parent user per tenant. In v1, most tenants have one parent account — this covers the common case. However, a tenant with multiple parent accounts (e.g., two parents co-managing a family subscription) will only notify the first-created parent; the second parent receives no `access_downgraded` notification when the subscription expires.
+
+**Fix (v1.1).** Fan out to all parent users: `SELECT id FROM user_profile WHERE tenant_id = $1 AND role IN ('parent', 'org_admin') ORDER BY created_at ASC` (no LIMIT). Enqueue one `notification.create` job per recipient. Use `idempotency_key: 'nfp-${event.id}-${userId}'` per recipient to prevent duplicates on job retry.
+
+**Tracking pointer.** Q-46.3 resolution. Inline `// ISSUE-0034` comment at parent lookup site in `supabase/functions/billing-svc/handlers.ts`.
+
+---
+
 ### ISSUE-0033 — GET /billing/invoices uses LIMIT 50 + truncated flag; cursor pagination deferred
 
 - Status: open
