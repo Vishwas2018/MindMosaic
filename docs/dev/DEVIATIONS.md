@@ -3,6 +3,20 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260606-1 — Tag name drift: DEV_PLAN `v1-phase-4-slice` → shipped as `v1-phase-4-partial`
+
+- Date: 2026-06-06
+- Stage: 47
+- Type: substitution
+- What the stage said: DEV_PLAN Stage 47 deliverables specify "git tag `v1-phase-4-slice`".
+- What I actually did: Pushed tag `v1-phase-4-partial`.
+- Why: Phase 4 closes Conditional Go (same pattern as Phase 1 → `v1-phase-1` and Phase 2 → `v1-phase-2-partial`). All 6 SLA budgets unmeasured (environment-gated, deferred to Stage 48). Using "partial" is consistent with Phase 2 naming convention and accurately describes a Conditional Go close rather than a full slice completion.
+- Impact on later stages: None. Tag is a git bookmark only. The billing layer is now addressable as `v1-phase-4-partial` on origin. No stage definitions reference this specific tag name.
+- Linked: Q-47.2, `docs/dev/phase-4-exit-report.md` §1
+- Resolved by: N/A — tag is immutable once pushed. Accepted as-is.
+
+---
+
 ### DEV-20260604-1 — Spec §25.6 + SCREEN_SPECS §17 cancel path `/billing/subscription/cancel` vs implementation `/billing/cancel`
 
 - Date: 2026-06-04
@@ -14,6 +28,7 @@
 - Impact on later stages: Stage 46 (cancellation flow UI) also uses `useCancelSubscription` — same path; no Stage 46 impact. v1.1 spec reconciliation needed: update spec §25.6 + SCREEN_SPECS §17 to document the actual `POST /billing/cancel` path. No data model or functional impact.
 - Linked: Q-45.3, `supabase/functions/billing-svc/handlers.ts` (`handleCancelSubscription`), `supabase/functions/billing-svc/index.ts` (route at `path === '/billing/cancel'`), `packages/sdk/src/hooks/billing.ts` (`useCancelSubscription`)
 - Resolved by: v1.1 spec reconciliation (update spec §25.6 + SCREEN_SPECS §17 to `/billing/cancel`)
+- Status note (2026-06-06, Phase 4 close): path confirmed benign — all consumers use `useCancelSubscription` SDK hook; no additional consumer drift introduced in Stages 45–46. No Stage 48 action required.
 
 ---
 

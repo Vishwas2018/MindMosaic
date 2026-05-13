@@ -9,6 +9,51 @@
 
 ## Resolved
 
+### Q-47.3 — Commit structure: single audit commit vs two commits
+
+- Date raised: 2026-06-06 (Stage 47 morning ritual)
+- Asked of: operator
+- Source: Phase 1 (Stage 27) = single audit commit; Phase 2 (Stage 41) = two commits (canonisation `4894359` + audit `67983a6`). Phase 4 has no canonisation deliverable.
+- Question: Should Stage 47 close as a single audit commit (Phase 1 pattern) or two commits (Phase 2 pattern)?
+- Why ambiguous: Phase 2 split because T-discipline was a materially distinct deliverable. Phase 4 has no equivalent canonisation work — all D1-D7 are documentation.
+- Blocking? yes — determines how D1-D7 are committed.
+- Assumed answer: Option A — single audit commit. Phase 4 has no canonisation to split off.
+- Code affected: all Stage 47 docs deliverables (D1-D7)
+- Status: resolved
+- Resolution: Operator confirmed 2026-06-06. **Single audit commit** per Phase 1 pattern. All D1-D7 in one commit. Tag push is a separate approved step.
+
+---
+
+### Q-47.2 — Tag name + timing: v1-phase-4-partial at Stage 47 close vs defer
+
+- Date raised: 2026-06-06 (Stage 47 morning ritual)
+- Asked of: operator
+- Source: DEV_PLAN Stage 47: "git tag `v1-phase-4-slice`"; R10 pre-read candidate: `v1-phase-4-partial` (reflecting Conditional Go verdict + Phase 2 naming precedent).
+- Question: Should the Phase 4 git tag be named `v1-phase-4-partial` (honest name for Conditional Go close, consistent with `v1-phase-2-partial` precedent) and pushed at Stage 47 close, or defer to Stage 49 launch gate?
+- Why ambiguous: DEV_PLAN says `v1-phase-4-slice`; using "partial" diverges from the DEV_PLAN wording. Phase 2 precedent: `v1-phase-2-partial` pushed at Stage 41 close despite deferred SLAs.
+- Blocking? yes for tag push (separate approval after audit commit). Not blocking for authoring.
+- Assumed answer: Option A — tag `v1-phase-4-partial` at Stage 47 close, separate push approval. Name drift from DEV_PLAN = deviation DEV-20260606-1.
+- Code affected: git tag only; `docs/dev/DEVIATIONS.md` (DEV-20260606-1)
+- Status: resolved
+- Resolution: Operator confirmed 2026-06-06. **Tag `v1-phase-4-partial` at Stage 47 close**. Separate push approval required. DEV-20260606-1 filed documenting tag name drift from DEV_PLAN `v1-phase-4-slice`.
+
+---
+
+### Q-47.1 — Phase 4 exit verdict: Conditional Go vs Full Go
+
+- Date raised: 2026-06-06 (Stage 47 morning ritual)
+- Asked of: operator
+- Source: DEV_PLAN Stage 47 exit criteria: "Billing flows work for at least Free→Standard→Premium→Free cycle."
+- Question: Is the Phase 4 exit verdict Conditional Go (same pattern as Phases 1+2) or Full Go?
+- Why ambiguous: Code-verifiable criteria met for all 5 stages (42–46). However, 6 numerical SLAs (billing webhook p95 < 300ms, flag propagation p95 < 30s, plus 4 carry-over from Phase 2) remain unmeasured (environment-gated). Phases 1 and 2 both closed Conditional Go under the same environment-gate pattern.
+- Blocking? yes — verdict drives §1 of phase-4-exit-report.md and the commit message.
+- Assumed answer: Option A — Conditional Go. SLA measurement is environment-gated; consistent with Phase 1+2 precedent.
+- Code affected: `docs/dev/phase-4-exit-report.md`
+- Status: resolved
+- Resolution: Operator confirmed 2026-06-06. **Conditional Go** — Go for Stage 48 (hardening pass). No-Go for production deploy until pre-deploy gate (migrations 0012–0020 Docker run + migration deploy orders 0017/0019/0020) and SLA validation (Stage 48 hardening pass). Consistent with Phase 1+2 pattern.
+
+---
+
 ### Q-46.3 — `access_downgraded` notification: who is the recipient `user_id`?
 
 - Date raised: 2026-06-05 (Stage 46 prep, §2A pre-read)

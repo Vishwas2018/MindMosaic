@@ -2,6 +2,52 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 47 — 2026-06-06 (Day 64, 1-day budget, 1-day actual)
+
+**Planned (from DEV_PLAN.md Stage 47):** Phase 4 Slice Exit Review — audit only, no feature delivery. 50-webhook replay (covered by existing test suite), billing endpoints contract-tested, PROJECT_STATE checked, git tag v1-phase-4-partial, dunning + refund + institutional deferred in §5.
+
+**Actually delivered:**
+
+- `docs/dev/QUESTIONS.md` — Q-47.1..3 added to ## Resolved (all operator-confirmed at morning ritual 2026-06-06).
+- `docs/dev/DEVIATIONS.md` — DEV-20260606-1 filed (tag name drift `v1-phase-4-slice` → `v1-phase-4-partial`, accepted deviation per Conditional Go + Phase 2 naming precedent); DEV-20260604-1 in-place status note added (path confirmed benign, no Stage 48 action required).
+- `docs/prompts/2026-06-06_stage-47.md` — C-C-D-V saved.
+- `docs/dev/phase-4-exit-report.md` (NEW) — 10 sections mirroring phase-2-exit-report.md; Conditional Go verdict; §2 Phase 4 Deliverables Gate (all 5 stages complete); §3 billing services + API layer (webhook chain, endpoints, flag propagation, access-downgraded notification); §4 quality gates (696/697 Vitest, 17/17 typecheck --force, 3-consecutive-commits criterion); §5 8 SLA budgets all deferred; §6 issues 0/0/8/13 (Phase 4 additions: ISSUE-0032/0033/0034); §7 deviations (DEV-20260604-1 + DEV-20260606-1); §8 ADR-0034 + ADR-0031 fifth amendment; §9 pre-deploy checklist (migration 0020 deploy order added); §10 statistics (+103 tests, 5 stages, 34 ADRs total).
+- `docs/dev/OPEN_ISSUES.md` — triage audit: confirmed 0/0/8/13; no Resolved movement; all Phase 4 issues (ISSUE-0032, 0033, 0034) triaged low v1.1.
+- `docs/dev/PROJECT_STATE.md` — overwritten (Stage 48 next, Day 64/75, +7.5 buffer, 10 open deviations, tag state updated to include v1-phase-4-partial pending push).
+- `DEV_PLAN.md §5` — verify-only; P1.4 + P3.2 already cover dunning/refund/institutional; ISSUE-0034 tracked in OPEN_ISSUES.md; no edits needed.
+- Audit commit SHA: TBD.
+
+**Time spent:** 1d (Day 64, on budget)
+
+**Surprises / departures:**
+
+- Stage 46 commits were not visible in the initial `git log --oneline -15` check (UTC timestamps vs AEST simulation dates caused ordering confusion in output). Resolved by re-reading with `--format="%h %ai %s"`. All Stage 46 work was fully committed (229d630 prep · 3aace88 impl · 30d8b17 close). No state loss.
+- D7 DEV_PLAN §5 = verify-only (no edits needed). P1.4 (Dunning + Refund, spec §25.7/§25.9) and P3.2 (Institutional Tier, spec §25.10) already present; ISSUE-0034 multi-parent fanout tracked in OPEN_ISSUES.md — no §5 backlog entry required.
+
+**Decisions made (not in stage):**
+
+- Q-47.1 resolved: Conditional Go (Phase 1+2 SLA deferral precedent; 6 SLAs environment-gated).
+- Q-47.2 resolved: Tag `v1-phase-4-partial` at Stage 47 close; DEV-20260606-1 filed.
+- Q-47.3 resolved: Single audit commit (Phase 1 pattern; no Phase 4 canonisation deliverable to split).
+
+**Deviations logged:**
+
+- DEV-20260606-1: tag name drift `v1-phase-4-slice` → `v1-phase-4-partial` (accepted).
+
+**Issues opened / closed / questions raised:**
+
+- Q-47.1..3: all resolved at morning ritual (2026-06-06).
+- No new issues opened.
+- DEV-20260606-1 filed.
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17/17 packages, 0 cached --force run) · Tests ✅ (696/697 — unchanged, docs-only audit) · Build n/a (no code changes) · RLS ✅ (no schema changes)
+
+**Tomorrow — first thing:**
+
+Stage 48 — Hardening Pass (Days 72–75 per DEV_PLAN; actual Day 65). Push `v1-phase-4-partial` tag (separate approval). Then read DEV_PLAN Stage 48 fully. Key items: (1) migrations 0012–0020 Docker run; (2) k6 SLA measurement against deployed environment; (3) Playwright E2e 13 specs; (4) 24h soak dead-letter check; (5) full axe-core sweep; (6) `scripts/validate-content.ts`; (7) review DAILY_LOG blockers.
+
 ## Stage 46 — 2026-06-05 (Day 63, 1-day budget, 1-day actual)
 
 **Planned (from DEV_PLAN.md Stage 46):** Cancellation + Access Preservation — close R3 webhook notification gap and R4 enum gap identified in §2A pre-read.
