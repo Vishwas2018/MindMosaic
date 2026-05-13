@@ -2,6 +2,60 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 49 — 2026-06-07 (Day 65, 2-day budget per DEV_PLAN, 1-day actual)
+
+**Planned (from DEV_PLAN.md Stage 49):** Launch Gate Review + v1.0.0 Tag — PROJECT_STATE final snapshot; DAILY_LOG final entry; launch gate checklist pass; `git tag -a v1.0.0`.
+
+**Actually delivered:**
+
+- `docs/dev/v1.0.0-release-notes.md` (NEW) — tag message content; scope summary; Conditional Go scope; operational verification items; known v1.1 carries; references to all exit reports.
+- `docs/dev/stage-49-exit-report.md` (NEW) — 10 sections; §1 Conditional Go verdict; §2 launch gate checklist (1 ✅, 5 ⏸); §3 sandbox deliverables; §4 DEV_PLAN discrepancy notes; §5 deployed-env deferrals (9 items); §6 open issues carry-forward (0/0/8/14); §7 deviations carry-forward (12); §8 §5 backlog summary; §9 final pre-deploy checklist (22 items, 12 ✅, 10 ⏸); §10 v1 statistics.
+- `docs/dev/PROJECT_STATE.md` — overwritten; 49/49 stages closed; v1 build window marked CLOSED; Day 65 of 75; +10.5 days banked; v1.0.0 tag pending push.
+- `docs/dev/DAILY_LOG.md` — this entry.
+- `docs/dev/DEVIATIONS.md` — DEV-20260607-1 + DEV-20260607-2 prepended (both low/process; both accepted; no v1.1 action).
+- `docs/dev/QUESTIONS.md` — Q-49.1..4 added to ## Resolved (all defaults confirmed).
+- `docs/prompts/2026-06-07_stage-49.md` — C-C-D-V saved.
+- v1.0.0 tag created on Stage 49 close commit (push = separate "create the tag push" approval).
+
+**Time spent:** 1d (Day 65, 1 day under DEV_PLAN 2-day budget; buffer at v1 close: +10.5 days banked)
+
+**Surprises / departures:**
+
+- DEV-20260607-1: DEV_PLAN Stage 49 line 451 says "all 47 stages ✅" — pre-existing artifact (DEV_PLAN authored when 47 stages existed; Stages 48/49 added later). CLAUDE.md anti-pattern 1 prohibits editing. PROJECT_STATE records accurate 49/49. Note only.
+- DEV-20260607-2: DEV_PLAN Stage 49 line 453 says "Launch gate checklist (from spec §4, v1-applicable items only)" — spec §4 is Assessment Framework Specifications (NAPLAN/ICAS/pathways), not launch criteria. Checklist items are correct; only the citation is wrong. CLAUDE.md anti-pattern 1 prohibits editing. Note only.
+
+**Decisions made (not in stage):**
+
+- Q-49.1..4 self-resolved (all Option A defaults): accurate stage count in PROJECT_STATE; Conditional Go verdict with items 2–6 ⏸; spec §4 citation noted in DAILY_LOG; close commit first then tag on new HEAD.
+
+**Deviations logged:**
+
+- DEV-20260607-1: DEV_PLAN "47 stages" count vs delivered 49 (low/process, accepted)
+- DEV-20260607-2: DEV_PLAN Stage 49 "spec §4" citation error (low/process, accepted)
+
+**Issues opened / closed / questions raised:**
+
+- Q-49.1..4 raised and resolved (all self-resolving defaults).
+- No new issues opened. No issues closed (all 0/0/8/14 carry forward as v1.1).
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17/17 packages, --force, 0 cached) · Tests ✅ (696/697 unchanged) · pgTAP ✅ (451/451) · axe-core ✅ (31/31) · pnpm audit ⚠ (18 findings, 0 critical, v1.1 track)
+
+**Retrospective notes (v1 build window close):**
+
+- Conditional Go pattern held across all 6 gate points: Phase 1 (Stage 27), Phase 2 (Stage 41), Phase 4 (Stage 47), Stage 48 hardening, Stage 49 launch gate. Consistent application of code-complete vs deployed-env partitioning prevented scope creep at every gate.
+- 10.5-day buffer ends unused — v1 build finished Day 65 of 75. Buffer was never drawn down below +5.5 days banked at any phase close.
+- T-discipline (T1–T5) + push-gate + close-ritual survived from Stage 41 canonisation through Stage 49 close without a single T4 violation over origin/main. Stage 49 uses single audit commit per operator instruction.
+- 49 stages, 21 total deviations (9 resolved), 0 launch-blockers, 0 critical/high open issues at v1 close.
+- DEV_PLAN §5 backlog is clean and prioritised. v1.1 P1 items (RepairEngine, DataSubjectRights, Observability, IdxDB, Dunning) are all documented with origin, estimate, and scope.
+
+**Tomorrow — first thing:**
+
+Launch-window operational verification: k6/session-loop.js (500 VU / 1h) + k6/billing-webhook.js; Playwright 11 specs; validate-content.ts; 24h dead-letter soak; Supabase backup drill; Stripe test-mode E2E; 8 SLA measurements. v1.1 development per DEV_PLAN §5.
+
+---
+
 ## Stage 48 — 2026-06-07 (Day 65, 4-day budget per DEV_PLAN, 1-day actual)
 
 **Planned (from DEV_PLAN.md Stage 48):** Hardening Pass — last-mile fixes before launch. Review DAILY_LOG blockers; run axe-core sweep; k6 soak 500 concurrent 1h; pipeline.dead_letter.count check; scripts/validate-content.ts; .env.example audit; Supabase backup drill; 3 consecutive green commits.

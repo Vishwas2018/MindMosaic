@@ -3,6 +3,34 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260607-2 — DEV_PLAN Stage 49 "spec §4" citation error in launch gate checklist
+
+- Date: 2026-06-07
+- Stage: 49
+- Type: process (documentation imprecision in active stage definition)
+- What the stage said: DEV_PLAN.md line 453: "Launch gate checklist (from spec §4, v1-applicable items only)."
+- What I actually did: Used the launch gate checklist as written. The 6 checklist items are correct and were applied as specified. Noted that the "spec §4" citation is wrong — spec §4 is "Assessment Framework Specifications" (NAPLAN / ICAS / Selective / Singapore / Olympiad pathway framework specs), not a launch readiness document. The checklist items are self-authored in DEV_PLAN, not sourced from spec §4.
+- Why: Pre-existing documentation error in the active stage definition. CLAUDE.md anti-pattern 1 prohibits editing active DEV_PLAN stage definitions. The checklist items themselves are operationally correct; only the citation is wrong. No deliverable is affected.
+- Impact on later stages: None. v1 build window is now closed. The incorrect citation is a historical artifact in DEV_PLAN; it does not affect any v1.1 development.
+- Linked: DEV-20260607-1 (related DEV_PLAN stage-49 documentation discrepancy)
+- Resolved by: Accepted as-is (documentation only; active stage definition immutable per CLAUDE.md anti-pattern 1).
+
+---
+
+### DEV-20260607-1 — DEV_PLAN Stage 49 deliverable says "all 47 stages ✅"; actual delivered count is 49
+
+- Date: 2026-06-07
+- Stage: 49
+- Type: process (documentation imprecision in active stage definition)
+- What the stage said: DEV_PLAN.md line 451: `docs/dev/PROJECT_STATE.md final snapshot — all 47 stages ✅, phase 3/5 + deferred items listed.`
+- What I actually did: PROJECT_STATE.md final snapshot records 49/49 stages closed — the accurate count. Stage 22 was split into 22a + 22b (DEV-20260511-1); Stages 48 and 49 were added to the plan during the planning pass, bringing the total from 47 to 49 numbered stages.
+- Why: DEV_PLAN was authored when the plan had 47 stages. Stages 48 (Hardening Pass) and 49 (Launch Gate Review) were added during planning; the Stage 49 deliverable line was not updated to reflect the new count. CLAUDE.md anti-pattern 1 prohibits editing active DEV_PLAN stage definitions.
+- Impact on later stages: None. v1 build window is closed. PROJECT_STATE.md records the correct count (49/49). The "47" in DEV_PLAN is a historical artifact.
+- Linked: DEV-20260607-2 (related DEV_PLAN stage-49 documentation discrepancy); DEV-20260511-1 (Stage 22 split)
+- Resolved by: Accepted as-is (documentation only; active stage definition immutable per CLAUDE.md anti-pattern 1).
+
+---
+
 ### DEV-20260606-2 — Mid-session pull required at Stage 47 morning ritual (Codespace sync drift)
 
 - Date: 2026-06-06

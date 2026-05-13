@@ -9,6 +9,66 @@
 
 ## Resolved
 
+### Q-49.4 — Tag commit ordering: close commit first, then tag on new HEAD?
+
+- Date raised: 2026-06-07 (Stage 49 morning ritual)
+- Asked of: self (T3 Option 3 — structural decision)
+- Source: Established pattern from v1-phase-1 (Stage 27 close), v1-phase-2-partial (Stage 41 close), v1-phase-4-partial (Stage 47 close)
+- Question: Should v1.0.0 tag be placed on current HEAD (36bd715, Stage 48 close) or on the new Stage 49 close commit?
+- Why ambiguous: DEV_PLAN implies tag is part of Stage 49 deliverables alongside the close commit; order is unspecified.
+- Blocking? no
+- Assumed answer: Close commit first → tag on new HEAD. Consistent with all prior phase tags.
+- Code affected: `git tag -a v1.0.0` + `git push origin v1.0.0`
+- Status: resolved
+- Resolution: **Default applied (2026-06-07).** Stage 49 close commit pushed first; v1.0.0 tag placed on that new HEAD. Tag captures the final documented state including PROJECT_STATE final snapshot and DAILY_LOG final entry. Consistent with v1-phase-1, v1-phase-2-partial, v1-phase-4-partial precedents.
+
+---
+
+### Q-49.3 — DEV_PLAN Stage 49 "spec §4" citation is incorrect
+
+- Date raised: 2026-06-07 (Stage 49 morning ritual T1 pre-read)
+- Asked of: self (T3 Option 3 — documentation decision)
+- Source: `DEV_PLAN.md` line 453: "Launch gate checklist (from spec §4, v1-applicable items only)"
+- Question: Log deviation for the incorrect citation, or note in DAILY_LOG only?
+- Why ambiguous: Spec §4 is Assessment Framework Specifications, not a launch criteria document. The 6 checklist items are correct; only the citation is wrong.
+- Blocking? no
+- Assumed answer: Note in DAILY_LOG; log as DEV-20260607-2. No edit to DEV_PLAN (anti-pattern 1).
+- Code affected: n/a (documentation only)
+- Status: resolved
+- Resolution: **Default applied (2026-06-07).** Noted in DAILY_LOG Stage 49 entry as documentation imprecision. DEV-20260607-2 filed. Checklist items applied as written; citation error has no deliverable impact. CLAUDE.md anti-pattern 1 prohibits editing active stage definitions.
+
+---
+
+### Q-49.2 — Conditional Go verdict with items 2–6 all environment-gated
+
+- Date raised: 2026-06-07 (Stage 49 morning ritual)
+- Asked of: self (T3 Option 3 — structural decision)
+- Source: DEV_PLAN Stage 49 launch gate checklist items 2–6; stage-48-exit-report.md §5
+- Question: Issue Conditional Go with items 2–6 ⏸, or No-Go until deployed-env items cleared?
+- Why ambiguous: DEV_PLAN shows all 6 items as ✅ (pre-checked template); Stage 48 exit report marks items 2–6 as ⏸ REQUIRES-DEPLOYED. Tagging v1.0.0 before running k6/Playwright/backup/Stripe is a meaningful scope boundary.
+- Blocking? no (established precedent from Phase 1/2/4 + Stage 48)
+- Assumed answer: Conditional Go — same pattern as all prior phase/stage gates.
+- Code affected: `docs/dev/stage-49-exit-report.md` §1, §5
+- Status: resolved
+- Resolution: **Default applied (2026-06-07).** Conditional Go issued. v1.0.0 tag placed on Stage 49 close commit as code-complete versioning marker. Items 2–6 documented in stage-49-exit-report §5 and §9 as launch-window prerequisites. The tag is not a production deploy authorization. Consistent with Phase 1 (Stage 27), Phase 2 (Stage 41), Phase 4 (Stage 47), Stage 48 Conditional Go precedents.
+
+---
+
+### Q-49.1 — "all 47 stages ✅" in DEV_PLAN Stage 49 deliverables; actual count is 49
+
+- Date raised: 2026-06-07 (Stage 49 morning ritual T1 pre-read)
+- Asked of: self (T3 Option 3 — documentation decision)
+- Source: `DEV_PLAN.md` line 451: `docs/dev/PROJECT_STATE.md final snapshot — all 47 stages ✅`
+- Question: Write accurate count (49/49) in PROJECT_STATE and note DAILY_LOG discrepancy, or file as deviation?
+- Why ambiguous: CLAUDE.md anti-pattern 1 prohibits editing active stage definitions. DEV_PLAN says 47; reality is 49.
+- Blocking? no
+- Assumed answer: Option A — accurate count in PROJECT_STATE; note in DAILY_LOG; file DEV-20260607-1.
+- Code affected: `docs/dev/PROJECT_STATE.md`
+- Status: resolved
+- Resolution: **Default applied (2026-06-07).** PROJECT_STATE final snapshot records 49/49 stages closed. DAILY_LOG Stage 49 entry notes the DEV_PLAN discrepancy. DEV-20260607-1 filed. CLAUDE.md anti-pattern 1 prohibits editing DEV_PLAN active stage definition text.
+
+---
+
 ### Q-48.6 — pgTAP failures against 0001–0020: fix or defer?
 
 - Date raised: 2026-06-07 (Stage 48 D7 pgTAP run)
