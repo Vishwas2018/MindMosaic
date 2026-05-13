@@ -2,6 +2,50 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## Stage 46 — 2026-06-05 (Day 63, 1-day budget, 1-day actual)
+
+**Planned (from DEV_PLAN.md Stage 46):** Cancellation + Access Preservation — close R3 webhook notification gap and R4 enum gap identified in §2A pre-read.
+
+**Actually delivered:**
+
+- `supabase/migrations/0020_notification_type_access_downgraded.sql` (NEW) — `ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'access_downgraded'`; 3rd ADD VALUE one-way DDL (after 0017 `alert_type`, 0019 `user_role`); deployment.md §Migration 0020 added at prep.
+- `supabase/functions/billing-svc/handlers.ts` (MODIFIED) — `BillingDbClient` interface: second `.eq()` chain added to `select().eq()` return type for two-condition `user_profile` lookup; Step 7 added in `handleStripeWebhook`: after `customer.subscription.deleted` DB update + ffp enqueue, looks up first parent by `tenant_id` + `role='parent'` ORDER BY created_at LIMIT 1; if found enqueues `notification.create` job with `idempotency_key: nfp-${event.id}`; if not found logs structured warning and skips (no webhook failure — ADR-0034 §3). ISSUE-0034 inline marker at lookup site.
+- `supabase/functions/notifications-svc/handlers.ts` (MODIFIED) — `CreateNotificationPayload` + `parseCreatePayload`: added `parent_id?: string`; `createNotification` switch: `access_downgraded` branch routes to `parent_id` as `userId`, `tenant_id` as `aggregateId`; returns 400 if `parent_id` absent.
+- `supabase/functions/notifications-svc/notification-copy.ts` (MODIFIED) — `access_downgraded` case: title "Your subscription has ended", body "Your MindMosaic plan has ended. You're now on the free plan.", link "/billing".
+- `supabase/functions/billing-svc/__tests__/stage46.contract.test.ts` (NEW) — 6 tests: with-parent enqueue both jobs + correct payload; idempotency_key format `nfp-${event.id}`; no-parent ffp-only + warn + 200; is_active=false tier=free regression; R1 cancel_at_period_end=true/false regression.
+- `supabase/functions/billing-svc/__tests__/webhook.contract.test.ts` (MODIFIED) — `buildClient` select chain extended for double-eq; `user_profile` stub added to deleted test.
+- `supabase/functions/notifications-svc/__tests__/contract.test.ts` (MODIFIED) — 2 new tests: `access_downgraded` with `parent_id` → 201 + correct copy; without `parent_id` → 400.
+- `apps/web/playwright/e2e/billing-cancel.spec.ts` (NEW) — `test.skip()`-guarded opt-in E2e spec.
+- Prep commit SHA `229d630`; impl commit SHA `3aace88`.
+
+**Time spent:** 1d (Day 63, on budget)
+
+**Surprises / departures:**
+
+- `event.id` not in scope inside `resolveSubscriptionState` (only `handleStripeWebhook` has it) — notification enqueue placed in Step 7 of `handleStripeWebhook`, not inside the state-machine case. No Q raised; architectural constraint was clear from code structure.
+- Existing `webhook.contract.test.ts` `buildClient` select chain needed double-eq extension to support the new parent lookup — backward-compatible fix applied without changing any test assertions.
+
+**Decisions made (not in stage):**
+
+- none (Q-46.1..3 all pre-resolved at prep; no mid-impl Q raised)
+
+**Deviations logged:**
+
+- none
+
+**Issues opened / closed / questions raised:**
+
+- Q-46.1..3: all resolved at prep (2026-06-05)
+- ISSUE-0034 (low): single-parent fanout in v1; multi-parent fanout deferred to v1.1
+
+**Quality gates at close:**
+
+- Lint ✅ · Typecheck ✅ (17/17 packages, 0 cached --force run) · Tests ✅ (696 passed / 1 skipped — 697 total Vitest) · Build n/a · RLS ✅ (migration 0020 is enum-only; no table changes)
+
+**Tomorrow — first thing:**
+
+Stage 47 — Phase 4 exit review (Day 64). Mirror Stage 41 pattern: OPEN_ISSUES triage, deviation review, v1-phase-4-partial tag candidate, deferred SLAs note. Read phase-2-exit-report.md as template.
+
 ## Stage 45 — 2026-06-04 (Days 61–62, 2-day budget, 2-day actual)
 
 **Planned (from DEV_PLAN.md Stage 45):** Screen 17 billing UI (3-tab Plans/Compare/Billing page); EntitlementsProvider live wiring; format.ts + BILLING_COPY utilities; ≥12 tests.
