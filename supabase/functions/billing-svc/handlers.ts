@@ -34,6 +34,12 @@ export interface BillingDbClient {
     };
     select(cols: string): {
       eq(col: string, val: unknown): {
+        eq(col: string, val: unknown): {
+          maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+          order(col: string, opts: { ascending: boolean }): {
+            limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
+          };
+        };
         maybeSingle(): Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
         order(col: string, opts: { ascending: boolean }): {
           limit(n: number): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }>;
@@ -175,6 +181,33 @@ export async function handleStripeWebhook(
       priority: 'medium',
       idempotency_key: `ffp-${event.id}`,
     }).select('id');
+  }
+
+  // ── Step 7: Enqueue notification.create for access_downgraded (Q-46.3) ────
+  if (event.type === 'customer.subscription.deleted' && tenantId !== null) {
+    // Look up first parent user for access_downgraded notification (Q-46.3).
+    // ISSUE-0034: single-parent fanout only in v1; v1.1 fans out to all parents.
+    const parentResult = await client
+      .from('user_profile')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('role', 'parent')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const parentId = (parentResult.data ?? [])[0]?.['id'] as string | undefined;
+    if (parentId) {
+      await client.from('job_queue').insert({
+        tenant_id: tenantId,
+        job_type: 'notification.create',
+        payload: { notification_type: 'access_downgraded', tenant_id: tenantId, parent_id: parentId },
+        priority: 'medium',
+        idempotency_key: `nfp-${event.id}`,
+      }).select('id');
+    } else {
+      console.warn(JSON.stringify({ level: 'warn', service: 'billing-svc',
+        event: 'access_downgraded_notification_skipped', reason: 'no_parent_user',
+        tenant_id: tenantId, stripe_event_id: event.id }));
+    }
   }
 
   return { status: 200, data: { received: true } };

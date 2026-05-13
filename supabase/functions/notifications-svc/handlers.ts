@@ -107,6 +107,8 @@ interface CreateNotificationPayload {
   // intervention_alert fields
   teacher_id?: string;
   alert_type?: string;
+  // access_downgraded fields
+  parent_id?: string;
 }
 
 function parseCreatePayload(raw: unknown): CreateNotificationPayload {
@@ -124,6 +126,7 @@ function parseCreatePayload(raw: unknown): CreateNotificationPayload {
     session_count: typeof p['session_count'] === 'number' ? p['session_count'] : undefined,
     teacher_id: typeof p['teacher_id'] === 'string' ? p['teacher_id'] : undefined,
     alert_type: typeof p['alert_type'] === 'string' ? p['alert_type'] : undefined,
+    parent_id: typeof p['parent_id'] === 'string' ? p['parent_id'] : undefined,
   };
 }
 
@@ -241,6 +244,10 @@ export async function createNotification(
     if (!payload.student_id) return { data: null, status: 400, error: 'student_id required for intervention_alert' };
     userId = payload.teacher_id;
     aggregateId = payload.student_id; // Q-34.6 self-resolve: student_id UUID as aggregate_id
+  } else if (notification_type === 'access_downgraded') {
+    if (!payload.parent_id) return { data: null, status: 400, error: 'parent_id required for access_downgraded' };
+    userId = payload.parent_id;
+    aggregateId = tenant_id;
   } else {
     return { data: null, status: 400, error: `unsupported notification_type: ${notification_type}` };
   }

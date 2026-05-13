@@ -30,5 +30,12 @@ export function getNotificationCopy(
       link: '/teacher#alerts',
     };
   }
+  if (type === 'access_downgraded') {
+    return {
+      title: 'Your subscription has ended',
+      body: "Your MindMosaic plan has ended. You're now on the free plan.",
+      link: '/billing',
+    };
+  }
   return { title: 'Notification', body: 'You have a new notification.', link: null };
 }

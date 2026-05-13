@@ -531,3 +531,41 @@ describe('e2e chain', () => {
     expect(readResult.data![0]!.type).toBe('assignment_assigned');
   });
 });
+
+// ─── createNotification — Stage 46: access_downgraded ────────────────────────
+
+describe('createNotification — access_downgraded (Stage 46)', () => {
+  const PARENT_ID = 'u0000046-0000-4000-8000-000000000001';
+
+  it('access_downgraded with parent_id → 201, notification row created with correct copy', async () => {
+    const client = buildClient({
+      notification: [
+        { data: [], error: null },                    // dedup SELECT
+        { data: null, error: null },                  // INSERT
+        { data: [{ id: NOTIF_ID }], error: null },   // cap SELECT
+      ],
+    });
+    const body = {
+      notification_type: 'access_downgraded',
+      tenant_id: TENANT_ID,
+      parent_id: PARENT_ID,
+    };
+    const result = await createNotification(body, client);
+    expect(result.status).toBe(201);
+    expect(result.data!.deduped).toBe(false);
+    expect(result.data!.notification!.type).toBe('access_downgraded');
+    expect(result.data!.notification!.title).toBe('Your subscription has ended');
+    expect(result.data!.notification!.link).toBe('/billing');
+  });
+
+  it('access_downgraded without parent_id → 400', async () => {
+    const client = buildClient({});
+    const body = {
+      notification_type: 'access_downgraded',
+      tenant_id: TENANT_ID,
+      // parent_id intentionally omitted
+    };
+    const result = await createNotification(body, client);
+    expect(result.status).toBe(400);
+  });
+});

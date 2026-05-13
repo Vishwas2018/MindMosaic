@@ -97,6 +97,31 @@ function buildClient(
             eq(col: string, val: unknown) {
               eqArgsList.push([col, val]);
               return {
+                eq(col2: string, val2: unknown) {
+                  eqArgsList.push([col2, val2]);
+                  return {
+                    maybeSingle() {
+                      const stub = getStub(table);
+                      calls.push({ table, op: 'select', eqArgs: [...eqArgsList] });
+                      return Promise.resolve({
+                        data: (stub.data ?? null) as Record<string, unknown> | null,
+                        error: (stub.error ?? null) as { message: string } | null,
+                      });
+                    },
+                    order(_col: string, _opts: { ascending: boolean }) {
+                      return {
+                        limit(_n: number) {
+                          const stub = getStub(table);
+                          calls.push({ table, op: 'select', eqArgs: [...eqArgsList] });
+                          return Promise.resolve({
+                            data: (stub.data ?? null) as Array<Record<string, unknown>> | null,
+                            error: (stub.error ?? null) as { message: string } | null,
+                          });
+                        },
+                      };
+                    },
+                  };
+                },
                 maybeSingle() {
                   const stub = getStub(table);
                   calls.push({ table, op: 'select', eqArgs: [...eqArgsList] });
@@ -313,6 +338,7 @@ describe('handleStripeWebhook — event state machine', () => {
       ],
       billing_customer: { data: { tenant_id: TENANT_ID }, error: null },
       subscription: { error: null },
+      user_profile: { data: [], error: null }, // Stage 46: no parent → no notification job
       job_queue: { data: [{ id: JOB_ID }], error: null },
     });
     const result = await handleStripeWebhook(
