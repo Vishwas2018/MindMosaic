@@ -3,6 +3,20 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260514-1 — v1.1 exam-content authoring phase inserted ahead of DEV_PLAN §5.1 P1.1–P1.7 backlog
+
+- Date: 2026-05-14
+- Stage: v1.1-S1
+- Type: scope-expansion (operator-blessed re-prioritization)
+- What the stage said: DEV_PLAN §5.1 lists P1.1 (Skill Graph Migration Worker) as the first v1.1 delivery item, followed by P1.2–P1.7. No exam-content authoring phase appears in the published priority sequence.
+- What I actually did: Operator approved a v1.1 exam-content authoring phase (5 stages: Stage 1 Question Bank Foundation, Stages 2–5 TBD) to ship ahead of P1.1–P1.7. The new phase delivers write-side CRUD on the existing `item` / `item_version` / `stimulus` schema (migration 0002), lifecycle FSM per spec §15.3, and platform_admin + service-role write model (ADR-0035). DEV_PLAN §5.1 updated with an additive entry referencing this deviation; P1.1–P1.7 definitions are untouched per CLAUDE.md anti-pattern 1.
+- Why: Content authoring is a hard dependency for seeding exam content before the learning engine can surface meaningful items to students. The 50-item / 10-misconception launch seed (Stage 49 launch gate item 6, still pending) and any v1.1 RepairEngine content (P1.2) both require an authoring layer to exist first. Operator re-prioritization.
+- Impact on later stages: P1.1–P1.7 delivery sequence is pushed back by the duration of the exam-content phase (~5 stages). No P1.1–P1.7 scope is changed or removed. The exam-content phase adds to the v1.1 backlog rather than replacing anything.
+- Linked: Q-1.1-1.0, ADR-0035, DEV_PLAN §5.1 additive entry
+- Resolved by: ongoing (exam-content phase in progress)
+
+---
+
 ### DEV-20260607-2 — DEV_PLAN Stage 49 "spec §4" citation error in launch gate checklist
 
 - Date: 2026-06-07

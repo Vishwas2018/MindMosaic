@@ -9,6 +9,111 @@
 
 ## Resolved
 
+### Q-1.1-1.6 — Retire mechanism: lifecycle enum vs hard-delete
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: self (T3 Option 3 — resolved by spec)
+- Source: spec §5.2 line 834; migration 0002 `item_lifecycle` enum
+- Question: Does retiring an item mean setting `lifecycle = 'retired'` (soft) or hard-deleting the row?
+- Why ambiguous: "retire" could mean either; hard-delete destroys audit history.
+- Blocking? no
+- Assumed answer: lifecycle enum transition only. `is_active = false` additionally prevents engine selection.
+- Code affected: `supabase/functions/content-svc/` lifecycle transition handler
+- Status: resolved
+- Resolution: **Resolved by spec §5.2 line 834 (2026-05-14).** Lifecycle enum is the retire mechanism. No hard-delete in Stage 1 (or any stage — audit history must be preserved). `PATCH .../lifecycle` sets `lifecycle = 'retired'` and `is_active = false` on the `item` row. Row remains queryable by `platform_admin` and `service-role`. ADR-0035 Decision 6 (implicit).
+
+---
+
+### Q-1.1-1.5 — Tagging: new tag table vs existing columns
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: self (T3 Option 3 — resolved by spec)
+- Source: spec §5.3; migration 0002 `item` table schema
+- Question: Does Stage 1 need a new tag/label table to associate items with skills, exam families, and year levels, or are the existing array columns sufficient?
+- Why ambiguous: some authoring systems use tag tables for flexibility; unclear if array columns support all v1.1 filtering needs.
+- Blocking? no
+- Assumed answer: Existing `skill_ids uuid[]`, `exam_families exam_family[]`, `year_levels int[]` columns on `item` are sufficient. No new table.
+- Code affected: `supabase/functions/content-svc/` create/update handlers; `packages/types/src/content.ts`
+- Status: resolved
+- Resolution: **Resolved by spec §5.3 (2026-05-14).** Migration 0002 lines 166, 170–171 define typed array columns with GIN indexes (`idx_item_skills`, `idx_item_exam`, `idx_item_year`). Spec §5.3 references these exact columns as the tagging mechanism. No new table required in Stage 1. ADR-0035 (implicit — no new schema).
+
+---
+
+### Q-1.1-1.4 — Ownership scope: platform-only vs teacher authoring in Stage 1
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: DEV_PLAN §5.1; spec §15.3; ADR-0035 Decision 2
+- Question: Should Stage 1 include teacher-role write access to items, or restrict to platform_admin + service-role only?
+- Why ambiguous: Teacher authoring is a plausible v1.1 feature; but per-tenant content isolation design has not been specced.
+- Blocking? yes — determines RLS policy shape
+- Assumed answer: Platform-only. Teacher authoring deferred.
+- Code affected: `supabase/migrations/` (new RLS policies); `supabase/functions/content-svc/`
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-14): Platform-only Stage 1.** Teacher authoring deferred to a future stage. Write access restricted to `platform_admin` + `service-role`. Per-tenant content isolation design not required for Stage 1. ADR-0035 Decision 2.
+
+---
+
+### Q-1.1-1.3 — Write model: Pattern G strict vs relaxed
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: migration 0002 RLS patterns; OWNERS.md content-svc entry; ADR-0035
+- Question: Should `item` / `item_version` / `stimulus` writes use Pattern G strict (platform_admin + service-role only) or a relaxed model permitting broader roles?
+- Why ambiguous: Content authoring is a write-heavy flow; restricting to platform_admin may be overly conservative if teachers need to create items.
+- Blocking? yes — determines RLS policy shape
+- Assumed answer: Pattern G strict (consistent with `skill_node`/`skill_edge` RLS in migration 0002).
+- Code affected: RLS policies on `item`, `item_version`, `stimulus`; content-svc JWT handling
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-14): Pattern G strict.** Writes = `platform_admin` + `service-role` only. Consistent with v1 content-table patterns. ADR-0035 Decision 1.
+
+---
+
+### Q-1.1-1.2 — FSM edge set: spec §15.3 verbatim vs extended
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required; spec §15.3 T1 pre-read first)
+- Source: spec §15.3 lines 2195–2210; migration 0001 `item_lifecycle` enum
+- Question: Should the lifecycle transition handler implement exactly the 6 edges from spec §15.3, or include `draft→retired` for convenience?
+- Why ambiguous: `draft→retired` is a natural shortcut for discarding bad drafts; but it is absent from spec §15.3.
+- Blocking? yes — determines transition validation logic
+- Assumed answer: Spec §15.3 verbatim. 6 edges only. `draft→retired` excluded.
+- Code affected: lifecycle transition handler in `supabase/functions/content-svc/`
+- Status: resolved
+- Resolution: **Operator confirmed Path 1 (2026-05-14): spec §15.3 verbatim.** T1 pre-read confirmed 6 edges in spec diagram; `draft→retired` absent. Any request to transition `draft→retired` returns 422 Unprocessable Entity. ADR-0035 Decision 3. Spec citation: §15.3 lines 2202–2208.
+
+---
+
+### Q-1.1-1.1 — Author attribution: new column vs metadata field
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: migration 0002 `item_version` schema (line 197: `metadata jsonb NOT NULL DEFAULT '{}'`)
+- Question: Should author attribution (the UUID of the user who created/updated an item version) be stored as a typed `author_id uuid REFERENCES user_profile(id)` column, or in the existing `metadata jsonb` field as `metadata.author_id`?
+- Why ambiguous: Typed column is queryable and FK-constrained; metadata is schema-free and zero-migration-cost.
+- Blocking? yes — determines whether a new migration is needed in Stage 1
+- Assumed answer: `metadata.author_id` — no migration needed; consistent with Stage 1 "no new schema" premise.
+- Code affected: `item_version` INSERT handler; `packages/types/src/content.ts` (metadata shape)
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-14): `item_version.metadata.author_id`.** No new column or migration in Stage 1. Author UUID stored in `metadata jsonb` at key `author_id`. Typed column deferred until teacher authoring scope clarifies (Q-1.1-1.4). ADR-0035 Decision 4.
+
+---
+
+### Q-1.1-1.0 — Phase ordering: exam-content ahead of DEV_PLAN §5.1 P1.1–P1.7
+
+- Date raised: 2026-05-14 (v1.1-S1 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: DEV_PLAN.md §5.1 P1 backlog; operator instruction 2026-05-14
+- Question: Does inserting an exam-content authoring phase (5 stages) ahead of the P1.1–P1.7 backlog constitute an out-of-order v1.1 delivery that needs explicit architectural approval?
+- Why ambiguous: DEV_PLAN §5.1 priority order is P1.1 first (Skill Graph Migration Worker). Inserting exam-content ahead of it deviates from the published priority sequence.
+- Blocking? yes — determines whether a deviation must be filed before any implementation
+- Assumed answer: Yes, file DEV-20260514-1; additive DEV_PLAN §5.1 entry only. P1.1–P1.7 definitions unchanged.
+- Code affected: `DEV_PLAN.md §5.1` (additive only); `docs/dev/DEVIATIONS.md`
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-14): Accept exam-content as v1.1 re-prioritization.** DEV-20260514-1 filed. DEV_PLAN §5.1 updated with additive entry for exam-content phase (≤30 lines). P1.1–P1.7 definitions untouched per CLAUDE.md anti-pattern 1.
+
+---
+
 ### Q-49.4 — Tag commit ordering: close commit first, then tag on new HEAD?
 
 - Date raised: 2026-06-07 (Stage 49 morning ritual)

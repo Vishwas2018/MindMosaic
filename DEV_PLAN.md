@@ -555,6 +555,19 @@ Priority labels:
 
 ### 5.1 P1 — v1.1 (first 4 weeks post-launch)
 
+**v1.1 Exam-Content Authoring Phase** _(operator-prioritized; 5 stages; DEV-20260514-1)_
+Inserted ahead of P1.1–P1.7 per operator approval 2026-05-14. Rationale: content authoring
+is a hard dependency for the 50-item seed (Stage 49 launch gate item 6) and P1.2 RepairEngine
+content. Delivers write-side CRUD on existing `item` / `item_version` / `stimulus` schema
+(migration 0002); lifecycle FSM per spec §15.3; Pattern G strict writes; platform_admin +
+service-role only in Stage 1; teacher authoring deferred (ADR-0035).
+
+Stage breakdown (branch `v1.1/exam-content`):
+- v1.1-S1: Question Bank Foundation — item + item_version + stimulus CRUD; lifecycle FSM
+- v1.1-S2 through v1.1-S5: TBD (operator will relay prompts per stage)
+
+P1.1–P1.7 definitions below are unchanged.
+
 **P1.1 Skill Graph Migration Worker** _(5 days)_
 Origin: Spec §22.9.2. Why deferred: complex worker (resumability, rollback, multi-table rewrites); not essential while v1 graph is stable. Why P1: blocks any production skill graph republish. Scope: `batch.skill_graph_migration` job consuming `skill_migration_map`; rewrites references in `skill_mastery`, `learning_velocity`, `student_misconception.evidence`, `repair_record.root_cause_skill_id`, `learning_plan.sessions[]`, `plan_override.target`, `assignment.target_skill_ids`; resumable in 10k-row chunks; post-migration verification + rollback; remove G4 code guard.
 
