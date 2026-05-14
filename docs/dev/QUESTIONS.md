@@ -9,6 +9,69 @@
 
 ## Resolved
 
+### Q-1.1-2.4 — Auth: student self-serve vs platform_admin-initiated for composed exam sessions
+
+- Date raised: 2026-05-14 (v1.1-S2 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: assessment-svc createSession handler (lines 220–358); existing feature-flag gate pattern
+- Question: Should students be able to initiate a composed practice exam themselves, or must a platform_admin (or teacher) initiate it on their behalf?
+- Why ambiguous: Composed exams are a new session type; the existing pathway feature-flag gate controls pathway availability but it's unclear whether that gate is sufficient for composed exam sessions or whether a new auth layer is needed.
+- Blocking? yes — determines whether createSession receives a new auth gate or reuses the existing one
+- Assumed answer: Student self-serve via existing pathway feature-flag gate. No new auth layer.
+- Code affected: `supabase/functions/assessment-svc/handlers.ts` (createSession); `packages/types/src/session.ts`
+- Status: resolved
+- Resolution: **Operator confirmed Option A (2026-05-14): student self-serve via existing pathway feature-flag gate.** No new auth layer in Stage 2. Pathway gate already controls which exam families and year levels a student can access. Composer params pass through the same auth flow as any other session creation. ADR-0036 Decision 8.
+
+---
+
+### Q-1.1-2.3 — Item selection algorithm: deterministic-seeded vs pure-deterministic ordering
+
+- Date raised: 2026-05-14 (v1.1-S2 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: ADR-0022 (replay-determinism contract); `packages/engines/src/contracts.ts` AssessmentEngine interface
+- Question: Should item selection within a difficulty band use (A) random uniform with deterministic seeded Fisher-Yates (no Math.random), or (B) pure deterministic ordering by difficulty + item_id (no randomness at all)?
+- Why ambiguous: ADR-0022 replay-determinism contract requires engines to be pure-function namespaces with no Math.random. Option A introduces randomness but seeds it for replay determinism. Option B avoids randomness entirely but produces the same selection every time for the same pathway/band inputs.
+- Blocking? yes — determines the composition algorithm and the seed derivation requirement
+- Assumed answer: Option A (seeded Fisher-Yates). Variety across exam sessions is desirable; seeding satisfies replay determinism.
+- Code affected: `supabase/functions/content-svc/handlers.ts` (selectItems); ADR-0036 (seed source)
+- Status: resolved
+- Resolution: **Operator confirmed Option A (2026-05-14): random uniform within difficulty band, deterministic seeded Fisher-Yates, NO Math.random, seed derived from session_id or idempotency key (exact source documented in ADR-0036).** Satisfies ADR-0022 replay-determinism: same seed → same selection, always. ADR-0036 Decision 5 (seed source stated explicitly in that ADR).
+
+---
+
+### Q-1.1-2.2 — Composer params persistence: ephemeral on CreateSessionRequest vs new config table
+
+- Date raised: 2026-05-14 (v1.1-S2 morning ritual)
+- Asked of: architect (T3 structural decision — round-trip required)
+- Source: `packages/types/src/session.ts` CreateSessionRequestSchema (lines 17–24); assessment-svc createSession (lines 267–280 session_record insert)
+- Question: Should the practice exam composition parameters (item_count, difficulty_distribution, time_limit_ms) be (1) ephemeral optional fields on CreateSessionRequest — validated, used to drive selection and engine init, not persisted as a separate config — or (2) persisted as a new `exam_config` table row referenced by the session?
+- Why ambiguous: Persisting creates a reusable config record; but it requires a new table (migration) and adds foreign-key complexity. Ephemeral is zero-migration but analytics must reconstruct intent from session state.
+- Blocking? yes — determines whether a migration is required in Stage 2
+- Assumed answer: Option 1 — ephemeral. Composer params are session-init inputs, not reusable templates. They flow through createSession → selectItems → engine.initialise and are preserved in engine_state_snapshot for analytics.
+- Code affected: `packages/types/src/session.ts` (CreateSessionRequestSchema); `supabase/functions/assessment-svc/handlers.ts` (createSession); `supabase/functions/content-svc/handlers.ts` (selectItems / ContentSelectRequest)
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-14): ephemeral composer_params on CreateSessionRequest.** No new config table. No migration in Stage 2. Params validated by Zod at the CreateSessionRequest boundary; used to drive selectItems and engine init; preserved in session record (field confirmed at impl T1 pre-read per ADR-0036 analytics contract). ADR-0036 Decision 3.
+
+---
+
+### Q-1.1-2.1 — §N trap: session_mode='practice' vs mode='exam' for composed mock exam
+
+- Date raised: 2026-05-14 (v1.1-S2 morning ritual — T1 pre-read finding)
+- Asked of: architect (T3 structural decision — round-trip required; blocking §N trap)
+- Source: spec §18 lines 2619–2624 (Session Modes table); migration 0001 lines 62–67 (engine_type + session_mode enums)
+- Question: The v1.1-phase-plan.md names S2 a "Practice Exam Composer" producing a "practice exam". Spec §18 defines session_mode='practice' = SkillEngine (targeted skill improvement, mastery delta, no score, immediate feedback). A scored/timed/fixed-sequence composed mock exam is categorically different. Which mode and engine_type should a composed practice exam use?
+  - Option 1: mode='exam' + engine_type='linear'. No new enum value; no migration. Spec-correct.
+  - Option 2: new session_mode value e.g. 'composed_exam'. New enum value; requires migration 0022.
+  - Option 3: mode='practice' per plan wording despite spec §18. Contradicts spec — rejected.
+- Why ambiguous: Plan uses informal "practice exam" language; spec uses 'practice' for a fundamentally different concept (SkillEngine, unscored). §N trap caught at T1 pre-read.
+- Blocking? yes — determines mode enum value, engine_type, and whether a migration is required
+- Assumed answer: Option 1 (mode='exam' + engine_type='linear'). Both values exist in migration 0001. Zero migration.
+- Code affected: `packages/types/src/session.ts` (CreateSessionRequestSchema composer_params validation); `supabase/functions/assessment-svc/handlers.ts` (createSession mode handling); ADR-0036
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-14): mode='exam' + engine_type='linear'.** session_mode='practice' must NOT be used for composed exams — it is reserved for SkillEngine targeted practice (spec §18 verbatim). No new enum value; no migration. v1.1-phase-plan.md "practice exam" language is informal; canonical implementation uses mode='exam'. ADR-0036 Decision 1.
+
+---
+
 ### Q-1.1-1.9 — GET /content/items/{id}/versions access: platform_admin only or all authenticated?
 
 - Date raised: 2026-05-14 (v1.1-S1 impl)
