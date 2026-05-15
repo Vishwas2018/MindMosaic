@@ -274,27 +274,68 @@ export async function getItem(
 
 // ─── /content/select ─────────────────────────────────────────────────────────
 
+export interface ComposerSelectParams {
+  item_count: number;
+  difficulty_distribution: { easy: number; mid: number; hard: number };
+  /** Stable shuffle seed (session_id per ADR-0036 §Decision 4). */
+  seed: string;
+}
+
 export interface ContentSelectRequest {
   blueprint_id?: string;
   pathway_id: string;
   exclude_recently_seen?: string[];
   target_difficulty_band?: 'easy' | 'mid' | 'hard';
+  /** v1.1-S2 (ADR-0036): when present, the distribution-driven composer branch
+   *  fires before adaptive/blueprint routing. */
+  composer?: ComposerSelectParams;
 }
 
 export async function selectItems(
   client: DbClient,
   req: ContentSelectRequest,
 ): Promise<HandlerResult<EngineItem[]>> {
-  // Resolve pathway + framework_config
+  // Resolve pathway + framework_config. exam_families + year_levels added for
+  // the v1.1-S2 composer branch (pathway-scoped filter); existing branches
+  // ignore the extra columns.
   const pathwayResult = await (client.from('pathway').select(
-    'id, slug, engine_type, framework_config_id',
+    'id, slug, engine_type, framework_config_id, exam_family, year_levels',
   ).eq('id', req.pathway_id) as unknown as { maybeSingle: () => Promise<{
-    data: { id: string; slug: string; engine_type: string; framework_config_id: string } | null;
+    data: {
+      id: string;
+      slug: string;
+      engine_type: string;
+      framework_config_id: string;
+      exam_family: string;
+      year_levels: number[];
+    } | null;
     error: { message: string } | null;
   }> }).maybeSingle();
   if (pathwayResult.error !== null) return err(500, 'INTERNAL_ERROR', pathwayResult.error.message);
   if (pathwayResult.data === null) return err(404, 'NOT_FOUND', `Pathway '${req.pathway_id}' not found`);
   const pathway = pathwayResult.data;
+
+  // v1.1-S2 (ADR-0036 §Decision 1+2+5): composer branch fires before adaptive/
+  // blueprint routing. The composer ignores adaptive_rules and blueprint
+  // sections; it draws items from the pathway-scoped active bank using
+  // difficulty bands resolved from framework_config (or defaults).
+  if (req.composer !== undefined) {
+    const fcBandsResult = await (client.from('framework_config').select(
+      'id, difficulty_bands',
+    ).eq('id', pathway.framework_config_id) as unknown as { maybeSingle: () => Promise<{
+      data: { id: string; difficulty_bands: Partial<DifficultyBands> | null } | null;
+      error: { message: string } | null;
+    }> }).maybeSingle();
+    if (fcBandsResult.error !== null) return err(500, 'INTERNAL_ERROR', fcBandsResult.error.message);
+    const bands = mergeDifficultyBands(fcBandsResult.data?.difficulty_bands ?? null);
+    return await selectByComposer(
+      client,
+      { exam_family: pathway.exam_family, year_levels: pathway.year_levels },
+      bands,
+      req.composer,
+      req.exclude_recently_seen ?? [],
+    );
+  }
 
   const fcResult = await (client.from('framework_config').select(
     'id, adaptive_rules, difficulty_bands, blueprint',
@@ -484,6 +525,84 @@ async function selectFromBlueprint(
       for (const row of filtered) out.push(toEngineItem(row, {}));
     }
   }
+  return ok(out);
+}
+
+// ─── v1.1-S2 composer branch (ADR-0036 §Decision 5/7) ───────────────────────
+//
+// Pathway-scoped, distribution-driven selection. For each non-empty difficulty
+// band: filter active items by pathway exam_family + year_levels + difficulty
+// range, exclude recently seen, seeded-shuffle, slice to the requested count.
+// 422 INSUFFICIENT_ITEMS when a band has fewer candidates than requested
+// (ADR-0036 §Decision 7 — no best-effort fill).
+//
+// Output ordering: easy → mid → hard concatenation. Within each band the
+// ordering is the seeded Fisher-Yates permutation. Same `seed` (= session_id
+// per ADR-0036 §Decision 4) always yields the same final sequence (replay
+// determinism per ADR-0022).
+//
+// Per-band sub-seed = `${seed}:${band}` so the three band shuffles are
+// statistically independent yet still deterministic from the master seed.
+
+import { seededShuffle } from '../_shared/seeded-shuffle.ts';
+
+async function selectByComposer(
+  client: DbClient,
+  pathwayScope: { exam_family: string; year_levels: number[] },
+  bands: DifficultyBands,
+  composer: ComposerSelectParams,
+  excludeIds: string[],
+): Promise<HandlerResult<EngineItem[]>> {
+  const exclude = new Set(excludeIds);
+  const out: EngineItem[] = [];
+
+  for (const band of ['easy', 'mid', 'hard'] as const) {
+    const targetCount = composer.difficulty_distribution[band];
+    if (targetCount === 0) continue;
+    const [low, high] = bands[band];
+
+    const candidatesResult = await (client.from('v_item_current').select(
+      'id, current_version, stem, response_type, response_config, skill_ids, difficulty, discrimination',
+    ) as unknown as DbBuilder)
+      .gte('difficulty', low)
+      .lte('difficulty', high)
+      .eq('is_active', true)
+      .contains('exam_families', [pathwayScope.exam_family])
+      .overlaps('year_levels', pathwayScope.year_levels);
+
+    const candidatesErr = (candidatesResult as unknown as { error: { message: string } | null }).error;
+    const candidatesData = (candidatesResult as unknown as {
+      data: Array<{
+        id: string;
+        current_version: number;
+        stem: Record<string, unknown>;
+        response_type: string;
+        response_config: Record<string, unknown>;
+        skill_ids: string[];
+        difficulty: number;
+        discrimination: number | null;
+      }> | null;
+    }).data;
+    if (candidatesErr !== null) return err(500, 'INTERNAL_ERROR', candidatesErr.message);
+
+    const candidates = (candidatesData ?? []).filter(row => !exclude.has(row.id));
+    if (candidates.length < targetCount) {
+      return err(
+        422,
+        'INSUFFICIENT_ITEMS',
+        `Difficulty band '${band}' has ${candidates.length} candidate item(s); ${targetCount} required`,
+      );
+    }
+
+    // Deterministic sort first (lex by id) so the input to the shuffle is
+    // independent of DB row order — replay safety. Then seeded-shuffle.
+    const sorted = candidates.slice().sort((a, b) => a.id.localeCompare(b.id));
+    const shuffled = seededShuffle(sorted, `${composer.seed}:${band}`);
+    for (const row of shuffled.slice(0, targetCount)) {
+      out.push(toEngineItem(row, {}));
+    }
+  }
+
   return ok(out);
 }
 

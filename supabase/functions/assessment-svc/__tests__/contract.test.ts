@@ -985,3 +985,207 @@ describe('_shared/idempotency — withIdempotency', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// createSession — composer_params wiring (v1.1-S2 / ADR-0036)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('assessment-svc — createSession composer_params wiring (v1.1-S2)', () => {
+  const COMPOSER_PARAMS = {
+    item_count: 3,
+    difficulty_distribution: { easy: 3, mid: 0, hard: 0 },
+    time_limit_ms: 1_800_000,
+  };
+
+  function spyFetcher(): {
+    fetcher: ContentSelectFetcher;
+    lastInput: () => Parameters<ContentSelectFetcher>[0] | null;
+  } {
+    let captured: Parameters<ContentSelectFetcher>[0] | null = null;
+    const fetcher: ContentSelectFetcher = async (input) => {
+      captured = input;
+      return { ok: true, data: [buildItem(1), buildItem(2), buildItem(3)] };
+    };
+    return { fetcher, lastInput: () => captured };
+  }
+
+  it('forwards composer_params to fetchContentSelect with seed = session_id', async () => {
+    const db = client({
+      pathway: { data: buildPathwayRow(), error: null },
+      feature_flag: {
+        data: [{ feature_key: 'icas_math_y5', tenant_id: TENANT_ID, enabled: true }],
+        error: null,
+      },
+      framework_config: { data: buildFrameworkConfigRow(), error: null },
+      session_record: { data: null, error: null },
+    });
+    const { fetcher, lastInput } = spyFetcher();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+        composer_params: COMPOSER_PARAMS,
+      },
+      fetchContentSelect: fetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    const inp = lastInput();
+    expect(inp).not.toBeNull();
+    expect(inp!.composer).toBeDefined();
+    expect(inp!.composer!.item_count).toBe(3);
+    expect(inp!.composer!.difficulty_distribution).toEqual({ easy: 3, mid: 0, hard: 0 });
+    // Seed is the freshly-generated session_id (first eff.uuid() call → 'uuid-...001').
+    expect(inp!.composer!.seed).toMatch(/^uuid-/);
+  });
+
+  it('persists composer_params into engine_state_snapshot (analytics marker per ADR-0036)', async () => {
+    // Capture the update payload that flips status='created' → 'active'; that
+    // update carries the full initialState as engine_state_snapshot. We hand-
+    // roll the DbClient here because createMockSupabase's proxy intercepts
+    // property reads at the Proxy.get level (overrides on the returned object
+    // are bypassed), so the standard spy pattern can't capture chained
+    // .update(patch).eq(...) payloads.
+    let capturedSnapshot: Record<string, unknown> | null = null;
+
+    function chainable(stub: { data: unknown; error: { message: string; code?: string } | null }): unknown {
+      const b: Record<string, unknown> = {};
+      b['select'] = () => b;
+      b['eq'] = () => b;
+      b['in'] = () => b;
+      b['or'] = () => b;
+      b['order'] = () => b;
+      b['limit'] = () => b;
+      b['range'] = () => b;
+      b['maybeSingle'] = () => Promise.resolve(stub);
+      b['single'] = () => Promise.resolve(stub);
+      b['then'] = (resolve: (v: typeof stub) => unknown) => resolve(stub);
+      return b;
+    }
+
+    const pathwayRow = buildPathwayRow();
+    const fcRow = buildFrameworkConfigRow();
+    const featureFlagRow = [{ feature_key: 'icas_math_y5', tenant_id: TENANT_ID, enabled: true }];
+
+    const db: DbClient = {
+      from(table: string) {
+        if (table === 'pathway')          return chainable({ data: pathwayRow,     error: null }) as never;
+        if (table === 'feature_flag')     return chainable({ data: featureFlagRow, error: null }) as never;
+        if (table === 'framework_config') return chainable({ data: fcRow,          error: null }) as never;
+        if (table === 'session_record') {
+          const tail = {
+            eq: () => Promise.resolve({ error: null, data: null }),
+          };
+          const sessionBuilder: Record<string, unknown> = {
+            insert: () => Promise.resolve({ error: null, data: null }),
+            update: (patch: Record<string, unknown>) => {
+              if (patch['engine_state_snapshot'] !== undefined) {
+                capturedSnapshot = patch['engine_state_snapshot'] as Record<string, unknown>;
+              }
+              return tail;
+            },
+            delete: () => ({ eq: () => Promise.resolve({ error: null, data: null }) }),
+          };
+          return sessionBuilder as never;
+        }
+        throw new Error(`unexpected table '${table}'`);
+      },
+      rpc: async () => ({ data: null, error: null }),
+    };
+
+    const { fetcher } = spyFetcher();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+        composer_params: COMPOSER_PARAMS,
+      },
+      fetchContentSelect: fetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    expect(capturedSnapshot).not.toBeNull();
+    expect(capturedSnapshot!['engine_type']).toBe('linear');
+    // Analytics contract: mode='exam' + engine_state_snapshot.composer_params present.
+    expect(capturedSnapshot!['composer_params']).toEqual(COMPOSER_PARAMS);
+  });
+
+  it('uses composer.time_limit_ms in the response (overrides framework_config.time_limit_ms when composer present)', async () => {
+    const db = client({
+      pathway: { data: buildPathwayRow(), error: null },
+      feature_flag: {
+        data: [{ feature_key: 'icas_math_y5', tenant_id: TENANT_ID, enabled: true }],
+        error: null,
+      },
+      framework_config: { data: buildFrameworkConfigRow(), error: null }, // time_limit_ms: null
+      session_record: { data: null, error: null },
+    });
+    const { fetcher } = spyFetcher();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+        composer_params: COMPOSER_PARAMS,
+      },
+      fetchContentSelect: fetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.time_limit_ms).toBe(COMPOSER_PARAMS.time_limit_ms);
+    }
+  });
+
+  it('regression: createSession WITHOUT composer_params does not include composer in fetcher input', async () => {
+    const db = client({
+      pathway: { data: buildPathwayRow(), error: null },
+      feature_flag: {
+        data: [{ feature_key: 'icas_math_y5', tenant_id: TENANT_ID, enabled: true }],
+        error: null,
+      },
+      framework_config: { data: buildFrameworkConfigRow(), error: null },
+      session_record: { data: null, error: null },
+    });
+    const { fetcher, lastInput } = spyFetcher();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'practice' as never,
+        target_skills: null,
+      },
+      fetchContentSelect: fetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    const inp = lastInput();
+    expect(inp).not.toBeNull();
+    expect(inp!.composer).toBeUndefined();
+  });
+});

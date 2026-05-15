@@ -44,6 +44,7 @@ import {
 } from '@mm/types';
 import { ItemDTOSchema, type ItemDTO } from '@mm/types';
 import { MasteryBandSchema, type MasteryBand } from '@mm/types';
+import { PracticeExamComposerParamsSchema } from '@mm/types';
 
 // ─── Engine type discriminator ───────────────────────────────────────────────
 // Mirrors DB enum `engine_type` from supabase/migrations/0001_enums_tenancy_auth.sql:62.
@@ -223,6 +224,11 @@ export const LinearEngineStateSchema = z.object({
   started_at: z.string().datetime(),
   time_limit_ms: z.number().int().positive().nullable(),
   total_items: z.number().int().nonnegative(),
+  // v1.1-S2 (ADR-0036 §Decision 3, Q-1.1-2.5): analytics marker for student-
+  // composed practice exams. Optional so existing sessions remain valid; field
+  // is preserved across respondToSession's parse → RPC re-write round-trip
+  // because it is declared here rather than relying on Zod strip behaviour.
+  composer_params: PracticeExamComposerParamsSchema.optional(),
 });
 export type LinearEngineState = z.infer<typeof LinearEngineStateSchema>;
 

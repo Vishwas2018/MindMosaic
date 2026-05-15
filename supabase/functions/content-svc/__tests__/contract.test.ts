@@ -1059,3 +1059,294 @@ describe('content-svc — PATCH /content/stimuli/{id} (updateStimulus)', () => {
     expect(result.code).toBe('NOT_FOUND');
   });
 });
+
+// ─── _shared/seeded-shuffle — v1.1-S2 (ADR-0036 §Decision 5) ─────────────────
+// Unit tests for the deterministic Fisher-Yates helper. The replay-determinism
+// contract (ADR-0022) requires same seed → same permutation across runs.
+
+import { seededShuffle, hashSeed } from '../../_shared/seeded-shuffle.ts';
+
+describe('_shared/seeded-shuffle — deterministic Fisher-Yates', () => {
+  it('same seed → same permutation across runs (replay determinism)', () => {
+    const input = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const a = seededShuffle(input, 'session-uuid-abc');
+    const b = seededShuffle(input, 'session-uuid-abc');
+    expect(a).toEqual(b);
+  });
+
+  it('different seed → different permutations (probabilistic but stable for these seeds)', () => {
+    const input = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+    const a = seededShuffle(input, 'seed-one');
+    const b = seededShuffle(input, 'seed-two');
+    expect(a).not.toEqual(b);
+  });
+
+  it('does not mutate the input array', () => {
+    const input = [1, 2, 3, 4, 5];
+    const snapshot = input.slice();
+    seededShuffle(input, 'seed-x');
+    expect(input).toEqual(snapshot);
+  });
+
+  it('empty + single-element arrays pass through unchanged', () => {
+    expect(seededShuffle([], 'seed-x')).toEqual([]);
+    expect(seededShuffle(['only'], 'seed-x')).toEqual(['only']);
+  });
+
+  it('output length equals input length; all original elements present', () => {
+    const input = Array.from({ length: 20 }, (_, i) => i);
+    const shuffled = seededShuffle(input, 'session-perm-check');
+    expect(shuffled).toHaveLength(input.length);
+    expect(shuffled.slice().sort((a, b) => a - b)).toEqual(input);
+  });
+
+  it('hashSeed: identical strings → identical hashes; differing strings → differing hashes', () => {
+    expect(hashSeed('abc')).toBe(hashSeed('abc'));
+    expect(hashSeed('abc')).not.toBe(hashSeed('abd'));
+    // Empty seed must still produce a valid (non-zero) hash — FNV offset basis.
+    expect(hashSeed('')).toBe(0x811c9dc5);
+  });
+});
+
+// ─── /content/select — composer branch (v1.1-S2 / ADR-0036) ──────────────────
+
+describe('content-svc — POST /content/select (composer branch, v1.1-S2)', () => {
+  // 30-item bank within the easy band, all matching the pathway scope; the
+  // composer should shuffle + slice 10 of them, leaving room for a second
+  // call to pick a different sample under a different seed.
+  function makeEasyBank(count: number): Array<{
+    id: string;
+    current_version: number;
+    stem: Record<string, unknown>;
+    response_type: string;
+    response_config: Record<string, unknown>;
+    skill_ids: string[];
+    difficulty: number;
+    discrimination: number | null;
+  }> {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `easy-item-${i.toString().padStart(3, '0')}`,
+      current_version: 1,
+      stem: { kind: 'plain_text', value: `Easy Q${i}` },
+      response_type: 'multiple_choice',
+      response_config: {},
+      skill_ids: ['sk-1'],
+      difficulty: 0.1,
+      discrimination: null,
+    }));
+  }
+
+  const pathwayStub = {
+    id: 'p-icas',
+    slug: 'icas-math-y5',
+    engine_type: 'linear',
+    framework_config_id: 'fc-icas',
+    exam_family: 'icas',
+    year_levels: [5],
+  };
+
+  const fcStub = {
+    id: 'fc-icas',
+    difficulty_bands: { easy: [0, 0.35], mid: [0.35, 0.7], hard: [0.7, 1.0] },
+  };
+
+  it('assembles exam of item_count items when all bands sufficient', async () => {
+    const easyBank = makeEasyBank(20);
+    const midBank = Array.from({ length: 10 }, (_, i) => ({
+      id: `mid-item-${i.toString().padStart(3, '0')}`,
+      current_version: 1,
+      stem: { value: `Mid Q${i}` },
+      response_type: 'mc',
+      response_config: {},
+      skill_ids: ['sk-1'],
+      difficulty: 0.5,
+      discrimination: null,
+    }));
+    const hardBank = Array.from({ length: 5 }, (_, i) => ({
+      id: `hard-item-${i.toString().padStart(3, '0')}`,
+      current_version: 1,
+      stem: { value: `Hard Q${i}` },
+      response_type: 'mc',
+      response_config: {},
+      skill_ids: ['sk-1'],
+      difficulty: 0.9,
+      discrimination: null,
+    }));
+    const client = mockClient({
+      pathway: { data: pathwayStub, error: null },
+      framework_config: { data: fcStub, error: null },
+      v_item_current: [
+        { data: easyBank, error: null },  // easy band call
+        { data: midBank, error: null },   // mid band call
+        { data: hardBank, error: null },  // hard band call
+      ],
+    });
+    const result = await selectItems(client, {
+      pathway_id: 'p-icas',
+      composer: {
+        item_count: 15,
+        difficulty_distribution: { easy: 5, mid: 7, hard: 3 },
+        seed: 'session-abc',
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data).toHaveLength(15);
+    // First 5 are from the easy bank, next 7 mid, last 3 hard (output ordering).
+    expect(result.data.slice(0, 5).every(i => i.item_id.startsWith('easy-'))).toBe(true);
+    expect(result.data.slice(5, 12).every(i => i.item_id.startsWith('mid-'))).toBe(true);
+    expect(result.data.slice(12, 15).every(i => i.item_id.startsWith('hard-'))).toBe(true);
+  });
+
+  it('returns 422 INSUFFICIENT_ITEMS when a band has fewer candidates than requested', async () => {
+    const client = mockClient({
+      pathway: { data: pathwayStub, error: null },
+      framework_config: { data: fcStub, error: null },
+      // Easy band has only 2 items but composer requests 5.
+      v_item_current: { data: makeEasyBank(2), error: null },
+    });
+    const result = await selectItems(client, {
+      pathway_id: 'p-icas',
+      composer: {
+        item_count: 5,
+        difficulty_distribution: { easy: 5, mid: 0, hard: 0 },
+        seed: 'session-abc',
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected error');
+    expect(result.status).toBe(422);
+    expect(result.code).toBe('INSUFFICIENT_ITEMS');
+    expect(result.message).toMatch(/easy.*2.*candidate.*5 required/i);
+  });
+
+  it('deterministic across runs: same seed → identical item order (replay safety)', async () => {
+    const bank = makeEasyBank(30);
+    function run() {
+      const client = mockClient({
+        pathway: { data: pathwayStub, error: null },
+        framework_config: { data: fcStub, error: null },
+        v_item_current: { data: bank, error: null },
+      });
+      return selectItems(client, {
+        pathway_id: 'p-icas',
+        composer: {
+          item_count: 10,
+          difficulty_distribution: { easy: 10, mid: 0, hard: 0 },
+          seed: 'stable-session-uuid',
+        },
+      });
+    }
+    const a = await run();
+    const b = await run();
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) throw new Error('expected ok');
+    expect(a.data.map(i => i.item_id)).toEqual(b.data.map(i => i.item_id));
+  });
+
+  it('different seeds → different selection order from the same bank', async () => {
+    const bank = makeEasyBank(30);
+    function run(seed: string) {
+      const client = mockClient({
+        pathway: { data: pathwayStub, error: null },
+        framework_config: { data: fcStub, error: null },
+        v_item_current: { data: bank, error: null },
+      });
+      return selectItems(client, {
+        pathway_id: 'p-icas',
+        composer: {
+          item_count: 10,
+          difficulty_distribution: { easy: 10, mid: 0, hard: 0 },
+          seed,
+        },
+      });
+    }
+    const a = await run('seed-one');
+    const b = await run('seed-two');
+    if (!a.ok || !b.ok) throw new Error('expected ok');
+    expect(a.data.map(i => i.item_id)).not.toEqual(b.data.map(i => i.item_id));
+  });
+
+  it('composer branch bypasses adaptive/blueprint routing entirely (no blueprint table query)', async () => {
+    // Provide pathway with engine_type='adaptive' to prove composer takes precedence.
+    const adaptivePathway = { ...pathwayStub, engine_type: 'adaptive' };
+    const client = mockClient({
+      pathway: { data: adaptivePathway, error: null },
+      framework_config: { data: fcStub, error: null },
+      v_item_current: { data: makeEasyBank(10), error: null },
+    });
+    const result = await selectItems(client, {
+      pathway_id: 'p-icas',
+      composer: {
+        item_count: 5,
+        difficulty_distribution: { easy: 5, mid: 0, hard: 0 },
+        seed: 'session-abc',
+      },
+    });
+    expect(result.ok).toBe(true);
+    // Verify the composer skipped the adaptive testlet path: no `blueprint` or
+    // `skill_node` table lookups happened. (If composer had fallen through to
+    // selectAdaptiveItems, it would have errored on missing adaptive_rules,
+    // since fcStub omits them.)
+    const calls = (client as ReturnType<typeof mockClient>).callCounts();
+    expect(calls['blueprint']).toBeUndefined();
+    expect(calls['skill_node']).toBeUndefined();
+  });
+
+  it('regression: existing blueprint-driven branch still works when composer is absent', async () => {
+    // Re-asserts the legacy linear path is unchanged. Mirrors the existing
+    // "linear pathway: returns blueprint-compliant EngineItem[]" test above
+    // but with the new pathway SELECT (which now also returns exam_family +
+    // year_levels — additive, ignored by the blueprint branch).
+    const client = mockClient({
+      pathway: {
+        data: {
+          id: 'p-icas',
+          slug: 'icas-math-y5',
+          engine_type: 'linear',
+          framework_config_id: 'fc-icas',
+          exam_family: 'icas',
+          year_levels: [5],
+        },
+        error: null,
+      },
+      framework_config: {
+        data: {
+          id: 'fc-icas',
+          adaptive_rules: null,
+          difficulty_bands: { easy: [0, 0.35], mid: [0.35, 0.7], hard: [0.7, 1.0] },
+          blueprint: null,
+        },
+        error: null,
+      },
+      blueprint: {
+        data: {
+          sections: [
+            {
+              name: 'Number',
+              target_items: 1,
+              skill_slugs: ['place-value'],
+              difficulty_split: { easy: 1.0, mid: 0, hard: 0 },
+            },
+          ],
+        },
+        error: null,
+      },
+      skill_node: { data: [{ id: 'sk-pv', slug: 'place-value' }], error: null },
+      v_item_current: {
+        data: [
+          { id: 'item-x', current_version: 1, stem: {}, response_type: 'mc', response_config: {}, skill_ids: ['sk-pv'], difficulty: 0.1, discrimination: null },
+        ],
+        error: null,
+      },
+    });
+    const result = await selectItems(client, {
+      pathway_id: 'p-icas',
+      blueprint_id: 'bp-icas',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.item_id).toBe('item-x');
+  });
+});

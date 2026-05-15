@@ -1,7 +1,7 @@
 # ADR-0036 — Practice Exam Composition Model (v1.1-S2)
 
-- Status: proposed
-- Date: 2026-05-14
+- Status: accepted
+- Date: 2026-05-14 (proposed) · 2026-05-15 (accepted at v1.1-S2 impl close)
 - Stage: v1.1-S2
 - Tags: backend | data | dx
 
@@ -85,11 +85,15 @@ B. **Platform_admin initiates on student behalf** — requires new delegation fl
    for composed exams (spec §18 §N trap — see Context above).
 2. **Ephemeral `composer_params`** on `CreateSessionRequest`. No new table.
 3. **Analytics contract**: a session is a student-composed practice exam when
-   `mode='exam'` AND `engine_state_snapshot` contains a `composer_params` key at the top
-   level of the linear-engine state object. Field path:
-   `engine_state_snapshot.composer_params` (confirm exact column type at impl T1 pre-read;
-   fallback candidate: session metadata jsonb if engine_state_snapshot schema prohibits
-   arbitrary keys).
+   `mode='exam'` AND `engine_state_snapshot->'composer_params' IS NOT NULL`. The
+   `composer_params` field is added as an **optional top-level field on
+   `LinearEngineStateSchema`** (`packages/engines/src/contracts.ts`). This makes the
+   round-trip safe: assessment-svc `respondToSession` parses `engine_state_snapshot`
+   via `EngineStateSchema.safeParse` and writes the resulting state back via the
+   atomic RPC; Zod's default `.object()` strips unknown keys, so without the schema
+   extension the marker would be silently dropped on first response submission.
+   Resolved Q-1.1-2.5 (impl T1 pre-read 2026-05-15). Zero migrations: extends the
+   Zod schema only; the jsonb column already accepts the field.
 4. **Seed source: `session_id`** (UUID). Available at selection call time; stable; replay-safe.
 5. **Random uniform, deterministic seeded Fisher-Yates** (Decision A). No `Math.random`.
    Same `session_id` → same item list always.
@@ -111,7 +115,10 @@ requirement. Zero-migration is the right call (consistent with ADR-0035 §Zero n
 **Analytics contract (Decision 3):** `engine_state_snapshot` is the existing per-session engine
 context store; persisting composer_params there avoids a new column and keeps engine context
 co-located. The `is_composed` column (Option 2) is speculative schema for a feature not yet
-deployed to users — rejected per CLAUDE.md "no hypothetical future requirements."
+deployed to users — rejected per CLAUDE.md "no hypothetical future requirements." The
+schema-extension path (extending LinearEngineStateSchema rather than relying on jsonb's
+key-permissiveness) was resolved at impl T1 pre-read after R4 confirmed Zod's strip behaviour
+would otherwise drop the marker on the first respondToSession round-trip — see Q-1.1-2.5.
 
 **seed = session_id (Decision 4):** The session row is inserted before `selectItems` is called
 (assessment-svc createSession lines 267–280 → 291–293). `session_id` is the natural, stable
@@ -157,18 +164,16 @@ Validation: all bounds enforced by Zod refinements on `ComposerParamsSchema`.
   "just give me 30 mixed items" convenience shorthand is not provided in Stage 2.
 - Follow-ups: When teacher authoring ships, consider a saved `exam_template` record so teachers
   can publish reusable exam configs. That is not Stage 2 scope.
-- Follow-up (Decision 3): Confirm `engine_state_snapshot` column type + top-level key support
-  at impl T1 pre-read. If schema prohibits arbitrary top-level keys, store in session metadata
-  jsonb instead and update this ADR.
 
 ## Implementation notes
 
 Files:
-- `packages/types/src/session.ts` — add `ComposerParamsSchema` + update `CreateSessionRequestSchema`
-- `supabase/functions/assessment-svc/handlers.ts` — extend `createSession` (composer_params → selectItems + engine init)
-- `supabase/functions/content-svc/handlers.ts` — extend `ContentSelectRequest` + `selectItems` (difficulty_distribution, item_count, seeded Fisher-Yates)
-- `packages/sdk/src/hooks/session.ts` — no change expected (CreateSessionRequest passthrough)
-- `packages/types/src/content.ts` — extend `ContentSelectRequestSchema`
+- `packages/types/src/session.ts` — add `PracticeExamComposerParamsSchema` + extend `CreateSessionRequestSchema`
+- `packages/engines/src/contracts.ts` — extend `LinearEngineStateSchema` with optional `composer_params` field (Q-1.1-2.5 resolution)
+- `supabase/functions/assessment-svc/handlers.ts` — extend `createSession` (composer_params → fetchContentSelect; marker carried into initialState)
+- `supabase/functions/content-svc/handlers.ts` — extend `ContentSelectRequest` + `selectItems` (item_count, difficulty_distribution, seeded Fisher-Yates branch)
+- `supabase/functions/_shared/seeded-shuffle.ts` — new deterministic seeded shuffle helper (no `Math.random`)
+- `packages/sdk/src/hooks/session.ts` — no change (additive CreateSessionRequest passthrough)
 
-Commit: TBD (impl) · Related: Q-1.1-2.1..4, DEV-20260514-1, spec §18 lines 2619–2624,
+Commit: TBD (impl) · Related: Q-1.1-2.1..5, DEV-20260514-1, spec §18 lines 2619–2624,
 migration 0001 lines 62–67, ADR-0022 (replay-determinism), ADR-0035

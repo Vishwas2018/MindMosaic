@@ -45,6 +45,7 @@ import type {
   SessionStateDTO,
   SessionSummaryDTO,
   CheckpointRequest,
+  PracticeExamComposerParams,
   SessionId,
   SkillId,
   ItemId,
@@ -103,12 +104,22 @@ export type DbBuilder = {
 /**
  * HTTP fetch surface for the content-svc /content/select call. Injected so
  * tests can stub without going through Deno's fetch.
+ *
+ * v1.1-S2 (ADR-0036): `composer` carries the practice-exam composition
+ * parameters + seed end-to-end. Seed is derived from `session_id` at
+ * createSession call time (ADR-0036 §Decision 4) so the assembled item list
+ * is replay-deterministic. Absent → existing blueprint / adaptive routing.
  */
 export type ContentSelectFetcher = (input: {
   pathway_id: string;
   blueprint_id?: string;
   exclude_recently_seen?: string[];
   target_difficulty_band?: 'easy' | 'mid' | 'hard';
+  composer?: {
+    item_count: number;
+    difficulty_distribution: { easy: number; mid: number; hard: number };
+    seed: string;
+  };
 }) => Promise<{ ok: true; data: EngineItem[] } | { ok: false; status: number; code: string; message: string }>;
 
 /**
@@ -287,9 +298,21 @@ export async function createSession(
     return err(500, 'INTERNAL_ERROR', insertRes.error.message);
   }
 
-  // 5. content-svc /content/select (HTTP, service-role; Q-19.7)
+  // 5. content-svc /content/select (HTTP, service-role; Q-19.7).
+  //    v1.1-S2: pass composer_params + session_id-derived seed when present
+  //    (ADR-0036 §Decision 4/5). Absent → existing blueprint/adaptive routing.
+  const composerParams: PracticeExamComposerParams | undefined = body.composer_params;
   const contentRes = await input.fetchContentSelect({
     pathway_id: pathway.id,
+    ...(composerParams !== undefined
+      ? {
+          composer: {
+            item_count: composerParams.item_count,
+            difficulty_distribution: composerParams.difficulty_distribution,
+            seed: sessionId,
+          },
+        }
+      : {}),
   });
   if (!contentRes.ok) {
     // Roll back the session row so the student isn't blocked by a half-create.
@@ -303,19 +326,32 @@ export async function createSession(
     return err(404, 'NOT_FOUND', 'No items selected for pathway');
   }
 
-  // 6. Build SessionContext + initialise engine state
+  // 6. Build SessionContext + initialise engine state.
+  //    v1.1-S2: when composer_params drove selection, prefer the caller's
+  //    time_limit_ms over framework_config (ADR-0036). The composer marker
+  //    is folded into initialState below for the linear-engine branch.
+  const effectiveTimeLimitMs =
+    composerParams !== undefined ? composerParams.time_limit_ms : fc.config.time_limit_ms;
   const ctx: SessionContext = {
     session_id: sessionId as SessionId,
     mode: body.mode,
     engine_type: pathway.engine_type,
     total_items: items.length,
-    time_limit_ms: fc.config.time_limit_ms,
+    time_limit_ms: effectiveTimeLimitMs,
     started_at: startedAt,
     planned_items: items,
     target_skills: (body.target_skills ?? []) as SkillId[],
   };
   const engine = pickEngine(pathway.engine_type);
-  const initialState = engine.initialise(ctx, fc.config);
+  const baseState = engine.initialise(ctx, fc.config);
+  // ADR-0036 §Decision 3 / Q-1.1-2.5: persist composer_params on the linear-
+  // engine state so the analytics marker survives respondToSession's
+  // EngineStateSchema parse → RPC re-write round-trip. Linear is the only
+  // engine that participates in composed practice exams (mode='exam').
+  const initialState =
+    composerParams !== undefined && baseState.engine_type === 'linear'
+      ? { ...baseState, composer_params: composerParams }
+      : baseState;
 
   const next = engine.getNextItem(initialState);
   if (isTerminationSignal(next)) {
@@ -343,7 +379,7 @@ export async function createSession(
       mode: body.mode,
       engine_type: pathway.engine_type,
       total_items: items.length,
-      time_limit_ms: fc.config.time_limit_ms,
+      time_limit_ms: effectiveTimeLimitMs,
       first_item: firstItem,
       navigation: {
         can_go_back: engine.canNavigateBack(initialState),

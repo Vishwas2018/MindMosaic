@@ -248,3 +248,87 @@ describe('assignments — StudentAssignmentDTOSchema extends AssignmentDTOSchema
     ).toBe(true);
   });
 });
+
+// ─── PracticeExamComposerParamsSchema — v1.1-S2 (ADR-0036) ──────────────────
+// Bounds per ADR-0036 §Bounds; integer-distribution model per §Decision 6
+// (sum of band counts === item_count). Refinements report a structured
+// VALIDATION_ERROR at the API boundary (per BUILD_CONTRACT Zod-at-boundaries).
+
+describe('PracticeExamComposerParamsSchema (v1.1-S2 / ADR-0036)', () => {
+  const valid = {
+    item_count: 30,
+    difficulty_distribution: { easy: 10, mid: 15, hard: 5 },
+    time_limit_ms: 1_800_000,
+  };
+
+  it('accepts a valid composer-params payload', () => {
+    expect(types.PracticeExamComposerParamsSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects distribution that does not sum to item_count', () => {
+    const r = types.PracticeExamComposerParamsSchema.safeParse({
+      ...valid,
+      difficulty_distribution: { easy: 10, mid: 15, hard: 4 }, // 29 ≠ 30
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects all-zero distribution', () => {
+    const r = types.PracticeExamComposerParamsSchema.safeParse({
+      item_count: 0,
+      difficulty_distribution: { easy: 0, mid: 0, hard: 0 },
+      time_limit_ms: 600_000,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects item_count below ADR-0036 §Bounds minimum (5)', () => {
+    expect(
+      types.PracticeExamComposerParamsSchema.safeParse({
+        ...valid,
+        item_count: 4,
+        difficulty_distribution: { easy: 4, mid: 0, hard: 0 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects item_count above ADR-0036 §Bounds maximum (80)', () => {
+    expect(
+      types.PracticeExamComposerParamsSchema.safeParse({
+        ...valid,
+        item_count: 81,
+        difficulty_distribution: { easy: 81, mid: 0, hard: 0 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects time_limit_ms outside [300_000, 10_800_000]', () => {
+    const tooShort = types.PracticeExamComposerParamsSchema.safeParse({
+      ...valid,
+      time_limit_ms: 299_999,
+    });
+    const tooLong = types.PracticeExamComposerParamsSchema.safeParse({
+      ...valid,
+      time_limit_ms: 10_800_001,
+    });
+    expect(tooShort.success).toBe(false);
+    expect(tooLong.success).toBe(false);
+  });
+
+  it('CreateSessionRequest accepts composer_params additively (no break to existing callers)', () => {
+    const minimal = {
+      assessment_profile_id: null,
+      repair_sequence_id: null,
+      assignment_id: null,
+      mode: 'exam' as const,
+      target_skills: null,
+      pathway_id: '00000000-0000-0000-0000-000000000010',
+    };
+    // Without composer_params (existing callers): valid.
+    expect(types.CreateSessionRequestSchema.safeParse(minimal).success).toBe(true);
+    // With composer_params: valid.
+    expect(
+      types.CreateSessionRequestSchema.safeParse({ ...minimal, composer_params: valid }).success,
+    ).toBe(true);
+  });
+});

@@ -9,6 +9,24 @@
 
 ## Resolved
 
+### Q-1.1-2.5 — Composer_params storage path on session_record: which clean engine_state_snapshot landing zone?
+
+- Date raised: 2026-05-15 (v1.1-S2 impl T1 pre-read, R4 finding)
+- Asked of: self (T3 Option 3 hybrid — implementation-detail self-resolve permitted; ADR-0036 §Decision 3 follow-up pre-anticipated this contingency)
+- Source: `supabase/migrations/0004_sessions_events.sql` lines 34–65 (session_record DDL); `packages/engines/src/contracts.ts` lines 215–226 (LinearEngineStateSchema); `supabase/functions/assessment-svc/handlers.ts` line 410 (EngineStateSchema.safeParse → RPC re-write round-trip)
+- Question: ADR-0036 §Decision 3 stores `composer_params` at the top level of `engine_state_snapshot.{linear-engine state object}`. R4 confirmed (a) session_record has no `source` or `metadata` jsonb column — only `engine_state_snapshot jsonb`; and (b) Zod default `.object()` STRIPS unknown top-level keys, so `respondToSession`'s parse → RPC re-write round-trip silently drops any composer_params injected by createSession. Which clean engine_state_snapshot path resolves the round-trip risk without a migration?
+  - Option A: Extend `LinearEngineStateSchema` with `composer_params: PracticeExamComposerParamsSchema.optional()`. Additive, zero-migration, replay-safe (preserved through Zod round-trip).
+  - Option B: Add `composer_params jsonb` column to `session_record` — requires migration 0022; violates ADR-0036 §Consequences "Zero migrations in Stage 2".
+  - Option C: Add a `session_record.metadata jsonb` general-purpose column — speculative schema for a feature not yet deployed (CLAUDE.md "no hypothetical future requirements").
+- Why ambiguous: ADR-0036 §Decision 3 specified the conceptual landing zone but flagged in its §Follow-up that the technical realisation depends on engine_state_snapshot column type + key support at impl T1 pre-read. Zod strip behaviour was the unknown.
+- Blocking? yes — determines where composer_params is read/written by createSession + carried in EngineState
+- Assumed answer: Option A. Matches ADR-0036 §Decision 3 intent (top-level on linear-engine state); zero migration; replay-safe; pre-anticipated by the ADR's own follow-up note.
+- Code affected: `packages/engines/src/contracts.ts` (LinearEngineStateSchema additive field); `supabase/functions/assessment-svc/handlers.ts` (createSession marker write); ADR-0036 §Decision 3 (resolution captured)
+- Status: resolved
+- Resolution: **Self-resolved Option A (2026-05-15)**: extend LinearEngineStateSchema with `composer_params: PracticeExamComposerParamsSchema.optional()`. ADR-0036 §Decision 3 updated to specify the schema extension path. Round-trip safe: composer_params survives respondToSession parse → RPC re-write. Zero new migrations. Analytics contract: `mode='exam'` ∧ `engine_state_snapshot->'composer_params' IS NOT NULL`. T3 Option 3 hybrid permits self-resolve where ADR pre-anticipated the contingency; operator may intercept by replying before push.
+
+---
+
 ### Q-1.1-2.4 — Auth: student self-serve vs platform_admin-initiated for composed exam sessions
 
 - Date raised: 2026-05-14 (v1.1-S2 morning ritual)
