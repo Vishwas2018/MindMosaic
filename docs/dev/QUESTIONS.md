@@ -9,6 +9,93 @@
 
 ## Resolved
 
+### Q-1.1-3.5 — Auth model for simulation exam sessions: student self-serve vs teacher/proctor-assigned?
+
+- Date raised: 2026-05-15 (v1.1-S3 morning ritual)
+- Asked of: architect (T3 structural decision — auth model)
+- Source: spec §22.7 line 2807 (`mode.exam` feature key — all tiers); v1.1-S2 ADR-0036 Decision 8 (student self-serve precedent); `supabase/functions/assessment-svc/handlers.ts` lines 251-258 (existing feature-flag gate)
+- Question: Should simulation exam sessions be (a) student self-serve via the existing pathway feature-flag gate (S2 parity), (b) teacher/proctor-assigned only (routed through the `assignment` table), or (c) both via a `simulation_params.proctored: boolean` flag?
+- Why ambiguous: Phase plan §S3 emphasises "real-exam constraints" which can read as proctored. But §22.7's feature_key registry has `mode.exam` available to all tiers (Free through Institutional), implying student self-serve is the spec-intended default. S2 chose student self-serve for the composer; S3 either matches or diverges.
+- Blocking? yes — determines the auth surface and whether `assignment` table integration is required in S3
+- Assumed answer: Option a. Student self-serve via existing pathway feature-flag gate. S2 parity. No new auth layer.
+- Code affected: `supabase/functions/assessment-svc/handlers.ts` createSession (lines 231-413); no new feature_key required (`mode.exam` already exists at §22.7)
+- Status: resolved
+- Resolution: **Operator confirmed Option a (2026-05-15): student self-serve via existing pathway feature-flag gate.** S2 parity. Teacher-administered simulation sessions remain possible later via assignment-table routing (S4 teacher authoring UI), but the v1.1-S3 backend default is self-serve. ADR-0037 Decision 7.
+
+---
+
+### Q-1.1-3.4 — Scoring determinism beyond ADR-0022: what does "scoring against rubric" add?
+
+- Date raised: 2026-05-15 (v1.1-S3 morning ritual)
+- Asked of: architect (T3 schema/contract decision)
+- Source: phase plan §S3 ("deterministically-scored … scoring against rubric"); ADR-0022 (replay-determinism contract — pure-function engines, no Math.random, no Date.now in scoring bodies); `packages/engines/src/contracts.ts` lines 85-95 (EngineItemSchema has `version` field already pinned at session-create)
+- Question: What concrete scoring-determinism guarantee does S3 add beyond what mode='exam' + ADR-0022 already provide for every session today?
+  - Option α: NEW guarantee — verify item-version pinning. Currently `EngineItem.version` is captured at session-create; verify the score path consults that captured version rather than re-fetching live from `v_item_current`. If verified-used, this is already documented behaviour and ADR-0037 captures it. If NOT verified, S3 must pin version explicitly — a genuinely structural change.
+  - Option β: NEW guarantee — idempotent re-scoring endpoint (`POST /sessions/{id}/recompute`) returning the same score from persisted state every call.
+  - Option γ: Phase-plan flourish — no new determinism guarantee beyond ADR-0022; "scoring against rubric" describes the existing `FrameworkConfig.scoring_rules` identity/percentage + bands path.
+- Why ambiguous: ADR-0022 already covers replay determinism. The phase-plan phrasing could either name an existing guarantee or hint at a new one. Item-version drift is the only realistic source of score-drift not already addressed.
+- Blocking? yes — determines whether S3 needs new code (Option α verification + possibly explicit pin) vs no code beyond what's already there
+- Assumed answer: Option γ DEFAULT + Option α verification at impl pre-read. Confirm `EngineItem.version` captured at session-create is consulted by the score path (not re-fetched live). If verified: ADR-0037 documents the verified pin, Option γ holds. If NOT verified: STOP, file Q-1.1-3.6 (T3 schema), surface for architect round-trip — this is genuinely structural.
+- Code affected: TBD at impl T1 pre-read — `packages/engines/src/linear.ts` scoreWithConfig (lines 206-216); `supabase/functions/assessment-svc/handlers.ts` submitSession score path (lines 539-686); `EngineItem.version` capture site at session-create
+- Status: resolved
+- Resolution: **Operator confirmed Option γ DEFAULT + Option α verification gate (2026-05-15).** At impl T1 pre-read, verify the item-version captured at session-create is the version consulted by the score path (not re-fetched live). If verified, ADR-0037 §Decision 5 documents the verified pin and Option γ holds (no new determinism code in S3). If NOT verified, STOP, file Q-1.1-3.6 (T3 schema — explicit version-pin requirement), surface for architect round-trip. ADR-0037 Decision 5.
+
+---
+
+### Q-1.1-3.3 — Engine config consultation for strict-mode: state-flag vs framework_config vs new method parameter?
+
+- Date raised: 2026-05-15 (v1.1-S3 morning ritual)
+- Asked of: architect (T3 engine-config decision)
+- Source: `packages/engines/src/linear.ts` lines 169-172 (canNavigateBack: `return state.current_index > 0`); ADR-0023 (EngineState discriminated union); ADR-0022 (pure-function engine namespace)
+- Question: How does LinearEngine know to lock back-navigation in simulation mode?
+  - Option I: Read `state.simulation_params` inside `canNavigateBack` (and any future strict-mode-aware method). Engine method body grows one branch. No interface change.
+  - Option II: Pass `FrameworkConfig.simulation_strict: boolean` through and consult config instead of state. Pathway-level configuration; less per-session flexibility (every session of that pathway becomes strict).
+  - Option III: New method parameter on the existing `AssessmentEngine` interface (e.g., `canNavigateBack(state, runtimeFlags?)`). Interface change ripples to AdaptiveEngine/SkillEngine/DiagnosticEngine signatures.
+- Why ambiguous: All three are workable; trade-off is between per-session flexibility (Option I), pathway-pinned config (Option II), and clean separation of runtime flags from persistent state (Option III).
+- Blocking? yes — determines where the strictness flag lives and which engine surface changes
+- Assumed answer: Option I. Engine consults its own state. Simulation flag is per-session (some sessions of a pathway are strict, others not); pathway-pinned is wrong. Interface-change ripple to other engines is unwarranted scope.
+- Code affected: `packages/engines/src/linear.ts` canNavigateBack only (one method, one branch addition); zero changes to AdaptiveEngine/SkillEngine/DiagnosticEngine
+- Status: resolved
+- Resolution: **Operator confirmed Option I (2026-05-15): state-flag consultation inside `LinearEngine.canNavigateBack`.** Read `state.simulation_params?.no_back_nav === true` and return false; else preserve current `current_index > 0` behaviour. No `AssessmentEngine` interface change. ADR-0037 Decision 4.
+
+---
+
+### Q-1.1-3.2 — Per-section structure on LinearEngineState in v1.1-S3?
+
+- Date raised: 2026-05-15 (v1.1-S3 morning ritual)
+- Asked of: architect (T3 schema decision)
+- Source: phase plan §S3 ("section timing, no mid-exam help"); `packages/engines/src/contracts.ts` lines 216-233 (LinearEngineStateSchema — flat planned_items, no sections); lines 295-306 (AdaptiveStageStateSchema — prior art for per-stage `time_limit_ms`)
+- Question: Does v1.1-S3 introduce section structure to LinearEngineState?
+  - Option A: NO sections in v1.1-S3 — session-wide strict timer only. Sections deferred sanctioned until a UI consumer exists. AdaptiveStageState cited as future prior art. Smallest possible change.
+  - Option B: Sections introduced — `LinearEngineState.sections?: SectionStateSchema[]` with per-section `time_limit_ms` and `item_ids`. Significant code + tests; UI does not yet consume this.
+  - Option C: Sections-by-convention — `simulation_params.section_boundaries: number[]` (item-index split-points) without state-level sections. Timer stays session-wide; UI/frontend renders the split. Middle path.
+- Why ambiguous: Phase plan §S3 names "section timing" as one of three S3 capabilities. Without a UI consumer (S5), per-section state is built ahead of demand. ADR-0022 + LinearEngine pure-function discipline make later addition cheap.
+- Blocking? yes — determines whether `LinearEngineState` gains sections in v1.1-S3 or stays flat
+- Assumed answer: Option A. No sections in v1.1-S3. Defer sanctioned. ADR-0037 must explicitly state the deferral with rationale + future-extension path (AdaptiveStageState as prior art; would follow Q-1.1-2.5 round-trip-safety pattern).
+- Code affected: `packages/engines/src/contracts.ts` (no section schema added in S3); ADR-0037 §Decision documents the deferral
+- Status: resolved
+- Resolution: **Operator confirmed Option A (2026-05-15): no sections in v1.1-S3 — SANCTIONED DEFERRAL.** ADR-0037 §Decision must explicitly state per-section timing deferred until a UI consumer exists (≥ S5); AdaptiveStageState cited as future prior art; extension would follow Q-1.1-2.5 round-trip-safety pattern. Not forgotten. ADR-0037 Decision 3.
+
+---
+
+### Q-1.1-3.1 — §N TRAP: Session mode for simulation exam — 'exam' vs 'challenge' vs new enum?
+
+- Date raised: 2026-05-15 (v1.1-S3 morning ritual — T1 pre-read finding)
+- Asked of: architect (T3 structural decision — blocking §N trap, parallel to Q-1.1-2.1)
+- Source: phase plan §S3 ("Simulation Exam Mode … New session mode"); spec §18 Session Modes table lines 2619-2628 (verbatim 'Exam' row Use Case = "Full practice exam simulation"); migration 0001 lines 62-67 (engine_type + session_mode enums)
+- Question: The v1.1 phase plan §S3 names "Simulation Exam Mode" and claims "new session mode". Spec §18 'Exam' row Use Case verbatim reads "Full practice exam simulation" — the spec already uses "simulation" as the description of `mode='exam'`. Which mode should v1.1-S3 use?
+  - Option 1: `mode='exam'` per spec §18 verbatim. Existing enum value (already used by v1.1-S2 composer). Zero migration. Spec-correct.
+  - Option 2: `mode='challenge'` per phase plan §S3 informal claim. But §18 'Challenge' row Use Case = "Timed competition, gamification" (leaderboard) — different product feature. Existing enum value; zero migration; SPEC-INCORRECT.
+  - Option 3: New enum value `'simulation'`. Migration 0022 + new feature_key. Breaks Q-1.1-2.1/2.2 zero-migration commitment.
+- Why ambiguous: Phase plan informal language ("new session mode") collides with spec §18 verbatim ("Full practice exam simulation" already covered by 'exam'). Same §N trap structure as Q-1.1-2.1 (S2's "practice" vs "exam" trap caught at morning ritual).
+- Blocking? yes — determines mode enum value, whether a migration is required, and whether `mode.exam` feature_key suffices
+- Assumed answer: Option 1 (mode='exam'). Spec §18 'Exam' row is the canonical home; "simulation" is verbatim in the Use Case column. §N trap escape. Differentiator from S2 composer = optional `simulation_params` on request (administration layer) vs composer_params (assembly layer); they are orthogonal and co-applicable.
+- Code affected: `packages/types/src/session.ts` (CreateSessionRequestSchema additive `simulation_params?`); `supabase/functions/assessment-svc/handlers.ts` createSession (forward + analytics-marker fold); `packages/engines/src/contracts.ts` LinearEngineStateSchema (additive `simulation_params?` optional, Q-1.1-2.5 round-trip-safety pattern); `packages/engines/src/linear.ts` canNavigateBack (state-flag branch per Q-1.1-3.3)
+- Status: resolved
+- Resolution: **Operator confirmed Option 1 (2026-05-15): mode='exam' per spec §18 'Exam' row Use Case verbatim ("Full practice exam simulation").** §N trap escape. mode='challenge' is spec-incorrect (leaderboard/gamification, different product). New enum rejected (zero-migration commitment held; speculative schema). ADR-0037 Decision 1.
+
+---
+
 ### Q-1.1-2.5 — Composer_params storage path on session_record: which clean engine_state_snapshot landing zone?
 
 - Date raised: 2026-05-15 (v1.1-S2 impl T1 pre-read, R4 finding)
