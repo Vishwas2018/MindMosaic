@@ -5,6 +5,38 @@
 
 ## Open
 
+### ISSUE-0037 — service_role key committed to `apps/web/.env.local.example`
+
+- Status: open
+- Severity: **high** (committed service-role credential — bypasses RLS on the local Supabase emulator; even if scoped to localhost it violates the never-commit-secrets norm and ships in a file teammates will copy verbatim into their own .env.local)
+- Reported: 2026-05-15 (v1.1-S2 impl — surfaced during pre-push V16 diff inspection)
+- Area: infra · security
+- Tags: secrets · supabase · env-template · rotation-required
+
+**Summary.** `apps/web/.env.local.example` currently contains real key material rather than the documented placeholder pattern. Schematically (literals redacted here so this issue doc itself does NOT carry the secret — see the file at HEAD `apps/web/.env.local.example:8-10` for the live values):
+
+```
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_<REDACTED-22-CHAR-SUFFIX>
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_<REDACTED-22-CHAR-SUFFIX>
+```
+
+The `sb_publishable_*` value on line 9 is the public/anon key (safe to ship). **The `sb_secret_*` value on line 10 is the service_role secret** — Supabase's newer key format (introduced 2024) that replaces the JWT-style `service_role` key. Service-role credentials bypass RLS and have unrestricted DML across all tables; norm is they NEVER appear in version control.
+
+**Risk scoping.** The URL targets `http://127.0.0.1:54321`, so the key is only valid against this developer's local Supabase emulator instance — there is no direct exposure of a hosted production project. However: (a) the key was generated locally by `supabase start` and is still a service-role credential per its grants; (b) the file is the documented copy-source for every contributor's `.env.local`, so the secret is now in the git history forever and will propagate to any clone; (c) developers sometimes seed their local emulator with production-derived data, in which case the localhost RLS bypass becomes a real PII concern.
+
+**Root cause.** A prior local-dev session pasted live keys into the template file (likely while resolving a copy-paste issue with `.env.local`) and committed it. The change was already present in `origin/v1.1/exam-content` at the start of v1.1-S2 impl — the unstaged diff observed at pre-push V16 reflects an attempt to undo/re-edit, not the original introduction.
+
+**Required actions (operator):**
+1. **Rotate the Supabase keys.** `supabase stop && supabase start` regenerates the project-local `sb_publishable_*` + `sb_secret_*` pair; record the new pair in your personal `.env.local` only.
+2. **Scrub the committed file** — replace line 10 (and the prior anon value if treated as sensitive) with the original placeholder pattern (`SUPABASE_SERVICE_ROLE_KEY=your-service-role-key`) in a chore-commit. Keep the unrelated stale value out of v1.1-S2.
+3. **History scrub (optional but recommended).** Because the value is in git history (commit predating v1.1-S2), a full repo history rewrite (`git filter-repo` or BFG) would be required to fully purge. Decide per threat model — if the key is rotated and the local emulator is the only target, history scrub may be deferred. If any teammate ever pointed this URL/key pair at a non-local environment, history scrub is mandatory.
+4. **Add CI guard.** Hook `gitleaks` or a `.env.local.example`-targeted pre-commit check that rejects any non-placeholder value matching `/^(sb_secret_|sb_publishable_|sk_(live|test)_|eyJ)/`.
+
+**Out of scope for v1.1-S2 impl.** Surfaced as a carry-forward item for the v1.1-S2 chore-close commit per operator instruction. Rotation + scrub-commit are operator follow-ups.
+
+---
+
 ### ISSUE-0036 — pgTAP test/schema drift for migrations 0012, 0015, 0016 (resolved at Stage 48)
 
 - Status: open → resolved at Stage 48 impl commit
