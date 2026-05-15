@@ -482,6 +482,23 @@ Reference: `docs/dev/ui-discipline.md §Pre-push verification round` for the ful
 
 ---
 
+## Pre-commit secret guard (ISSUE-0037 remediation)
+
+`.githooks/pre-commit` rejects any staged line of the form `KEY=<prefix><value>` where
+`<prefix>` is one of `sb_secret_`, `sb_publishable_`, `sk_live_`, `sk_test_`, `eyJ` AND
+`<value>` contains BOTH a lowercase letter AND a digit (the real-key entropy heuristic).
+Placeholders like `sb_secret_REPLACE_WITH_LOCAL_SERVICE_ROLE_KEY` (UPPER_CASE_WITH_UNDERSCORES,
+no digits) and `sk_test_your-stripe-secret-key` (lowercase, no digits) pass through.
+
+Activate once per clone: `git config core.hooksPath .githooks`.
+
+The guard is local defense-in-depth ahead of GitHub's remote push-protection. Coverage gap by
+design: any value missing either lowercase letters or digits is treated as a placeholder, so
+all-numeric or all-uppercase keys (rare in practice) would slip through; the remote scanner
+catches those.
+
+---
+
 ## Push gate
 
 After the verification round passes, architect responds with the literal phrase **"create the commit"** before any push. Applies to prep, impl, and chore-close commits separately. No bundled approvals.

@@ -1,0 +1,71 @@
+#!/bin/sh
+# ISSUE-0037 remediation — reject committed secrets matching real-key patterns.
+# Active only when `git config core.hooksPath .githooks` is set (once per clone).
+#
+# Heuristic: a line of the form `KEY=<prefix><value>` matching one of the
+# known secret prefixes (sb_secret_/sb_publishable_/sk_live_/sk_test_/eyJ)
+# is rejected when the value contains BOTH a lowercase letter AND a digit.
+# Real keys are high-entropy alphanumerics that hit both classes; placeholder
+# values like `REPLACE_WITH_*` (uppercase-only) and `your-stripe-secret-key`
+# (lowercase-only, no digits) are exempted.
+
+set -e
+
+# Collect staged files (ACM = Added, Copied, Modified). Quote each name in
+# case it contains spaces or special chars.
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+hit=0
+
+# IFS for newline only so file names with spaces survive.
+old_ifs="$IFS"
+IFS='
+'
+for f in $staged; do
+  IFS="$old_ifs"
+  # Skip files that disappeared between staging and hook execution.
+  [ -f "$f" ] || { IFS='
+'; continue; }
+
+  # Find candidate lines: KEY=<prefix><20+ chars of [A-Za-z0-9._-]>.
+  # `-aH` forces text mode + filename for portability.
+  matches=$(grep -nE '^[A-Za-z_][A-Za-z0-9_]*=(sb_secret_|sb_publishable_|sk_live_|sk_test_|eyJ)[A-Za-z0-9._-]{20,}' "$f" 2>/dev/null || true)
+  [ -z "$matches" ] && { IFS='
+'; continue; }
+
+  # Inspect each candidate. printf instead of echo for portability.
+  printf '%s\n' "$matches" | while IFS= read -r matched; do
+    # matched format: "lineNum:fullLine"
+    line=${matched#*:}
+    # Extract the substring after the prefix, up to first non-allowed char.
+    val=$(printf '%s' "$line" | sed -E 's/^[^=]+=(sb_secret_|sb_publishable_|sk_live_|sk_test_|eyJ)([A-Za-z0-9._-]+).*/\2/')
+    # Real-key signal: contains at least one lowercase letter AND one digit.
+    lower=$(printf '%s' "$val" | tr -cd 'a-z')
+    digit=$(printf '%s' "$val" | tr -cd '0-9')
+    if [ -n "$lower" ] && [ -n "$digit" ]; then
+      echo "ERROR: $f: real-secret pattern detected:" >&2
+      echo "  $matched" >&2
+      printf 'real-secret-hit\n' >> .git/.precommit-secret-hits
+    fi
+  done
+
+  IFS='
+'
+done
+IFS="$old_ifs"
+
+if [ -f .git/.precommit-secret-hits ]; then
+  hit=$(wc -l < .git/.precommit-secret-hits)
+  rm -f .git/.precommit-secret-hits
+fi
+
+if [ "${hit:-0}" -gt 0 ]; then
+  echo "" >&2
+  echo "Refusing to commit. Replace real key values with placeholders before staging." >&2
+  echo "Placeholders use UPPER_CASE_WITH_UNDERSCORES (no digits) or 'your-*' style." >&2
+  echo "(ISSUE-0037 remediation — pre-commit secret guard)" >&2
+  exit 1
+fi
+
+exit 0

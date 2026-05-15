@@ -81,11 +81,11 @@ Full table: `docs/dev/perf/measurements.md`.
 - ADRs accepted: **36** (ADR-0001 through ADR-0036; ADR-0036 accepted at v1.1-S2 impl close 0bdd43b)
 - ADRs proposed: 0
 - Workspaces: **17** — unchanged
-- Issues critical / high / medium / low: **0 / 1 / 8 / 14**
-  - **High (1, NEW): ISSUE-0037** — service_role key in `apps/web/.env.local.example` (local-emulator scope; operator-owned rotation + scrub + CI-guard follow-up)
+- Issues critical / high / medium / low: **0 / 0 / 8 / 14**
   - Medium (8): ISSUE-0009, ISSUE-0010, ISSUE-0011, ISSUE-0014, ISSUE-0021, ISSUE-0023, ISSUE-0027, ISSUE-0030
   - Low (14): ISSUE-0015, ISSUE-0016, ISSUE-0017, ISSUE-0019, ISSUE-0020, ISSUE-0022, ISSUE-0024, ISSUE-0025, ISSUE-0028, ISSUE-0031, ISSUE-0032, ISSUE-0033, ISSUE-0034, ISSUE-0035
-  - Prior resolved: ISSUE-0005, 0006, 0007, 0008, 0012, 0013, 0018, 0026, 0029, 0036
+  - Resolved this session: ISSUE-0037 (downgraded high → info after never-committed + CLI-shared-default findings; full narrative in OPEN_ISSUES.md ## Resolved)
+  - Prior resolved: ISSUE-0005, 0006, 0007, 0008, 0012, 0013, 0018, 0026, 0029, 0036, 0037
 - Migrations: **0001–0021 unchanged** (v1.1-S2 added 0 migrations; Q-1.1-2.1/2.2 zero-migration commitment held)
 - Open questions: **0** — Q-1.1-1.0..9 + Q-1.1-2.1..5 all resolved
 - Open bugs: 0
@@ -109,13 +109,13 @@ Full table: `docs/dev/perf/measurements.md`.
 
 **Carry-forward (operator follow-ups, NOT v1.1-S3 work):**
 
-- **ISSUE-0037 remediation.** Three steps, all operator-owned:
-  1. Rotate the local Supabase keys: `supabase stop && supabase start` regenerates the project-local `sb_publishable_*` + `sb_secret_*` pair. Record the new pair in personal `.env.local` only.
-  2. Scrub-commit on `apps/web/.env.local.example` — restore placeholder pattern (`SUPABASE_SERVICE_ROLE_KEY=your-service-role-key` + matching anon placeholder). Standalone commit; not bundled with v1.1-S3 work.
-  3. Add CI-guard: `gitleaks` or pre-commit regex rejecting any value matching `/^(sb_secret_|sb_publishable_|sk_(live|test)_|eyJ)/` inside `.env*.example` files.
-  4. History scrub (optional, defer-by-default): the secret remains in pre-v1.1-S2 history. If the key was ever pointed at a non-local environment, a `git filter-repo` / BFG history rewrite is mandatory; otherwise rotation + scrub-commit is sufficient given the local-emulator scope.
+- **ISSUE-0037 — RESOLVED in this session.** Filing assumed a committed `sb_secret_*` credential. Two findings during remediation collapsed the severity to info: (1) `git log --all -S` proves the literal was never committed (only the operator's local working tree carried it); (2) `npx supabase start` banner confirms the keys are CLI shared defaults, not project-exclusive credentials. Rotation impossible by design. Remediation delivered as template-hygiene + defense-in-depth: scrub `.env.local.example` to placeholders, install `.githooks/pre-commit` secret guard, document in `CLAUDE.md §Pre-commit secret guard`. Full narrative in `OPEN_ISSUES.md ## Resolved`. No further operator action required for security.
+
+- **`.githooks/pre-commit` activation.** Once per clone: `git config core.hooksPath .githooks`. Same activation as the existing commit-msg hook. Local defense ahead of GitHub push-protection.
 
 - **DEV-20260515-1: T3 fidelity reminder.** For future stages, classify each Q-* at impl T1 as structural-vs-tight-detail BEFORE deciding self-resolve eligibility, even when an ADR pre-frames the answer. ADR pre-anticipation reduces decision risk but does not collapse a structural decision into a tight implementation detail.
+
+- **TO FILE at v1.1-S3 chore-close: DEV-20260515-2.** Spurious commit-success report during v1.1-S2 chore-close (2026-05-15): announced "Commit landed: 6b4f53c" before the push completed; push was then rejected by GitHub push-protection (literal `sb_secret_*` in ISSUE-0037 description). Local commit had succeeded but the operator-visible state ("landed on origin") had not. Process fix for future commit + push pairs: announce commit + push as one atomic step, only after both succeed. Tracking only — no rework; final f72a7a8 landed clean after redaction. Operator instruction: file at S3 chore-close, not now.
 
 **Launch-window operational verification (owner: deploy operator):**
 - Run k6/session-loop.js (500 VU / 1h) + k6/billing-webhook.js against deployed env

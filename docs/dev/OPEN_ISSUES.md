@@ -5,38 +5,6 @@
 
 ## Open
 
-### ISSUE-0037 — service_role key committed to `apps/web/.env.local.example`
-
-- Status: open
-- Severity: **high** (committed service-role credential — bypasses RLS on the local Supabase emulator; even if scoped to localhost it violates the never-commit-secrets norm and ships in a file teammates will copy verbatim into their own .env.local)
-- Reported: 2026-05-15 (v1.1-S2 impl — surfaced during pre-push V16 diff inspection)
-- Area: infra · security
-- Tags: secrets · supabase · env-template · rotation-required
-
-**Summary.** `apps/web/.env.local.example` currently contains real key material rather than the documented placeholder pattern. Schematically (literals redacted here so this issue doc itself does NOT carry the secret — see the file at HEAD `apps/web/.env.local.example:8-10` for the live values):
-
-```
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_<REDACTED-22-CHAR-SUFFIX>
-SUPABASE_SERVICE_ROLE_KEY=sb_secret_<REDACTED-22-CHAR-SUFFIX>
-```
-
-The `sb_publishable_*` value on line 9 is the public/anon key (safe to ship). **The `sb_secret_*` value on line 10 is the service_role secret** — Supabase's newer key format (introduced 2024) that replaces the JWT-style `service_role` key. Service-role credentials bypass RLS and have unrestricted DML across all tables; norm is they NEVER appear in version control.
-
-**Risk scoping.** The URL targets `http://127.0.0.1:54321`, so the key is only valid against this developer's local Supabase emulator instance — there is no direct exposure of a hosted production project. However: (a) the key was generated locally by `supabase start` and is still a service-role credential per its grants; (b) the file is the documented copy-source for every contributor's `.env.local`, so the secret is now in the git history forever and will propagate to any clone; (c) developers sometimes seed their local emulator with production-derived data, in which case the localhost RLS bypass becomes a real PII concern.
-
-**Root cause.** A prior local-dev session pasted live keys into the template file (likely while resolving a copy-paste issue with `.env.local`) and committed it. The change was already present in `origin/v1.1/exam-content` at the start of v1.1-S2 impl — the unstaged diff observed at pre-push V16 reflects an attempt to undo/re-edit, not the original introduction.
-
-**Required actions (operator):**
-1. **Rotate the Supabase keys.** `supabase stop && supabase start` regenerates the project-local `sb_publishable_*` + `sb_secret_*` pair; record the new pair in your personal `.env.local` only.
-2. **Scrub the committed file** — replace line 10 (and the prior anon value if treated as sensitive) with the original placeholder pattern (`SUPABASE_SERVICE_ROLE_KEY=your-service-role-key`) in a chore-commit. Keep the unrelated stale value out of v1.1-S2.
-3. **History scrub (optional but recommended).** Because the value is in git history (commit predating v1.1-S2), a full repo history rewrite (`git filter-repo` or BFG) would be required to fully purge. Decide per threat model — if the key is rotated and the local emulator is the only target, history scrub may be deferred. If any teammate ever pointed this URL/key pair at a non-local environment, history scrub is mandatory.
-4. **Add CI guard.** Hook `gitleaks` or a `.env.local.example`-targeted pre-commit check that rejects any non-placeholder value matching `/^(sb_secret_|sb_publishable_|sk_(live|test)_|eyJ)/`.
-
-**Out of scope for v1.1-S2 impl.** Surfaced as a carry-forward item for the v1.1-S2 chore-close commit per operator instruction. Rotation + scrub-commit are operator follow-ups.
-
----
-
 ### ISSUE-0036 — pgTAP test/schema drift for migrations 0012, 0015, 0016 (resolved at Stage 48)
 
 - Status: open → resolved at Stage 48 impl commit
@@ -556,6 +524,39 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 L5 writes `async_pipeline_event` (scope_type='student_pathway'); L7/L9 write both. L1/L2/L3a/L3b continue writing `pipeline_event`. Linked: ADR-0032, ADR-0033, Q-29.4, Q-30.2, ISSUE-0017.
 
 ## Resolved
+
+### ISSUE-0037 — `sb_secret_*` literal observed in local working tree of `apps/web/.env.local.example`
+
+- Status: resolved — 2026-05-15 (ISSUE-0037 remediation, this commit on v1.1/exam-content)
+- **Severity at resolution: info** (downgraded from initial filing's "high" — see Findings)
+- Reported: 2026-05-15 (v1.1-S2 impl — surfaced during pre-push V16 diff inspection)
+- Area: infra · security · template-hygiene
+- Tags: secrets · supabase · env-template · pre-commit-guard
+
+**Initial filing** asserted: a committed `sb_secret_*` service_role credential in `apps/web/.env.local.example`, propagating to every clone via git history, requiring rotation + scrub + history rewrite + CI guard. Severity = high.
+
+**Findings at remediation** (two, both reducing severity):
+
+1. **Never-committed.** `git log --all -S "sb_secret_N7UND0UgjKTVK" -- apps/web/.env.local.example` returns **empty**. HEAD's `.env.local.example` always carried the original `your-anon-key` / `your-service-role-key` placeholder strings (see commits `5e3e1f0` Stage 14, `75984c6` Stage 26, `3a782fc` Stage 42 — only three modifications, none introducing the literal). The `sb_*` literals existed only in the operator's local unstaged working tree and never reached origin. The single attempt to commit them — embedded as evidence inside the ISSUE-0037 description block in `OPEN_ISSUES.md:21` during the v1.1-S2 chore — was correctly blocked by GitHub push-protection; that chore landed clean at `f72a7a8` after redaction.
+
+2. **CLI shared defaults, not project secrets.** `npx supabase start` output on this project includes the explicit banner: *"API keys and JWT secrets are shared defaults. Do not use in production."* The exact `sb_publishable_*` and `sb_secret_*` values printed by the CLI (suffixes redacted here so this doc itself does not carry the literal — `npx supabase status` reveals them on any developer's machine) are built into the Supabase CLI itself and byte-identical across every install running the new-format key flag. `stop && start` cannot rotate them by design (would defeat the CLI's consistent-dev-keys UX). They are not exclusive credentials.
+
+**Combined severity profile after findings:** info / template-hygiene defect. No incident, no exposure beyond what every Supabase CLI user already has locally, no rotation possible. The original "high" rating assumed an exclusive credential in committed history; both legs of that assumption were wrong.
+
+**Remediation delivered (this commit):**
+
+- **D1 N/A (rotation impossible).** `npx supabase stop && npx supabase start` was run and confirmed the keys are byte-identical CLI defaults. No actual rotation; documented as N/A above.
+- **D2 scrub.** `apps/web/.env.local.example` now uses placeholders of identical shape: `sb_publishable_REPLACE_WITH_LOCAL_ANON_KEY` / `sb_secret_REPLACE_WITH_LOCAL_SERVICE_ROLE_KEY` + a comment block telling contributors to retrieve live values via `npx supabase status`. Stripe placeholders already correct. The HEAD-vs-working-tree divergence that triggered the filing is closed: working tree now matches a clean template.
+- **D3 pre-commit guard.** `.githooks/pre-commit` rejects any staged line `KEY=<prefix><value>` where `<prefix>` ∈ {`sb_secret_`, `sb_publishable_`, `sk_live_`, `sk_test_`, `eyJ`} AND `<value>` contains BOTH lowercase letters AND digits (the real-key entropy heuristic). Tested: placeholders pass, real key shape rejected. Documented in `CLAUDE.md §Pre-commit secret guard`. Active per clone after `git config core.hooksPath .githooks` (same activation as the existing commit-msg hook).
+- **D4 this entry.** Severity downgraded high → info; resolution paragraph written.
+
+**Operator follow-ups (none required for security):**
+- If desired, a future migration to a per-project JWT signing secret (override the CLI shared default) would create truly project-exclusive keys. Out of v1.1 scope; would need an ADR if pursued.
+- If GitHub repository-level secret-scanning rules ever produce a false-positive backlog because of the CLI's shared-default values appearing in dev tooling output, document an allowlist exception for that specific known value.
+
+**Cross-refs.** `CLAUDE.md §Pre-commit secret guard`; `.githooks/pre-commit`; `apps/web/.env.local.example` HEAD post-remediation; commit `f72a7a8` (v1.1-S2 chore, where the literal was first redacted-on-attempt by GitHub push-protection).
+
+---
 
 ### ISSUE-0029 — Stage close typecheck gate may return stale turbo-cached green when node_modules drift
 

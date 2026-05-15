@@ -2,6 +2,18 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## ISSUE-0037 remediation (operator side track) — 2026-05-15
+
+Single tight commit on `v1.1/exam-content` (between f72a7a8 and HEAD). Not a stage; no morning ritual, no retros. Two findings during D1 collapsed ISSUE-0037 severity high → info: (1) `git log --all -S "sb_secret_N7UND0UgjKTVK"` returns empty — the `sb_secret_*` literal was never committed; only the operator's local working tree carried it. The single push attempt that included the literal (inside the original v1.1-S2 chore's ISSUE-0037 evidence block) was correctly rejected by GitHub push-protection, then landed clean at f72a7a8 after redaction. (2) `npx supabase start` banner: *"API keys and JWT secrets are shared defaults. Do not use in production."* The exact `sb_publishable_*` + `sb_secret_*` values are CLI shared defaults, byte-identical across every Supabase CLI install with the new key format. Rotation impossible by design.
+
+- **D2 scrub.** `apps/web/.env.local.example` lines 8–14: placeholders of identical shape (`sb_publishable_REPLACE_WITH_LOCAL_ANON_KEY` / `sb_secret_REPLACE_WITH_LOCAL_SERVICE_ROLE_KEY`) + comment block instructing contributors to retrieve live values via `npx supabase status` after `npx supabase start`. Stripe + app URL placeholders untouched (already correct).
+- **D3 pre-commit guard.** `.githooks/pre-commit` (NEW) rejects staged lines matching `^[A-Z_]+=(sb_secret_|sb_publishable_|sk_live_|sk_test_|eyJ)[A-Za-z0-9._-]{20,}` when the value carries BOTH a lowercase letter AND a digit (real-key entropy heuristic). Placeholders (`REPLACE_WITH_*` uppercase-only) and Stripe-style `your-*-key` (no digits) pass through. Tested green against scrubbed `.env.local.example` (pass); tested rejection against simulated leak (real key → exit 1). Activate per clone: `git config core.hooksPath .githooks`. Documented in `CLAUDE.md §Pre-commit secret guard`.
+- **D4 ISSUE-0037 → ## Resolved.** Severity downgraded high → info with both findings on record. PROJECT_STATE.md issue counts 0/1/8/14 → 0/0/8/14.
+
+**Quality gates at close:** Lint ✅ · Typecheck ✅ (17/17, --force, 0 cached) · Tests ✅ (753 passed / 1 skipped — unchanged; remediation is docs + hooks only).
+
+---
+
 ## v1.1-S2 — 2026-05-15
 
 **Planned (from docs/dev/v1.1-phase-plan.md §S2):** Practice Exam Composer — backend facility that assembles a free-form, scored, timed, fixed-sequence exam session from the pathway-scoped question bank by `(item_count, difficulty_distribution, time_limit_ms)`. Spec §18 + LinearEngine; no new engine.
