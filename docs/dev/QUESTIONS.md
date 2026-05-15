@@ -9,6 +9,81 @@
 
 ## Resolved
 
+### Q-1.1-4.5 — Bank browser depth: item-level list endpoint vs pathway-level stats only?
+
+- Date raised: 2026-05-15 (v1.1-S4 morning ritual)
+- Asked of: architect (T3 structural — API scope)
+- Source: `packages/sdk/src/hooks/content.ts` (no `useListItems` hook; only `useItemAdmin(id)` platform_admin only + `usePathways()`); v1.1-phase-plan §S4 ("pick from bank")
+- Question: Does the S4 bank browser require (a) a new `/content-svc/items?pathway_id=` list endpoint + SDK hook, (b) pathway-level stats only (item counts per difficulty) via the existing `usePathways()`, or (c) item-level preview via `useItemAdmin(id)` surfaced behind a detail drawer?
+- Why ambiguous: Phase plan says "pick from bank" which could mean browsing items by ID, or simply selecting a pathway as the item pool. No `useListItems` SDK hook exists. Adding a list endpoint is a non-trivial API addition not mentioned in the S4 budget.
+- Blocking? yes — determines API scope for S4
+- Assumed answer: Option b. Pathway-level bank browse via `usePathways()` only. No new list endpoint. Item-level previews deferred.
+- Code affected: `packages/sdk/src/hooks/content.ts`, `apps/web/src/app/(teacher)/teacher/content/page.tsx`
+- Status: resolved
+- Resolution: **Operator confirmed Simplified Option a (2026-05-15): bank browser via existing `usePathways()` only. No new stats endpoint in S4. Item-level previews deferred.** ADR-0038 Decision 5.
+
+---
+
+### Q-1.1-4.4 — Schema: how does `composer_params` reach the assignment? Extend `CreateAssignmentRequest` vs session-only?
+
+- Date raised: 2026-05-15 (v1.1-S4 morning ritual)
+- Asked of: architect (T3 structural — schema + cross-service contract)
+- Source: `packages/sdk/src/hooks/assignments.ts` (uses `difficulty_range: {min, max}`); `packages/types/src/session.ts` lines 26–53 (`PracticeExamComposerParamsSchema` uses `difficulty_distribution: {easy, mid, hard}` — count-per-band model); phase plan §S4 "consumes S1 + S2"
+- Question: Should the teacher exam authoring form (a) extend `CreateAssignmentRequest` additively with `composer_params?` + `simulation_params?` so assignments-svc stores and forwards them into session-create when a student starts, or (b) surface the form fields only in the UI and reconstruct them at session-create time client-side?
+- Why ambiguous: `CreateAssignmentRequest` body uses `difficulty_range: {min, max}` (a float range model) while S2's `PracticeExamComposerParamsSchema` uses `difficulty_distribution: {easy, mid, hard}` (integer counts per band). Additive extension of both on `CreateAssignmentRequest` requires assignments-svc to accept and persist both, then forward `composer_params` into `CreateSessionRequest` when student starts. Option b keeps the backend unchanged but puts the reconstruction logic in the client.
+- Blocking? yes — determines backend scope (assignments-svc handler extension in S4 vs UI-only)
+- Assumed answer: Option a — extend `CreateAssignmentRequest` additively with `composer_params?` + `simulation_params?`; assignments-svc persists + forwards into session-create on student start.
+- Code affected: `packages/types/src/assignment.ts`, `supabase/functions/assignments-svc/handlers.ts`, `packages/sdk/src/hooks/assignments.ts`
+- Status: resolved
+- Resolution: **Operator confirmed Option a, scope-expanded (2026-05-15): extend `CreateAssignmentRequest` additively with `composer_params?` AND `simulation_params?`. S4 INCLUDES assignments-svc backend extension (additive field; handler accepts + persists + forwards into session-create when student starts). `difficulty_range` vs `difficulty_distribution` duplication acceptable — alternates; handler honours whichever is present; refactor deferred.** ADR-0038 Decision 4.
+
+---
+
+### Q-1.1-4.3 — Form pattern: single-page with section dividers vs multi-step wizard?
+
+- Date raised: 2026-05-15 (v1.1-S4 morning ritual)
+- Asked of: architect (T3 UX — layout pattern)
+- Source: `apps/web/src/app/(teacher)/teacher/assignments/new/page.tsx` (5-step wizard pattern); UI_CONTRACT.md; phase plan §S4 "compose, publish to class"
+- Question: Should the `/teacher/content/new` exam authoring form follow (a) the existing 5-step wizard pattern from `assignments/new/page.tsx` for consistency, or (b) a single-page form with section dividers (Bank Pick / Configure / Assign)?
+- Why ambiguous: The assignments new-assignment flow uses a multi-step wizard (`WizardState`, `Step = 1|2|3|4|5`). Pattern parity with that flow would suggest a wizard. However the S4 form is narrower (pathway picker + distribution + time + simulate toggle + class assign), which may be sufficiently concise for single-page treatment.
+- Blocking? no — UX decision; both are implementable
+- Assumed answer: Option b — single-page form with section dividers
+- Code affected: `apps/web/src/app/(teacher)/teacher/content/new/page.tsx`
+- Status: resolved
+- Resolution: **Operator confirmed Option b (2026-05-15): single-page form with section dividers (Bank Pick / Configure / Assign). No wizard.** ADR-0038 Decision 3.
+
+---
+
+### Q-1.1-4.2 — Route breakdown: 1-page vs 2-page for bank browser + composer form?
+
+- Date raised: 2026-05-15 (v1.1-S4 morning ritual)
+- Asked of: architect (T3 scope — route structure)
+- Source: `apps/web/src/app/(teacher)/teacher/assignments/` (2-route pattern: list `page.tsx` + `new/page.tsx`); phase plan §S4 "pick from bank, preview, compose, publish to class"
+- Question: Should S4 implement (a) two separate routes — `/teacher/content` (bank browser) + `/teacher/content/new` (composer form) — for pattern parity with `/teacher/assignments[/new]`, or (b) a single combined route where the bank browser and composer form are co-located on one page?
+- Why ambiguous: Phase plan gives both "pick from bank" and "compose" as S4 verbs without specifying how many routes. The assignments pattern uses two routes; some compose flows are single-route with in-page state.
+- Blocking? no — layout detail
+- Assumed answer: Option a — two routes
+- Code affected: `apps/web/src/app/(teacher)/teacher/content/` (new directory + two route files)
+- Status: resolved
+- Resolution: **Operator confirmed Option a (2026-05-15): two routes — `/teacher/content` (bank browser) + `/teacher/content/new` (composer form). Pattern parity with `/teacher/assignments[/new]`.** ADR-0038 Decision 2.
+
+---
+
+### Q-1.1-4.1 — §N trap: does "Teacher Exam Authoring UI" mean item authoring or exam authoring?
+
+- Date raised: 2026-05-15 (v1.1-S4 morning ritual) — §N trap pattern (parallel to S2/S3 structural ambiguity catches)
+- Asked of: architect (T3 SCOPE BLOCKING — §N trap)
+- Source: v1.1-phase-plan §S4 title "Teacher Exam Authoring UI"; `docs/dev/decisions/0035-content-authoring-write-model.md` §Decision 2 ("Platform-only Stage 1 — only `platform_admin` (via Admin UI / direct API) and `service-role` (batch ingest) can create/update items. When teacher authoring ships, add `author_id uuid REFERENCES user_profile(id)`... update RLS to Pattern F."); phase plan §S4 body "pick from bank, preview, compose, publish to class. Consumes S1 + S2."
+- Question: Does "Teacher Exam Authoring UI" mean (a) exam authoring — teachers compose existing bank items into exam-mode assignments (using S2 `composer_params`), or (b) item authoring — teachers write new questions into the content bank?
+- Why ambiguous: The stage title's "authoring" can read as writing new items. But ADR-0035 §Decision 2 explicitly deferred teacher item writes: "When teacher authoring ships, add `author_id uuid REFERENCES user_profile(id)`... update RLS to Pattern F." Phase plan body says "pick from bank, preview, compose" — verbs consistent with exam authoring of existing bank items, not item creation. Zero migrations and zero RLS changes implied by phase plan verb set.
+- Blocking? yes — defines entire scope of S4
+- Assumed answer: Option a — exam authoring only (compose existing bank items into exam-mode assignments). ADR-0035 §Decision 2 holds.
+- Code affected: `apps/web/src/app/(teacher)/teacher/content/`, `packages/types/src/assignment.ts`, `supabase/functions/assignments-svc/handlers.ts`
+- Status: resolved
+- Resolution: **Operator confirmed Option a (2026-05-15): exam authoring only. ADR-0035 §Decision 2 holds. No item-authoring in S4. Zero migration, zero RLS change.** ADR-0038 Decision 1.
+
+---
+
 ### Q-1.1-3.5 — Auth model for simulation exam sessions: student self-serve vs teacher/proctor-assigned?
 
 - Date raised: 2026-05-15 (v1.1-S3 morning ritual)
