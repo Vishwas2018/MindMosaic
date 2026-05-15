@@ -46,6 +46,7 @@ import type {
   SessionSummaryDTO,
   CheckpointRequest,
   PracticeExamComposerParams,
+  SimulationParams,
   SessionId,
   SkillId,
   ItemId,
@@ -348,9 +349,17 @@ export async function createSession(
   // engine state so the analytics marker survives respondToSession's
   // EngineStateSchema parse → RPC re-write round-trip. Linear is the only
   // engine that participates in composed practice exams (mode='exam').
+  // v1.1-S3 (ADR-0037 §Decision 6, Q-1.1-3.1): simulation_params co-applied
+  // identically. Both are optional and orthogonal — a session can have
+  // neither, one, or both. mode='exam' covers both per spec §18.
+  const simulationParams: SimulationParams | undefined = body.simulation_params;
   const initialState =
-    composerParams !== undefined && baseState.engine_type === 'linear'
-      ? { ...baseState, composer_params: composerParams }
+    baseState.engine_type === 'linear'
+      ? {
+          ...baseState,
+          ...(composerParams !== undefined ? { composer_params: composerParams } : {}),
+          ...(simulationParams !== undefined ? { simulation_params: simulationParams } : {}),
+        }
       : baseState;
 
   const next = engine.getNextItem(initialState);
@@ -531,8 +540,18 @@ export async function respondToSession(
     time_remaining_ms: engine.getTimeRemaining(newState, eff.ms),
   };
 
+  // v1.1-S3 (ADR-0037 §Decision 2, Q-1.1-3.4 Gate 2): when a simulation exam
+  // has hide_feedback_until_submit set, the server suppresses per-item
+  // feedback in the response. The real is_correct value is still recorded in
+  // session_response via the atomic RPC above (line 484) and consulted at
+  // submitSession score time — only the client-facing return is muted.
+  const isLinearSim =
+    state.engine_type === 'linear' &&
+    state.simulation_params?.hide_feedback_until_submit === true;
+  const exposedIsCorrect = isLinearSim ? null : engineResp.is_correct;
+
   return ok<RecordResponseResponse>({
-    is_correct: engineResp.is_correct,
+    is_correct: exposedIsCorrect,
     explanation: null, // exam mode hides explanations; practice/repair will populate (v1.1)
     next_item: nextItem,
     termination,

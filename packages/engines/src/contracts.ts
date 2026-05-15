@@ -44,7 +44,7 @@ import {
 } from '@mm/types';
 import { ItemDTOSchema, type ItemDTO } from '@mm/types';
 import { MasteryBandSchema, type MasteryBand } from '@mm/types';
-import { PracticeExamComposerParamsSchema } from '@mm/types';
+import { PracticeExamComposerParamsSchema, SimulationParamsSchema } from '@mm/types';
 
 // ─── Engine type discriminator ───────────────────────────────────────────────
 // Mirrors DB enum `engine_type` from supabase/migrations/0001_enums_tenancy_auth.sql:62.
@@ -229,6 +229,12 @@ export const LinearEngineStateSchema = z.object({
   // is preserved across respondToSession's parse → RPC re-write round-trip
   // because it is declared here rather than relying on Zod strip behaviour.
   composer_params: PracticeExamComposerParamsSchema.optional(),
+  // v1.1-S3 (ADR-0037 §Decision 6, Q-1.1-3.1): analytics + enforcement marker
+  // for simulation-exam administration. Optional; same round-trip-safety
+  // pattern as composer_params. LinearEngine.canNavigateBack consults
+  // simulation_params.no_back_nav; assessment-svc respondToSession consults
+  // simulation_params.hide_feedback_until_submit to gate is_correct exposure.
+  simulation_params: SimulationParamsSchema.optional(),
 });
 export type LinearEngineState = z.infer<typeof LinearEngineStateSchema>;
 

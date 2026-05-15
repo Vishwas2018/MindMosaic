@@ -1189,3 +1189,262 @@ describe('assessment-svc — createSession composer_params wiring (v1.1-S2)', ()
     expect(inp!.composer).toBeUndefined();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// createSession + respondToSession — simulation_params wiring (v1.1-S3 / ADR-0037)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('assessment-svc — simulation_params wiring (v1.1-S3)', () => {
+  const SIM_PARAMS = { no_back_nav: true, hide_feedback_until_submit: true };
+
+  // Hand-rolled DbClient (same shape as the composer-marker test in S2 — Proxy
+  // mock can't capture chained .update().eq() payloads).
+  function buildCapturingClient(): {
+    db: DbClient;
+    capturedSnapshot: () => Record<string, unknown> | null;
+  } {
+    let capturedSnapshot: Record<string, unknown> | null = null;
+
+    function chainable(stub: { data: unknown; error: { message: string; code?: string } | null }): unknown {
+      const b: Record<string, unknown> = {};
+      b['select'] = () => b;
+      b['eq'] = () => b;
+      b['in'] = () => b;
+      b['or'] = () => b;
+      b['order'] = () => b;
+      b['limit'] = () => b;
+      b['range'] = () => b;
+      b['maybeSingle'] = () => Promise.resolve(stub);
+      b['single'] = () => Promise.resolve(stub);
+      b['then'] = (resolve: (v: typeof stub) => unknown) => resolve(stub);
+      return b;
+    }
+
+    const pathwayRow = buildPathwayRow();
+    const fcRow = buildFrameworkConfigRow();
+    const featureFlagRow = [{ feature_key: 'icas_math_y5', tenant_id: TENANT_ID, enabled: true }];
+
+    const db: DbClient = {
+      from(table: string) {
+        if (table === 'pathway')          return chainable({ data: pathwayRow,     error: null }) as never;
+        if (table === 'feature_flag')     return chainable({ data: featureFlagRow, error: null }) as never;
+        if (table === 'framework_config') return chainable({ data: fcRow,          error: null }) as never;
+        if (table === 'session_record') {
+          const tail = { eq: () => Promise.resolve({ error: null, data: null }) };
+          const builder: Record<string, unknown> = {
+            insert: () => Promise.resolve({ error: null, data: null }),
+            update: (patch: Record<string, unknown>) => {
+              if (patch['engine_state_snapshot'] !== undefined) {
+                capturedSnapshot = patch['engine_state_snapshot'] as Record<string, unknown>;
+              }
+              return tail;
+            },
+            delete: () => ({ eq: () => Promise.resolve({ error: null, data: null }) }),
+          };
+          return builder as never;
+        }
+        throw new Error(`unexpected table '${table}'`);
+      },
+      rpc: async () => ({ data: null, error: null }),
+    };
+    return { db, capturedSnapshot: () => capturedSnapshot };
+  }
+
+  const allowingFetcher: ContentSelectFetcher = async () => ({
+    ok: true,
+    data: [buildItem(1), buildItem(2), buildItem(3)],
+  });
+
+  it('createSession persists simulation_params on engine_state_snapshot (analytics marker)', async () => {
+    const { db, capturedSnapshot } = buildCapturingClient();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+        simulation_params: SIM_PARAMS,
+      },
+      fetchContentSelect: allowingFetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    const snap = capturedSnapshot();
+    expect(snap).not.toBeNull();
+    expect(snap!['engine_type']).toBe('linear');
+    expect(snap!['simulation_params']).toEqual(SIM_PARAMS);
+  });
+
+  it('createSession co-applies composer_params + simulation_params on the same session', async () => {
+    const { db, capturedSnapshot } = buildCapturingClient();
+    const composer = {
+      item_count: 3,
+      difficulty_distribution: { easy: 3, mid: 0, hard: 0 },
+      time_limit_ms: 1_800_000,
+    };
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+        composer_params: composer,
+        simulation_params: SIM_PARAMS,
+      },
+      fetchContentSelect: allowingFetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    const snap = capturedSnapshot();
+    expect(snap).not.toBeNull();
+    expect(snap!['composer_params']).toEqual(composer);
+    expect(snap!['simulation_params']).toEqual(SIM_PARAMS);
+  });
+
+  it('createSession regression: no simulation_params → no marker on engine_state_snapshot', async () => {
+    const { db, capturedSnapshot } = buildCapturingClient();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+      },
+      fetchContentSelect: allowingFetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    const snap = capturedSnapshot();
+    expect(snap).not.toBeNull();
+    expect(snap!['simulation_params']).toBeUndefined();
+  });
+
+  it('createSession response.navigation.can_go_back is false when simulation_params.no_back_nav', async () => {
+    const { db } = buildCapturingClient();
+    const result = await createSession({
+      client: db,
+      studentId: STUDENT_ID,
+      tenantId: TENANT_ID,
+      body: {
+        pathway_id: PATHWAY_ID,
+        assessment_profile_id: null,
+        repair_sequence_id: null,
+        assignment_id: null,
+        mode: 'exam' as never,
+        target_skills: null,
+        simulation_params: SIM_PARAMS,
+      },
+      fetchContentSelect: allowingFetcher,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // initialise sets current_index=0; canNavigateBack would normally be false at
+      // index 0 regardless. To prove the simulation gate IS the reason: see the
+      // engine-level tests in packages/engines/src/__tests__/linear.test.ts which
+      // exercise the locked branch past index 0. Here we confirm the createSession
+      // response surface reads from engine.canNavigateBack (it does — handlers.ts:385).
+      expect(result.data.navigation.can_go_back).toBe(false);
+    }
+  });
+
+  it('respondToSession mutes is_correct in response when hide_feedback_until_submit === true', async () => {
+    // Build a session_record whose engine_state_snapshot already carries the
+    // simulation flag set — i.e. a session that was created in simulation mode.
+    const state = buildInitialLinearState();
+    const simState = { ...state, simulation_params: SIM_PARAMS };
+    const row = buildSessionRow({ engine_state_snapshot: simState });
+    const db = client({
+      session_record: { data: row, error: null },
+      _rpc: {
+        create_session_response_atomic: {
+          data: [{ response_id: 'r-1', event_id: 'e-1', new_sequence: 1, new_version: 3 }],
+          error: null,
+        },
+      },
+    });
+    const result = await respondToSession({
+      client: db,
+      sessionId: SESSION_ID,
+      studentId: STUDENT_ID,
+      lockHeader: 'lock-abc',
+      body: respondBody,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // Client-facing return MUST be null per ADR-0037 §Decision 2.
+      expect(result.data.is_correct).toBeNull();
+      // Real correctness still recorded internally (RPC ran with p_is_correct=true).
+      // The stored value is verified via the RPC call inspection in the existing
+      // "rotates lock_token on success" test; this test asserts only the surfaced shape.
+    }
+  });
+
+  it('respondToSession returns real is_correct when simulation_params absent (regression)', async () => {
+    const row = buildSessionRow();
+    const db = client({
+      session_record: { data: row, error: null },
+      _rpc: {
+        create_session_response_atomic: {
+          data: [{ response_id: 'r-1', event_id: 'e-1', new_sequence: 1, new_version: 3 }],
+          error: null,
+        },
+      },
+    });
+    const result = await respondToSession({
+      client: db,
+      sessionId: SESSION_ID,
+      studentId: STUDENT_ID,
+      lockHeader: 'lock-abc',
+      body: respondBody,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.is_correct).toBe(true);
+    }
+  });
+
+  it('respondToSession returns real is_correct when simulation hide_feedback_until_submit === false explicit', async () => {
+    const state = buildInitialLinearState();
+    const simState = { ...state, simulation_params: { no_back_nav: true, hide_feedback_until_submit: false } };
+    const row = buildSessionRow({ engine_state_snapshot: simState });
+    const db = client({
+      session_record: { data: row, error: null },
+      _rpc: {
+        create_session_response_atomic: {
+          data: [{ response_id: 'r-1', event_id: 'e-1', new_sequence: 1, new_version: 3 }],
+          error: null,
+        },
+      },
+    });
+    const result = await respondToSession({
+      client: db,
+      sessionId: SESSION_ID,
+      studentId: STUDENT_ID,
+      lockHeader: 'lock-abc',
+      body: respondBody,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.is_correct).toBe(true);
+    }
+  });
+});

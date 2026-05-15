@@ -332,3 +332,96 @@ describe('PracticeExamComposerParamsSchema (v1.1-S2 / ADR-0036)', () => {
     ).toBe(true);
   });
 });
+
+// ─── SimulationParamsSchema — v1.1-S3 (ADR-0037) ─────────────────────────────
+// Two-flag minimum set; both default-true when simulation_params is present.
+// Orthogonal to PracticeExamComposerParams — co-application is valid.
+// strict_timing intentionally OMITTED (redundant against mode='exam' server-
+// authoritative timing per spec §18 'Exam' row).
+
+describe('SimulationParamsSchema (v1.1-S3 / ADR-0037)', () => {
+  it('accepts explicit { no_back_nav: true, hide_feedback_until_submit: true }', () => {
+    const r = types.SimulationParamsSchema.safeParse({
+      no_back_nav: true,
+      hide_feedback_until_submit: true,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.no_back_nav).toBe(true);
+      expect(r.data.hide_feedback_until_submit).toBe(true);
+    }
+  });
+
+  it('applies both defaults (true) when empty object provided', () => {
+    const r = types.SimulationParamsSchema.safeParse({});
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.no_back_nav).toBe(true);
+      expect(r.data.hide_feedback_until_submit).toBe(true);
+    }
+  });
+
+  it('accepts explicit non-strict flags (no_back_nav: false)', () => {
+    const r = types.SimulationParamsSchema.safeParse({
+      no_back_nav: false,
+      hide_feedback_until_submit: false,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.no_back_nav).toBe(false);
+      expect(r.data.hide_feedback_until_submit).toBe(false);
+    }
+  });
+
+  it('rejects non-boolean flag values', () => {
+    const r = types.SimulationParamsSchema.safeParse({
+      no_back_nav: 'true',
+      hide_feedback_until_submit: 1,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('CreateSessionRequest accepts simulation_params additively (no break to existing callers)', () => {
+    const minimal = {
+      assessment_profile_id: null,
+      repair_sequence_id: null,
+      assignment_id: null,
+      mode: 'exam' as const,
+      target_skills: null,
+      pathway_id: '00000000-0000-0000-0000-000000000010',
+    };
+    // Without simulation_params (existing callers): valid.
+    expect(types.CreateSessionRequestSchema.safeParse(minimal).success).toBe(true);
+    // With simulation_params: valid.
+    expect(
+      types.CreateSessionRequestSchema.safeParse({
+        ...minimal,
+        simulation_params: { no_back_nav: true, hide_feedback_until_submit: true },
+      }).success,
+    ).toBe(true);
+  });
+
+  it('CreateSessionRequest accepts composer_params + simulation_params co-applied (orthogonal)', () => {
+    const minimal = {
+      assessment_profile_id: null,
+      repair_sequence_id: null,
+      assignment_id: null,
+      mode: 'exam' as const,
+      target_skills: null,
+      pathway_id: '00000000-0000-0000-0000-000000000010',
+    };
+    const composer = {
+      item_count: 30,
+      difficulty_distribution: { easy: 10, mid: 15, hard: 5 },
+      time_limit_ms: 1_800_000,
+    };
+    const simulation = { no_back_nav: true, hide_feedback_until_submit: true };
+    expect(
+      types.CreateSessionRequestSchema.safeParse({
+        ...minimal,
+        composer_params: composer,
+        simulation_params: simulation,
+      }).success,
+    ).toBe(true);
+  });
+});

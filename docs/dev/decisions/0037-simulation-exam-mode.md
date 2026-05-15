@@ -1,7 +1,7 @@
 # ADR-0037 — Simulation Exam Mode Model (v1.1-S3)
 
-- Status: proposed
-- Date: 2026-05-15
+- Status: accepted
+- Date: 2026-05-15 (proposed) · 2026-05-15 (accepted at v1.1-S3 impl close)
 - Stage: v1.1-S3
 - Tags: backend | dx
 
@@ -238,15 +238,50 @@ Files (anticipated; impl T1 pre-read finalises):
   S2 precedent).
 - ADR-0037 — status proposed → accepted at impl close.
 
-**Determinism verification result (impl T1, post-pre-read):** TBD — populated at impl
-prep. If Option α verified, this line records "verified — EngineItem.version captured
-at session-create is consulted by the score path at <file>:<line>." If NOT verified,
-this line records "Option α gap — Q-1.1-3.6 filed, ADR-0037 §Decision 5 updated."
+**Determinism verification result (impl T1, 2026-05-15) — Gate 1 PASS.** The
+synchronous score path operates entirely on stored state; no database re-fetch of item
+content at any point. Item-version pinning is achieved via a full content snapshot in
+`state.planned_items` (`response_config`, `difficulty`, `skill_ids`, `version` all
+frozen at session-create from the content-svc selectItems response). Citations:
 
-**`hide_feedback_until_submit` enforcement result (impl T1):** TBD — populated at impl
-prep. Records whether any current backend path exposes per-item feedback during a
-session, and the gating site if so.
+- `supabase/functions/assessment-svc/handlers.ts:620` —
+  `const stateParse = EngineStateSchema.safeParse(row.engine_state_snapshot)` — score-
+  time state parsed from session_record, never re-fetched.
+- `supabase/functions/assessment-svc/handlers.ts:626` —
+  `terminateForConfig(state, 'user_submitted', fc.config, eff.ms)` — pure-function call.
+- `supabase/functions/assessment-svc/handlers.ts:468-473` — at respondToSession time,
+  `const item = planned.find(...); engineResp.is_correct = computeCorrectness(item, …)`
+  — EngineItem retrieved from `state.planned_items`, not re-fetched.
+- `supabase/functions/assessment-svc/handlers.ts:1042-1051` (`computeCorrectness`) —
+  reads `item.response_config['correct_option_id']` from snapshotted EngineItem.
+- `packages/engines/src/linear.ts:153-167` (`score`) — `state.responses.filter(r => r.
+  is_correct).length` — counts from stored responses.
+- `grep "v_item_current\|item_version" supabase/functions/assessment-svc/handlers.ts`
+  → 0 hits.
+- `grep "v_item_current" packages/engines/` → 0 hits.
+- `intelligence-svc/handlers.ts:1009` DOES query `item_version`, but that's the ASYNC
+  pipeline (intelligence layer), not the synchronous score path that produces
+  `raw_score`/`scaled_score`/`score_band` on the session_record.
 
-Commit: TBD (impl) · Related: Q-1.1-3.1..5, ADR-0022 (replay-determinism), ADR-0023
-(EngineState discriminated union), ADR-0036 (S2 composer; Q-1.1-2.5 round-trip-safety
-pattern), spec §18 lines 2619-2628, spec §22.7 line 2807
+Option γ holds — no new determinism code in S3. Q-1.1-3.6 NOT filed (gate passed).
+
+**`hide_feedback_until_submit` enforcement result (impl T1, 2026-05-15) — Gate 2
+EXPOSURE EXISTS, gated server-side in S3.** Per-item feedback IS exposed via
+`is_correct` in the `respondToSession` response (`supabase/functions/assessment-svc/
+handlers.ts:535` pre-S3: `is_correct: engineResp.is_correct`). For `mode='exam'`
+sessions with `simulation_params.hide_feedback_until_submit === true`, S3 gates this
+exposure server-side at the same location: when the linear-state's simulation flag is
+set, the response returns `is_correct: null` to the client. The real boolean is still
+stored in `session_response` via the atomic RPC (line 484) and consulted at
+submitSession score time — only the client-facing return is muted. The pre-existing
+issue that `next_item.response_config` may carry `correct_option_id` (see
+computeCorrectness at line 1042-1051) is a known v1 design constraint and out of S3
+scope; addressing it would require a server-side projection step on every item delivery.
+
+`explanation: null` (line 536) is already muted for `mode='exam'` per the existing
+comment — no S3 change needed there.
+
+Commit: this impl commit (see git log on v1.1/exam-content) · Related: Q-1.1-3.1..5,
+ADR-0022 (replay-determinism), ADR-0023 (EngineState discriminated union), ADR-0036
+(S2 composer; Q-1.1-2.5 round-trip-safety pattern), spec §18 lines 2619-2628, spec
+§22.7 line 2807

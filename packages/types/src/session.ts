@@ -52,6 +52,24 @@ export const PracticeExamComposerParamsSchema = z
   );
 export type PracticeExamComposerParams = z.infer<typeof PracticeExamComposerParamsSchema>;
 
+// ─── SimulationParams (v1.1-S3, ADR-0037) ───────────────────────────────────
+// Optional, additive extension to CreateSessionRequest. When present, the
+// session is administered under strict simulation-exam conditions. Orthogonal
+// to PracticeExamComposerParams — both can be set on the same request (compose
+// then administer). Minimum flag set per ADR-0037 §Decision 2:
+// - no_back_nav: locks LinearEngine.canNavigateBack to false. Enforced server-side.
+// - hide_feedback_until_submit: gates per-item feedback exposure in
+//   respondToSession (handlers.ts:535 — is_correct returned as null when true).
+// Both flags default-true when simulation_params is present.
+// strict_timing intentionally OMITTED — redundant against mode='exam'
+// server-authoritative timing per spec §18 'Exam' row.
+
+export const SimulationParamsSchema = z.object({
+  no_back_nav: z.boolean().default(true),
+  hide_feedback_until_submit: z.boolean().default(true),
+});
+export type SimulationParams = z.infer<typeof SimulationParamsSchema>;
+
 export const CreateSessionRequestSchema = z.object({
   assessment_profile_id: z.string().uuid().nullable(),
   repair_sequence_id: z.string().uuid().nullable(),
@@ -60,6 +78,7 @@ export const CreateSessionRequestSchema = z.object({
   target_skills: z.array(z.string()).nullable(),
   pathway_id: z.string().nullable(),
   composer_params: PracticeExamComposerParamsSchema.optional(),
+  simulation_params: SimulationParamsSchema.optional(),
 });
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 

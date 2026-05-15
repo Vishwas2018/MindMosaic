@@ -97,6 +97,48 @@ describe('LinearEngine — getNextItem & navigation', () => {
     expect(LinearEngine.canNavigateBack(state)).toBe(true);
   });
 
+  // ── v1.1-S3 (ADR-0037 §Decision 4) ───────────────────────────────────────
+  // canNavigateBack consults state.simulation_params.no_back_nav.
+  // No interface change; one state-flag branch ahead of the legacy
+  // `current_index > 0` check.
+
+  it('canNavigateBack returns false when simulation_params.no_back_nav === true (locked even past index 0)', () => {
+    const session = buildLinearSession(3);
+    let state = LinearEngine.initialise(session, buildLinearConfig());
+    // Advance past index 0 so the legacy `current_index > 0` rule would otherwise return true.
+    state = LinearEngine.recordResponse(
+      state,
+      buildResponse({ item: session.planned_items[0]!, isCorrect: true, offsetMs: 1_000 }),
+    );
+    if (state.engine_type !== 'linear') throw new Error('expected linear');
+    // Apply the simulation lock by extending state with the analytics+enforcement marker.
+    const lockedState = { ...state, simulation_params: { no_back_nav: true, hide_feedback_until_submit: true } };
+    expect(LinearEngine.canNavigateBack(lockedState)).toBe(false);
+  });
+
+  it('canNavigateBack preserves current_index>0 behaviour when simulation_params absent (regression)', () => {
+    const session = buildLinearSession(3);
+    let state = LinearEngine.initialise(session, buildLinearConfig());
+    state = LinearEngine.recordResponse(
+      state,
+      buildResponse({ item: session.planned_items[0]!, isCorrect: true, offsetMs: 1_000 }),
+    );
+    // simulation_params undefined — legacy logic must hold.
+    expect(LinearEngine.canNavigateBack(state)).toBe(true);
+  });
+
+  it('canNavigateBack allows back-nav when simulation_params.no_back_nav === false explicit', () => {
+    const session = buildLinearSession(3);
+    let state = LinearEngine.initialise(session, buildLinearConfig());
+    state = LinearEngine.recordResponse(
+      state,
+      buildResponse({ item: session.planned_items[0]!, isCorrect: true, offsetMs: 1_000 }),
+    );
+    if (state.engine_type !== 'linear') throw new Error('expected linear');
+    const opted = { ...state, simulation_params: { no_back_nav: false, hide_feedback_until_submit: false } };
+    expect(LinearEngine.canNavigateBack(opted)).toBe(true);
+  });
+
   it('edge: empty items array signals immediate termination', () => {
     const state = LinearEngine.initialise(buildLinearSession(0), buildLinearConfig());
     const next = LinearEngine.getNextItem(state);

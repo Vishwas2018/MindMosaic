@@ -168,6 +168,9 @@ export const LinearEngine: AssessmentEngine = {
 
   canNavigateBack(state: EngineState): boolean {
     assertLinearState(state);
+    // v1.1-S3 (ADR-0037 §Decision 4, Q-1.1-3.3): simulation mode locks
+    // back-navigation server-side. State-flag consultation; no interface change.
+    if (state.simulation_params?.no_back_nav === true) return false;
     return state.current_index > 0;
   },
 
