@@ -8,7 +8,7 @@
 - Last completed stage: v1.1-S5 — Student Practice + Simulation Flows (2026-05-18)
 - Next stage: v1.1-S6 — Bulk Content Import Pipeline + Authoring Spec Templates
 - v1 build window: **CLOSED** — 49/49 stages (Days 1–65 of 75; 10 days banked unused)
-- Active branch: `v1.1/exam-content` — 16 commits ahead of origin/main (9376d98 v1.0.0): a7a43d0 v1.1-S1 prep · e76dbfc v1.1-S1 impl · c4c868e v1.1-S1 chore · 3c1afe0 v1.1-S2 prep · 0bdd43b v1.1-S2 impl · f72a7a8 v1.1-S2 chore · ac36e80 ISSUE-0037 remediation · 560e2d2 v1.1-S3 prep · 96b19b5 v1.1-S3 impl · ca9c670 v1.1-S3 chore · 2faeb65 v1.1-S4 prep · b8b8290 v1.1-S4 impl · 5c9692f v1.1-S4 chore · 7b63e2a v1.1-S5 prep · 18aac21 v1.1-S5 impl · this chore
+- Active branch: `v1.1/exam-content` — 18 commits ahead of origin/main (9376d98 v1.0.0): a7a43d0 v1.1-S1 prep · e76dbfc v1.1-S1 impl · c4c868e v1.1-S1 chore · 3c1afe0 v1.1-S2 prep · 0bdd43b v1.1-S2 impl · f72a7a8 v1.1-S2 chore · ac36e80 ISSUE-0037 remediation · 560e2d2 v1.1-S3 prep · 96b19b5 v1.1-S3 impl · ca9c670 v1.1-S3 chore · 2faeb65 v1.1-S4 prep · b8b8290 v1.1-S4 impl · 5c9692f v1.1-S4 chore · 7b63e2a v1.1-S5 prep · 18aac21 v1.1-S5 impl · efb27e7 v1.1-S5 chore · dc851cf audit+ISSUE-0042 prep · b3eb668 ISSUE-0042 fix · this doc-chore
 - Buffer days consumed total: ~16.5 of 26 allocated (DEV_PLAN §3.1) — v1.1 unbudgeted
 - Phase 0 complete: Stages 1–14. Phase 0 buffer at close: 0 of 3 consumed.
 - Phase 1 complete: Stages 15–27 (13 stages). Phase 1 buffer at close: **+2 days banked**.
@@ -26,7 +26,7 @@
 - v1.1-S3 actual: ~1 day (v1.1 stages unbudgeted in DEV_PLAN).
 - v1.1-S4 actual: ~1 day (v1.1 stages unbudgeted in DEV_PLAN).
 - v1.1-S5 actual: ~1 day (v1.1 stages unbudgeted in DEV_PLAN).
-- Stages closed: **v1: 49/49 closed; v1.1: 5/7 closed (S1, S2, S3, S4, S5 complete)**
+- Stages closed: **v1: 49/49 closed; v1.1: 5/7 closed (S1, S2, S3, S4, S5 complete; S6 in progress)**
 
 ## Test suite
 
@@ -84,11 +84,11 @@ Full table: `docs/dev/perf/measurements.md`.
 - ADRs accepted: **40** (ADR-0001 through ADR-0040; ADR-0039 accepted at v1.1-S5 impl close 18aac21 with folded amendment: C3 time-limit option set + is_simulation LinearEngine-scope derivation; ADR-0040 accepted at v1.1-S5 chore audit close — v1.1 platform phase audit findings, 0 Critical / 1 High / 5 Medium / 4 Low)
 - ADRs proposed: 0
 - Workspaces: **17** — unchanged
-- Issues critical / high / medium / low: **0 / 1 / 13 / 19**
-  - High (1): ISSUE-0042 (Zod parse gap at API boundaries — **pre-S6 blocker**)
+- Issues critical / high / medium / low: **0 / 0 / 13 / 19**
+  - High (0): none
   - Medium (13): ISSUE-0009, ISSUE-0010, ISSUE-0011, ISSUE-0014, ISSUE-0021, ISSUE-0023, ISSUE-0027, ISSUE-0030, ISSUE-0039, ISSUE-0040, ISSUE-0041, ISSUE-0043, ISSUE-0045
   - Low (19): ISSUE-0015, ISSUE-0016, ISSUE-0017, ISSUE-0019, ISSUE-0020, ISSUE-0022, ISSUE-0024, ISSUE-0025, ISSUE-0028, ISSUE-0031, ISSUE-0032, ISSUE-0033, ISSUE-0034, ISSUE-0035, ISSUE-0038 (info), ISSUE-0044, ISSUE-0046, ISSUE-0047, ISSUE-0048
-  - Resolved: ISSUE-0005, 0006, 0007, 0008, 0012, 0013, 0018, 0026, 0029, 0036, 0037
+  - Resolved: ISSUE-0005, 0006, 0007, 0008, 0012, 0013, 0018, 0026, 0029, 0036, 0037, **0042** (content-svc scope; b3eb668 2026-05-19)
 - Migrations: **0001–0022** (migrations 0001–0020 pgTAP-verified 451/451; 0021 SQL on disk deferred-validation; 0022 adds composer_params + simulation_params jsonb nullable columns to assignment table — deferred-validation per 0021 pattern)
 - Open questions: **0** — Q-1.1-1.0..9 + Q-1.1-2.1..5 + Q-1.1-3.1..5 + Q-1.1-4.1..8 + Q-1.1-5.1..6 all resolved
 - Open bugs: 0
@@ -106,17 +106,22 @@ Full table: `docs/dev/perf/measurements.md`.
 
 **v1.1-S6 — Bulk Content Import Pipeline + Authoring Spec Templates** is next. **S5 platform phase COMPLETE — S6 unblocked.**
 
-**ISSUE-0042 is the one pre-S6 blocker (High):** fix Zod parse gap in `content-svc/handlers.ts:840–848` (createItem/updateItem use assertion-based checks instead of `ItemCreateDTOSchema.parse()`) at S6 prep before any import-pipeline implementation. ADR-0040 decision: all other 9 audit findings carry.
+**ISSUE-0042 CLOSED** (b3eb668 2026-05-19 — content-svc scope). assessment-svc index.ts:222 type-assertion gap carries non-blocking per ADR-0040. **S6 is unblocked.**
 
-Before any code:
-- Read `docs/dev/v1.1-phase-plan.md §S6` in full (full §Phase Exit Record confirms S6 unblocked).
-- Resolve the 5 open decisions deferred to S6 morning ritual (listed at end of v1.1-phase-plan.md).
-- Fix ISSUE-0042 (`content-svc/handlers.ts` Zod gap) — pre-S6 blocker per ADR-0040.
-- Read `supabase/functions/content-svc/` — S6 extends S1's CRUD endpoints with batch import.
-- Read `packages/types/src/` for item/stimulus schemas — manifest format must match.
-- Legal review of authoring spec templates is a **hard prerequisite** before bulk authoring runs (S7.1 gate).
-- S6 has no UI component — no T5 mockup gate. Standard prep/impl/chore discipline applies.
-- ADR for content-import pipeline patterns required (listed as ADR-00XX in v1.1-phase-plan §S6).
+**v1.1-S6 morning ritual complete (2026-05-19).** Q-1.1-6.1..6 all resolved. ADR-0041 draft pending prep commit. T5 adapted to backend artifacts (no UI). Three-gate flow:
+- Gate I = API design sketch + manifest format spec + ADR-0041 outline → operator approval
+- Gate II = handler skeleton + Zod manifest schema + router branch + test stubs
+- Gate III = fill (idempotency, partial-failure, SHA dup check, contract tests, docs)
+
+Key S6 constraints:
+- `POST /content/import` per spec §21.2 (not `/content/items/batch`)
+- `copyright_declaration: z.literal('original')` required field in manifest Zod schema
+- Exact-match SHA dup check on normalised stem JSON; fuzzy deferred (ISSUE-0049)
+- All imports land as `draft`; no lifecycle override in manifest
+- Dry-run mode (`?dry_run=true`) required per spec §21.2
+- Legal review of authoring spec templates: hard gate for S7.1; owner = operator-side
+- Pattern G strict (platform_admin + service-role); Idempotency-Key on POST
+- 0 new migrations expected
 
 **Carry-forward operator follow-ups:**
 

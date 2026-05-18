@@ -89,28 +89,6 @@
 
 ---
 
-### ISSUE-0042 — Zod parse gap at content-svc and assessment-svc API boundaries
-
-- Status: open
-- Severity: high
-- Reported: 2026-05-18 (v1.1-S5 chore close — P2 audit)
-- Area: backend (supabase/functions/content-svc/handlers.ts, assessment-svc/index.ts)
-- Tags: validation · zod · api-boundary · security
-
-**Summary.** Two API boundary violations of the CLAUDE.md non-negotiable "Zod validation at every API boundary":
-
-1. **content-svc `createItem` / `updateItem`** (`handlers.ts:840–848`): input validation uses assertion-based checks (`typeof body.field !== 'string'`) instead of `ItemCreateDTOSchema.parse()`. This bypasses Zod's full schema enforcement — enum values, string length constraints, nested object shapes — and leaves the batch import endpoint (S6) building on an unvalidated write path.
-2. **assessment-svc `createSession`** (`index.ts`): `const body = JSON.parse(bodyText) as CreateSessionRequest` — type assertion with no Zod parse. Any malformed or unexpected field passes through to the engine layer.
-
-**Pre-S6 blocker: YES.** S6 extends the content-svc write path with batch import. The batch endpoint must validate every item via `ItemCreateDTOSchema.parse()` per the S6 spec; if the underlying createItem path also lacks Zod parse, the validation guarantee is hollow. Fix `content-svc` before S6 impl commit.
-
-**Fix.**
-- `content-svc/handlers.ts`: Replace assertion checks with `ItemCreateDTOSchema.parse(body)` (or `.safeParse` with structured error return) on `createItem` and `updateItem`.
-- `assessment-svc/index.ts`: Replace `as CreateSessionRequest` with `CreateSessionRequestSchema.parse(body)` wrapping.
-Add tests for malformed-input rejection at both boundaries. 
-
----
-
 ### ISSUE-0041 — N+1 query patterns in assignments-svc
 
 - Status: open
@@ -693,6 +671,23 @@ L5 writes `async_pipeline_event` (scope_type='student_pathway'); L7/L9 write bot
 **Tracking pointer.** v1.1-S4 impl commit b8b8290. Spec covers `/teacher/content` and `/teacher/content/new`. ADR-0038 §Implementation Notes.
 
 ## Resolved
+
+### ISSUE-0042 — Zod parse gap at content-svc and assessment-svc API boundaries
+
+- Status: resolved — 2026-05-19 (commit b3eb668)
+- Severity at resolution: high
+- Reported: 2026-05-18 (v1.1-S5 chore close — P2 audit)
+- Area: backend (supabase/functions/content-svc/handlers.ts, assessment-svc/index.ts)
+- Tags: validation · zod · api-boundary · security
+
+**Summary.** Two API boundary violations of the CLAUDE.md non-negotiable "Zod validation at every API boundary":
+
+1. **content-svc `createItem` / `updateItem`** (`handlers.ts:840–848`): assertion-based checks instead of `ItemCreateDTOSchema.parse()`.
+2. **assessment-svc `createSession`** (`index.ts:222`): `as CreateSessionRequest` type assertion with no Zod parse.
+
+**Resolution.** content-svc scope closed at b3eb668 (2026-05-19): `createItem` and `updateItem` now use `ItemCreateDTOSchema.safeParse()` / `ItemUpdateDTOSchema.safeParse()`; 422 VALIDATION_ERROR returned on failure with first-issue field-path message. +3 contract tests. content-svc scope only; assessment-svc `index.ts:222` type-assertion gap carries non-blocking per ADR-0040.
+
+---
 
 ### ISSUE-0037 — `sb_secret_*` literal observed in local working tree of `apps/web/.env.local.example`
 
