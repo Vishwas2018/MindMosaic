@@ -9,6 +9,175 @@
 
 ## Resolved
 
+### Q-1.1-5.6 — Post-submission results: simulation-specific variant or reuse /results/[id]?
+
+- Date raised: 2026-05-18 (v1.1-S5 morning ritual)
+- Asked of: self (T3 tight detail)
+- Source: `apps/web/src/app/(student)/results/[id]/page.tsx` (mode='exam' → hero ring + topic
+  breakdown); SCREEN_SPECS §11 Variants table (scored variant for NAPLAN/ICAS/mock = ring +
+  accuracy + topic breakdown); ADR-0037 §Decision 1 (simulation sessions use mode='exam')
+- Question: Should S5 add a simulation-specific results variant on `/results/[id]`, or reuse
+  the existing scored (mode='exam') results view?
+- Why ambiguous: Simulation sessions are `mode='exam'`; the existing results page already
+  renders the scored variant with hero ring + accuracy + topic breakdown. A dedicated simulation
+  results view might add "Taken under exam conditions" context, but the core data is identical.
+- Blocking? no — scope cut
+- Assumed answer: Reuse existing `/results/[id]`; no simulation-specific variant.
+- Code affected: none (existing results page unchanged)
+- Status: resolved
+- Resolution: **Operator confirmed reuse existing `/results/[id]` (2026-05-18): no
+  simulation-specific results variant in S5. Simulation sessions use `mode='exam'`; existing
+  scored results view renders correctly. A "Taken under exam conditions" badge is deferred to
+  v1.1.2 pending UX evidence.** ADR-0039 Decision 6.
+
+---
+
+### Q-1.1-5.5 — Existing session-running UI: extend or leave unchanged?
+
+- Date raised: 2026-05-18 (v1.1-S5 morning ritual) — conditioned on Q-1.1-5.4 resolution
+- Asked of: architect (T3 structural — scope)
+- Source: `apps/web/src/app/(student)/session/[id]/exam/page.tsx:164` (ExamPage — no
+  simulation indicator currently); Q-1.1-5.4 resolution (Option a — `is_simulation` exposed
+  on `SessionStateDTO`)
+- Question: Following Q-1.1-5.4 resolving to Option a, should S5 (a) add a `<SimulationBanner
+  />` component on the exam page with conditional render on `state.is_simulation === true`, or
+  (b) leave the exam page unchanged and rely on the entry screen copy to communicate conditions?
+- Why ambiguous: Q-1.1-5.4 Option a makes `is_simulation` server-authoritative. Whether to
+  render a banner in the session is a separate UX scope decision.
+- Blocking? no — conditioned on Q-1.1-5.4 resolution
+- Assumed answer: Option a — add `<SimulationBanner />`, minimal scope.
+- Code affected: `apps/web/src/app/(student)/session/[id]/exam/page.tsx` (SimulationBanner
+  conditional)
+- Status: resolved
+- Resolution: **Operator confirmed Option a (2026-05-18): add `<SimulationBanner />`
+  conditional on `state.is_simulation === true`. Minimal — one new inline component, one
+  conditional branch on exam page. No new UI primitive (`SimulationBanner` is a thin inline
+  composition of existing primitives within exam-page scope).** ADR-0039 Decision 5.
+
+---
+
+### Q-1.1-5.4 — Simulation-mode UI affordances: how does client know this is a simulation session?
+
+- Date raised: 2026-05-18 (v1.1-S5 morning ritual) — structural decision requiring T3
+  round-trip
+- Asked of: architect (T3 STRUCTURAL — type contract + assessment-svc change)
+- Source: `packages/types/src/session.ts:152–164` (`SessionStateDTOSchema` — no
+  `simulation_params` field); `apps/web/src/app/(student)/session/[id]/exam/page.tsx:164`
+  (ExamPage — no simulation indicator); ADR-0037 §Decision 4 (`simulation_params` stored in
+  `engine_state_snapshot`, not exposed in state DTO); R12 morning-ritual pre-read
+- Question: Should S5 (a) add `is_simulation: boolean` to `SessionStateDTOSchema` and have
+  `assessment-svc` `getSessionState` read `engine_state_snapshot.simulation_params` and set
+  `is_simulation = !!state.simulation_params`, enabling a `<SimulationBanner />` on the exam
+  page; (b) infer simulation from `navigation.can_go_back` being consistently false (fragile
+  — also false at first item of any exam); (c) pass `?simulation=true` query param on
+  navigation (client-authoritative, not server-backed, lost on resume); or (d) no simulation
+  indicator on the exam page at all?
+- Why ambiguous: `SessionStateDTO` does not expose `simulation_params` (confirmed R12). Options
+  b/c are fragile or non-resumable. Option d is minimal scope but poor UX for simulation
+  fidelity. Option a is clean but adds a type contract change, assessment-svc handler change,
+  and a new banner component.
+- Blocking? yes — if Option a, impl scope includes types + SDK auto-propagation +
+  assessment-svc handler + exam page change
+- Assumed answer: Option a — additive `is_simulation: boolean`; server-authoritative; banner
+  persists on resume.
+- Code affected: `packages/types/src/session.ts` (SessionStateDTOSchema), `supabase/functions/
+  assessment-svc/handlers.ts` (getSessionState reads simulation_params), `apps/web/src/app/
+  (student)/session/[id]/exam/page.tsx` (SimulationBanner conditional)
+- Status: resolved
+- Resolution: **Operator confirmed Option a, scope-expanded (2026-05-18): add
+  `is_simulation: z.boolean()` to `SessionStateDTOSchema` additively. `assessment-svc`
+  `getSessionState` reads `engine_state_snapshot.simulation_params` and sets
+  `is_simulation = !!state.simulation_params`. S5 scope includes: types + SDK
+  auto-propagation + assessment-svc handler change + `SimulationBanner` conditional on exam
+  page. Server-authoritative; banner persists on session resume.** ADR-0039 Decision 4.
+
+---
+
+### Q-1.1-5.3 — Does S5 ship a student self-serve composer form?
+
+- Date raised: 2026-05-18 (v1.1-S5 morning ritual)
+- Asked of: architect (T3 structural — scope)
+- Source: v1.1-phase-plan.md §S5 ("Consumes S3 + S4"); ADR-0036 Decision 8 (student
+  self-serve auth for `composer_params` sessions); `apps/web/src/app/(student)/session-
+  selection/page.tsx` (existing pathway buttons without `composer_params`)
+- Question: Does S5 ship (a) a student-side composer form — pathway picker + difficulty
+  distribution (easy/mid/hard integer counts) + item count + time limit — mirroring S4's
+  teacher form for student self-serve; or (b) no student composer — S5 limited to navigation
+  polish on the existing session-selection screen, interpreting "consumes S3 + S4" narrowly
+  as teacher-assigned exam start only?
+- Why ambiguous: Phase plan says "Consumes S3 + S4." Option b interprets this as meaning
+  student-start of teacher-published S4 assignments (already works via `/assignments` +
+  `useStartAssignment`). Option a interprets it as student-initiated composed sessions —
+  the natural student counterpart to S4's teacher-side form.
+- Blocking? yes — defines the primary S5 deliverable
+- Assumed answer: Option a — student self-serve composer form.
+- Code affected: `apps/web/src/app/(student)/practice/page.tsx`, `apps/web/src/app/(student)/
+  exam-sim/page.tsx`
+- Status: resolved
+- Resolution: **Operator confirmed Option A (2026-05-18): S5 ships a student-side self-serve
+  composer form (pathway picker + difficulty distribution + item count + time limit). Mirrors
+  S4 teacher form on student side. Student-initiated composed/simulation sessions are the S5
+  deliverable; teacher-assigned exam start already works from Stage 40 via `/assignments` +
+  `useStartAssignment`.** ADR-0039 Decision 3.
+
+---
+
+### Q-1.1-5.2 — Route breakdown: two routes vs single route
+
+- Date raised: 2026-05-18 (v1.1-S5 morning ritual)
+- Asked of: architect (T3 structural — route structure)
+- Source: v1.1-phase-plan.md §S5 ("apps/web/src/app/(student)/practice/* + .../exam-sim/*");
+  `apps/web/src/app/(teacher)/teacher/content/` (S4 two-route pattern: `page.tsx` +
+  `new/page.tsx`); `apps/web/src/app/(student)/session-selection/page.tsx` (single combined
+  route for all modes)
+- Question: Should S5 implement (a) two separate routes `/practice` + `/exam-sim` with a
+  shared `<StudentComposerForm simulationLocked={bool} />` component, (b) a single unified
+  `/compose` route with a simulation toggle, or (c) extend existing `/session-selection` with
+  composer options?
+- Why ambiguous: Phase plan names both routes explicitly. Option a has ADR-0038 pattern
+  parity. Option b minimises route surface but departs from the two-route S4 pattern. Option c
+  avoids new routes but pollutes the existing session-selection screen.
+- Blocking? no — layout detail
+- Assumed answer: Option a — two routes with shared form component.
+- Code affected: `apps/web/src/app/(student)/practice/page.tsx`, `apps/web/src/app/(student)/
+  exam-sim/page.tsx` (both NET-NEW); shared `StudentComposerForm` component (NET-NEW)
+- Status: resolved
+- Resolution: **Operator confirmed Option A with shared form component (2026-05-18): two
+  routes `/practice` + `/exam-sim`, both thin wrappers around `<StudentComposerForm
+  simulationLocked={bool} />`. Pattern parity with S4's two-route model; code surface
+  minimised via shared component.** ADR-0039 Decision 2.
+
+---
+
+### Q-1.1-5.1 — §N trap: what does /exam-sim/* map to?
+
+- Date raised: 2026-05-18 (v1.1-S5 morning ritual) — §N trap (parallel to S2/S3/S4 structural
+  ambiguity catches)
+- Asked of: architect (T3 SCOPE BLOCKING — §N trap)
+- Source: v1.1-phase-plan.md §S5 ("apps/web/src/app/(student)/exam-sim/*"); ADR-0037
+  §Decision 1 (simulation exam mode = `mode='exam'` + `simulation_params`; no new session
+  type, no new session-running surface); `UI_CONTRACT §4.6` (focus shell for session-running
+  surfaces)
+- Question: Does `/exam-sim/*` map to (a) a student entry/setup screen that calls
+  `useCreateSession` with `simulation_params` and redirects to the existing
+  `/session/[id]/exam`, or (b) a new session-running surface with different UX parallel to
+  `/session/[id]/exam`?
+- Why ambiguous: Phase plan names `/exam-sim/*` as a route but does not specify entry screen
+  vs session-running surface. ADR-0037 established `mode='exam'` + `simulation_params` as the
+  mechanism — no new route type, no new engine. Option b would fork the exam engine page and
+  create a parallel session-running surface not backed by any spec distinction.
+- Blocking? yes — defines the entire UX shape and scope of S5
+- Assumed answer: Option A — entry/setup screen only; session runs on existing
+  `/session/[id]/exam`.
+- Code affected: `apps/web/src/app/(student)/exam-sim/page.tsx` (NET-NEW entry screen);
+  `apps/web/src/app/(student)/session/[id]/exam/page.tsx` (unchanged per Option A)
+- Status: resolved
+- Resolution: **Operator confirmed Option A (2026-05-18): `/exam-sim` is a student entry/setup
+  screen that calls `useCreateSession` with `simulation_params` and redirects to the existing
+  `/session/[id]/exam`. No new session-running surface.** ADR-0039 Decision 1.
+
+---
+
 ### Q-1.1-4.8 — Should ADR-0038 §Decision 4 "zero migrations" be corrected?
 
 - Date raised: 2026-05-18 (v1.1-S4 pre-push verification)
