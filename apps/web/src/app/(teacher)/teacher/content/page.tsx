@@ -9,43 +9,15 @@
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AppShell,
-  Brand,
   Button,
   Card,
   EmptyState,
-  NavLink,
-  Sidebar,
   TopBar,
 } from '@mm/ui'
 import { usePathways } from '@mm/sdk'
 import type { PathwayDTO } from '@mm/types'
 import { EXAM_CONTENT_COPY as C } from '../../copy/examContent'
-
-// ── Sidebar nav (D7: includes Exam Content entry) ─────────────────────────────
-
-export function TeacherSidebarNav({ pathname }: { pathname: string }) {
-  const nav = [
-    { href: '/teacher', label: 'Overview' },
-    { href: '/teacher/students', label: 'Students' },
-    { href: '/teacher/assignments', label: 'Assignments' },
-    { href: '/teacher/content', label: 'Exam Content' },
-    { href: '/teacher/analytics', label: 'Analytics' },
-  ]
-  return (
-    <Sidebar variant="teacher">
-      <div className="p-4 border-b border-[var(--border)]">
-        <Brand logoSrc="/logo.svg" size="sm" />
-      </div>
-      <nav className="flex-1 px-2 py-4 space-y-0.5" aria-label="Teacher navigation">
-        {nav.map(({ href, label }) => (
-          <NavLink key={href} href={href} active={pathname.startsWith(href) && (href !== '/teacher' || pathname === '/teacher')}>
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-    </Sidebar>
-  )
-}
+import { TeacherSidebarNav } from '../../../../components/teacher/TeacherSidebarNav'
 
 // ── State components ──────────────────────────────────────────────────────────
 

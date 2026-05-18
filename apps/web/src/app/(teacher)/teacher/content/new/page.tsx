@@ -14,7 +14,7 @@ import {
   EmptyState,
 } from '@mm/ui'
 import { usePathways, useMyClasses, useCreateAssignment } from '@mm/sdk'
-import { TeacherSidebarNav } from '../page'
+import { TeacherSidebarNav } from '../../../../../components/teacher/TeacherSidebarNav'
 import { usePathname } from 'next/navigation'
 import { EXAM_CONTENT_COPY as C } from '../../../copy/examContent'
 import type { PathwayDTO } from '@mm/types'

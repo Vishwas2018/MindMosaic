@@ -5,6 +5,161 @@
 
 ## Open
 
+### ISSUE-0048 — PROJECT_STATE.md per-package test count discrepancy
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-18 (v1.1-S5 chore close — P8 audit)
+- Area: docs (docs/dev/PROJECT_STATE.md)
+- Tags: documentation · test-count
+
+**Summary.** `docs/dev/PROJECT_STATE.md` §Test suite documents the per-package breakdown as `@mm/types=160` and `apps/web=85`. Actual `pnpm -r run test` output at v1.1-S5 close shows `@mm/types=153` and `apps/web=92`. Total 828 is correct in both the docs and the actual run — the discrepancy is in how the +33 S5 delta was distributed across packages. No functional impact; total gate count is correct.
+
+**Fix (documentation).** Correct the per-package breakdown line in `PROJECT_STATE.md` to `@mm/types=153` and `apps/web=92` at next evening-ritual overwrite.
+
+---
+
+### ISSUE-0047 — Inline LoadingState in S4 teacher content pages
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-18 (v1.1-S5 chore close — P4 audit)
+- Area: frontend (apps/web/src/app/(teacher)/content/)
+- Tags: components · ui-consistency
+
+**Summary.** `apps/web/src/app/(teacher)/content/page.tsx` and `teacher/content/new/page.tsx` define local inline skeleton `LoadingState()` functions instead of importing the shared `LoadingState` component from `@mm/ui`. This introduces a divergence from the design system — future changes to the shared component will not propagate to these pages.
+
+**Fix.** Replace the inline `LoadingState` definitions with imports from `@mm/ui`. No behavior change — purely an import correction. Address at next S4/teacher-content touch.
+
+---
+
+### ISSUE-0046 — role="alert" misuse on non-urgent form validation messages
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-18 (v1.1-S5 chore close — P5 audit)
+- Area: frontend (apps/web/src/components/student/StudentComposerForm.tsx)
+- Tags: a11y · aria · form-validation
+
+**Summary.** `StudentComposerForm.tsx` lines 216, 247, 296, 360 apply `role="alert"` to inline form validation messages (e.g., item count bounds, difficulty sum mismatch). `role="alert"` is semantically reserved for time-sensitive/urgent interruptions (live region, assertive). Non-urgent validation feedback should use `role="status"` (polite) or no live-region role at all when tied to a submit action.
+
+**Fix.** Replace `role="alert"` with `role="status"` on field-level validation messages; reserve `role="alert"` for genuine error conditions. Address at next StudentComposerForm touch.
+
+---
+
+### ISSUE-0045 — Focus management missing on /practice and /exam-sim route entry
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-18 (v1.1-S5 chore close — P5 audit)
+- Area: frontend (apps/web/src/app/(student)/practice/, exam-sim/)
+- Tags: a11y · focus-management · navigation
+
+**Summary.** Neither `/practice/page.tsx` nor `/exam-sim/page.tsx` manage focus on route entry. After navigating to these pages (e.g., via StudentNav), keyboard and screen-reader users land with focus in an indeterminate position. UI_CONTRACT §a11y (lines 748–759) requires focus to land on the page heading or the first interactive element after navigation. The `<SimulationBanner />` on `exam/page.tsx` is correctly handled (it is an inline conditional, not a navigation target) — this issue covers the entry pages only.
+
+**Fix.** Add `useEffect(() => { headingRef.current?.focus() }, [])` on route entry, or use Next.js `router.events` approach per existing pattern in other student routes. Address before launch or at next S5 touch.
+
+---
+
+### ISSUE-0044 — assignments-svc flat error format inconsistent with other services
+
+- Status: open
+- Severity: low
+- Reported: 2026-05-18 (v1.1-S5 chore close — P3 audit)
+- Area: backend (supabase/functions/assignments-svc/handlers.ts)
+- Tags: error-format · api-consistency
+
+**Summary.** `assignments-svc/handlers.ts` returns flat error objects `{ data: null, status: 4xx, error: 'CODE' }`. `content-svc` and `assessment-svc` use a tagged-union format `{ ok: false, error: { code, message } }`. The SDK error-handling layer normalises responses, but divergence in raw wire format makes direct debugging and contract testing harder. Found at P3 error-handling audit.
+
+**Fix.** Align `assignments-svc` error shape with the tagged-union format used by other services. Low priority — SDK normalisation masks the discrepancy at runtime. Address when assignments-svc is next touched for S6+ work.
+
+---
+
+### ISSUE-0043 — assessment-svc /respond and /submit missing Idempotency-Key enforcement
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-18 (v1.1-S5 chore close — P2 audit)
+- Area: backend (supabase/functions/assessment-svc/index.ts)
+- Tags: idempotency · api · assessment-svc
+
+**Summary.** `assessment-svc` POST `/sessions/{id}/respond` and POST `/sessions/{id}/submit` do not read or enforce the `Idempotency-Key` header. The CLAUDE.md non-negotiable requires `Idempotency-Key` on every `POST`/`PATCH`/`DELETE`. `assignments-svc` has the same gap (tracked as ISSUE-0023 — logged-only, not enforced). For `/respond`, duplicate delivery without idempotency protection risks double-scoring a session response; for `/submit`, duplicate submission risks double-closing a session. Extends the pattern identified in ISSUE-0023.
+
+**Fix.** Add `Idempotency-Key` header extraction and idempotency-window check (matching the content-svc pattern) to both endpoints. Address before launch — high replay risk in mobile/flaky-network scenarios.
+
+---
+
+### ISSUE-0042 — Zod parse gap at content-svc and assessment-svc API boundaries
+
+- Status: open
+- Severity: high
+- Reported: 2026-05-18 (v1.1-S5 chore close — P2 audit)
+- Area: backend (supabase/functions/content-svc/handlers.ts, assessment-svc/index.ts)
+- Tags: validation · zod · api-boundary · security
+
+**Summary.** Two API boundary violations of the CLAUDE.md non-negotiable "Zod validation at every API boundary":
+
+1. **content-svc `createItem` / `updateItem`** (`handlers.ts:840–848`): input validation uses assertion-based checks (`typeof body.field !== 'string'`) instead of `ItemCreateDTOSchema.parse()`. This bypasses Zod's full schema enforcement — enum values, string length constraints, nested object shapes — and leaves the batch import endpoint (S6) building on an unvalidated write path.
+2. **assessment-svc `createSession`** (`index.ts`): `const body = JSON.parse(bodyText) as CreateSessionRequest` — type assertion with no Zod parse. Any malformed or unexpected field passes through to the engine layer.
+
+**Pre-S6 blocker: YES.** S6 extends the content-svc write path with batch import. The batch endpoint must validate every item via `ItemCreateDTOSchema.parse()` per the S6 spec; if the underlying createItem path also lacks Zod parse, the validation guarantee is hollow. Fix `content-svc` before S6 impl commit.
+
+**Fix.**
+- `content-svc/handlers.ts`: Replace assertion checks with `ItemCreateDTOSchema.parse(body)` (or `.safeParse` with structured error return) on `createItem` and `updateItem`.
+- `assessment-svc/index.ts`: Replace `as CreateSessionRequest` with `CreateSessionRequestSchema.parse(body)` wrapping.
+Add tests for malformed-input rejection at both boundaries. 
+
+---
+
+### ISSUE-0041 — N+1 query patterns in assignments-svc
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-18 (v1.1-S5 chore close — P7 audit)
+- Area: backend (supabase/functions/assignments-svc/handlers.ts)
+- Tags: performance · n+1 · assignments-svc
+
+**Summary.** Four `await`-in-loop patterns identified in `assignments-svc/handlers.ts`:
+
+1. `publishAssignment` (~lines 570–576): per-`classId` loop calling individual DB queries.
+2. `getAssignmentsForStudent` (~lines 716–720): `fetchDisplayName` called per assignment row.
+3. `getAssignmentsForClass` (~lines 784–787): `fetchDisplayName` called per assignment row.
+4. `getAssignmentTracking` (~lines 813–816): `fetchDisplayName` called per tracking row.
+
+Under small class sizes (v1 launch), these are acceptable. At scale (50+ students per class), these become O(n) DB round-trips per request, violating the `BUILD_CONTRACT §10` dashboard load budget (p95 2000 ms).
+
+**Fix.** Batch `fetchDisplayName` lookups into a single `IN (...)` query per handler; join or use `Promise.all` with a single batch call. Address before launch scaling validation or when assignments-svc performance is next measured.
+
+---
+
+### ISSUE-0040 — SDK hooks missing staleTime causes refetch storms
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-18 (v1.1-S5 chore close — P7 audit)
+- Area: frontend (packages/sdk/src/hooks/content.ts, session.ts, assignments.ts)
+- Tags: performance · react-query · sdk
+
+**Summary.** Three SDK hooks use React Query with `staleTime` defaulting to 0: `usePathways` (`content.ts`), `useSessionState` (`session.ts`), and `useAssignmentsForClass` (`assignments.ts`). With `staleTime: 0`, React Query re-fetches from the server on every window focus event and component remount. On the `/practice` and `/exam-sim` pages, `usePathways` fires a fresh network request every time the user alt-tabs back to the browser. Under `useSessionState` during an active exam, this causes unnecessary re-fetches mid-session. `BUILD_CONTRACT §10` item delivery p95 budget is 200 ms; refetch storms compound latency.
+
+**Fix.** Add appropriate `staleTime` values: `usePathways` 5–10 minutes (reference data), `useSessionState` 0–30 seconds (session data, should be fresh but not every focus), `useAssignmentsForClass` 1–2 minutes. Coordinate with cache invalidation on mutation. Address before launch or when SDK hooks are next touched.
+
+---
+
+### ISSUE-0039 — Submit error does not discriminate 402 Upgrade Required
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-18 (v1.1-S5 chore close — P3 + P4 audit)
+- Area: frontend (apps/web/src/components/student/StudentComposerForm.tsx, apps/web/src/app/(teacher)/content/new/page.tsx)
+- Tags: error-handling · billing · upgrade-flow
+
+**Summary.** `StudentComposerForm.tsx:359–362` and `teacher/content/new/page.tsx:347–354` render a generic error message on any submit failure. Neither handler inspects the response status for 402 and redirects or renders the `<UpgradeState />` component. The 5-state matrix requires the Upgrade (402) state on every data-bound component (UI_CONTRACT:547–557); the form-submit error path is a second entry point where a 402 can surface (e.g., user upgrades plan in another tab, then submits a form — the UI must direct them to upgrade, not show a generic error).
+
+**Fix.** On submit failure, check `error.status === 402` and render `<UpgradeState />` (or route to upgrade page) instead of the generic error message. Applies to both `StudentComposerForm.tsx` and `teacher/content/new/page.tsx`. Address before launch.
+
+---
+
 ### ISSUE-0036 — pgTAP test/schema drift for migrations 0012, 0015, 0016 (resolved at Stage 48)
 
 - Status: open → resolved at Stage 48 impl commit

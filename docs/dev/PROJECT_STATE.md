@@ -81,12 +81,13 @@ Full table: `docs/dev/perf/measurements.md`.
 
 ## Open items
 
-- ADRs accepted: **39** (ADR-0001 through ADR-0039; ADR-0039 accepted at v1.1-S5 impl close 18aac21 with folded amendment: C3 time-limit option set + is_simulation LinearEngine-scope derivation)
+- ADRs accepted: **40** (ADR-0001 through ADR-0040; ADR-0039 accepted at v1.1-S5 impl close 18aac21 with folded amendment: C3 time-limit option set + is_simulation LinearEngine-scope derivation; ADR-0040 accepted at v1.1-S5 chore audit close — v1.1 platform phase audit findings, 0 Critical / 1 High / 5 Medium / 4 Low)
 - ADRs proposed: 0
 - Workspaces: **17** — unchanged
-- Issues critical / high / medium / low: **0 / 0 / 8 / 15**
-  - Medium (8): ISSUE-0009, ISSUE-0010, ISSUE-0011, ISSUE-0014, ISSUE-0021, ISSUE-0023, ISSUE-0027, ISSUE-0030
-  - Low (15): ISSUE-0015, ISSUE-0016, ISSUE-0017, ISSUE-0019, ISSUE-0020, ISSUE-0022, ISSUE-0024, ISSUE-0025, ISSUE-0028, ISSUE-0031, ISSUE-0032, ISSUE-0033, ISSUE-0034, ISSUE-0035, ISSUE-0038 (info)
+- Issues critical / high / medium / low: **0 / 1 / 13 / 19**
+  - High (1): ISSUE-0042 (Zod parse gap at API boundaries — **pre-S6 blocker**)
+  - Medium (13): ISSUE-0009, ISSUE-0010, ISSUE-0011, ISSUE-0014, ISSUE-0021, ISSUE-0023, ISSUE-0027, ISSUE-0030, ISSUE-0039, ISSUE-0040, ISSUE-0041, ISSUE-0043, ISSUE-0045
+  - Low (19): ISSUE-0015, ISSUE-0016, ISSUE-0017, ISSUE-0019, ISSUE-0020, ISSUE-0022, ISSUE-0024, ISSUE-0025, ISSUE-0028, ISSUE-0031, ISSUE-0032, ISSUE-0033, ISSUE-0034, ISSUE-0035, ISSUE-0038 (info), ISSUE-0044, ISSUE-0046, ISSUE-0047, ISSUE-0048
   - Resolved: ISSUE-0005, 0006, 0007, 0008, 0012, 0013, 0018, 0026, 0029, 0036, 0037
 - Migrations: **0001–0022** (migrations 0001–0020 pgTAP-verified 451/451; 0021 SQL on disk deferred-validation; 0022 adds composer_params + simulation_params jsonb nullable columns to assignment table — deferred-validation per 0021 pattern)
 - Open questions: **0** — Q-1.1-1.0..9 + Q-1.1-2.1..5 + Q-1.1-3.1..5 + Q-1.1-4.1..8 + Q-1.1-5.1..6 all resolved
@@ -105,9 +106,12 @@ Full table: `docs/dev/perf/measurements.md`.
 
 **v1.1-S6 — Bulk Content Import Pipeline + Authoring Spec Templates** is next. **S5 platform phase COMPLETE — S6 unblocked.**
 
+**ISSUE-0042 is the one pre-S6 blocker (High):** fix Zod parse gap in `content-svc/handlers.ts:840–848` (createItem/updateItem use assertion-based checks instead of `ItemCreateDTOSchema.parse()`) at S6 prep before any import-pipeline implementation. ADR-0040 decision: all other 9 audit findings carry.
+
 Before any code:
 - Read `docs/dev/v1.1-phase-plan.md §S6` in full (full §Phase Exit Record confirms S6 unblocked).
 - Resolve the 5 open decisions deferred to S6 morning ritual (listed at end of v1.1-phase-plan.md).
+- Fix ISSUE-0042 (`content-svc/handlers.ts` Zod gap) — pre-S6 blocker per ADR-0040.
 - Read `supabase/functions/content-svc/` — S6 extends S1's CRUD endpoints with batch import.
 - Read `packages/types/src/` for item/stimulus schemas — manifest format must match.
 - Legal review of authoring spec templates is a **hard prerequisite** before bulk authoring runs (S7.1 gate).
