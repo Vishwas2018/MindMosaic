@@ -863,6 +863,9 @@ export async function resumeSession(
     answered_item_ids: answeredItemIds(state),
     lock_token: newLockToken,
     version: row.version,
+    // v1.1-S5 (ADR-0039 Q-1.1-5.4): simulation_params lives on LinearEngineState only.
+    // Narrow via engine_type discriminant; false for all other engine branches.
+    is_simulation: state.engine_type === 'linear' ? state.simulation_params != null : false,
   });
 }
 

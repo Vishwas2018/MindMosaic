@@ -160,6 +160,10 @@ export const SessionStateDTOSchema = z.object({
   answered_item_ids: z.array(z.string()),
   lock_token: z.string(),
   version: z.number().int(),
+  // v1.1-S5 (ADR-0039 Q-1.1-5.4 Option a): server-authoritative simulation flag.
+  // assessment-svc resumeSession derives this from engine_state_snapshot.simulation_params.
+  // Additive; clients read only. Persists correctly on session resume.
+  is_simulation: z.boolean(),
 });
 export type SessionStateDTO = z.infer<typeof SessionStateDTOSchema>;
 

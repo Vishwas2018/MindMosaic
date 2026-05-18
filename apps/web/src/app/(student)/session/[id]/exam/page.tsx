@@ -20,6 +20,7 @@ import {
 import type { ItemDTO, RecordResponseRequest, RecordResponseResponse } from '@mm/types'
 import { OfflineBanner } from '@/components/exam/OfflineBanner'
 import { SavedPill } from '@/components/exam/SavedPill'
+import { SimulationBanner } from '@/components/exam/SimulationBanner'
 import { Timer } from '@/components/exam/Timer'
 import { useResponseQueue } from '@/components/exam/useResponseQueue'
 
@@ -489,6 +490,8 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
         helper={<SavedPill saveTick={saveTick} suppressed={!queue.isOnline} />}
         onExit={() => setModal('exit-confirm')}
       />
+      {/* v1.1-S5 (ADR-0039 §Decision 5): outside QuestionMap focus trap (N2) */}
+      {sessionState.data?.is_simulation === true && <SimulationBanner />}
 
       <main
         id="exam-main"

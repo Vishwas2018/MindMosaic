@@ -44,7 +44,7 @@ import {
   createMockSupabase,
   type MockResponses,
 } from '../../_test-helpers/mock-supabase.ts';
-import type { EngineItem, LinearEngineState } from '@mm/engines';
+import type { EngineItem, LinearEngineState, SkillEngineState } from '@mm/engines';
 
 // ─── Test data builders ─────────────────────────────────────────────────────
 
@@ -1445,6 +1445,121 @@ describe('assessment-svc — simulation_params wiring (v1.1-S3)', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.data.is_correct).toBe(true);
+    }
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// resumeSession — is_simulation derivation (v1.1-S5 ADR-0039 Q-1.1-5.4)
+// ───────────────────────────────────────────────────────────────────────────
+
+const SKILL_ID = 'cccccccc-cccc-4ccc-8ccc-000000000001';
+
+function buildSkillItem(): EngineItem {
+  const id = 'dddddddd-dddd-4ddd-8ddd-000000000001';
+  return {
+    item_id: id as never,
+    version: 1,
+    stem: { text: 'Skill item' },
+    stimulus: null,
+    response_type: 'multiple_choice',
+    response_config: {
+      options: [{ id: 'a' }, { id: 'b' }],
+      correct_option_id: 'a',
+    } as never,
+    tools_available: [],
+    sequence_number: 0,
+    skill_ids: [SKILL_ID as never],
+    difficulty: 0.5,
+  } as EngineItem;
+}
+
+function buildInitialSkillState(): SkillEngineState {
+  return {
+    engine_type: 'skill',
+    session_id: SESSION_ID as never,
+    mode: 'practice' as never,
+    started_at: FROZEN_NOW,
+    time_limit_ms: null,
+    target_skills: [SKILL_ID as never],
+    per_skill_state: [{
+      skill_id: SKILL_ID as never,
+      items_attempted: 0,
+      items_correct: 0,
+      last_difficulty: 0.5,
+      consecutive_correct: 0,
+      consecutive_incorrect: 0,
+      estimated_mastery: 0.0,
+    }],
+    current_difficulty: 0.5,
+    current_skill_id: SKILL_ID as never,
+    responses: [],
+    answered_item_ids: [],
+    item_pool: [buildSkillItem()],
+    mastery_threshold: 0.85,
+    difficulty_step_up: 0.1,
+    difficulty_step_down: 0.15,
+    cognitive_load_threshold: 0.8,
+    cognitive_load_step_down: 0.1,
+    expected_time_per_item_ms: 30000,
+  };
+}
+
+describe('assessment-svc — resumeSession is_simulation derivation (v1.1-S5)', () => {
+  it('linear engine + simulation_params present → is_simulation: true', async () => {
+    const state = buildInitialLinearState();
+    const simState = { ...state, simulation_params: { no_back_nav: true, hide_feedback_until_submit: true } };
+    const db = client({
+      session_record: { data: buildSessionRow({ status: 'interrupted', engine_state_snapshot: simState }), error: null },
+    });
+    const result = await resumeSession({
+      client: db,
+      sessionId: SESSION_ID,
+      studentId: STUDENT_ID,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.is_simulation).toBe(true);
+    }
+  });
+
+  it('linear engine + no simulation_params → is_simulation: false', async () => {
+    const db = client({
+      session_record: { data: buildSessionRow({ status: 'interrupted' }), error: null },
+    });
+    const result = await resumeSession({
+      client: db,
+      sessionId: SESSION_ID,
+      studentId: STUDENT_ID,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.is_simulation).toBe(false);
+    }
+  });
+
+  it('skill engine (non-linear) → is_simulation: false', async () => {
+    const db = client({
+      session_record: {
+        data: buildSessionRow({
+          status: 'interrupted',
+          engine_type: 'skill',
+          engine_state_snapshot: buildInitialSkillState(),
+        }),
+        error: null,
+      },
+    });
+    const result = await resumeSession({
+      client: db,
+      sessionId: SESSION_ID,
+      studentId: STUDENT_ID,
+      effects: fixedEffects(),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.is_simulation).toBe(false);
     }
   });
 });

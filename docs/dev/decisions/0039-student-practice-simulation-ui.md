@@ -1,6 +1,6 @@
 # ADR-0039 — Student Practice + Simulation UI model
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-05-18
 - Stage: v1.1-S5
 - Tags: frontend, backend, data
@@ -210,6 +210,69 @@ Anticipated files:
 - `apps/web/src/app/(student)/session/[id]/exam/page.tsx` — add SimulationBanner conditional
 - `apps/web/src/app/(student)/copy/studentComposer.ts` (new copy file)
 - `apps/web/playwright/e2e/student-composer-a11y.spec.ts` (new axe-core test)
+
+### Composer param option sets (schema-derived)
+
+Time-limit `<Select>` options are derived from `PracticeExamComposerParamsSchema.time_limit_ms`
+bounds (`packages/types/src/session.ts:37`, min 300_000 / max 10_800_000). Full option set:
+
+| Label  | ms value   |
+| ------ | ---------- |
+| 5 min  | 300,000    |
+| 10 min | 600,000    |
+| 15 min | 900,000    |
+| 30 min | 1,800,000  |
+| 45 min | 2,700,000  |
+| 60 min | 3,600,000  |
+| 90 min | 5,400,000  |
+| 120 min| 7,200,000  |
+| 180 min| 10,800,000 |
+
+Checkpoint A sketch listed 15/30/45/60/90/120/180 min — corrected here per C3 schema
+cross-check. Skeleton and fill must use the full schema-derived list starting at 5 min.
+
+Item-count range (5–80) derives from `session.ts:35` (`z.number().int().min(5).max(80)`).
+
+Difficulty distribution refinements derive from `session.ts:40 + 47`:
+sum of `easy + mid + hard` must equal `item_count` AND be `> 0`.
+The cross-field Zod `.refine()` belongs on the shared form schema (N1 carry from Checkpoint A).
+
+Form-state internal field (C2 resolution): `simulationParams: SimulationParams | null`.
+- `null` = simulation off (practice mode).
+- `{ no_back_nav: true, hide_feedback_until_submit: true }` = simulation on.
+- Submit maps `null → undefined` for the optional `simulation_params` wire field.
+- When `simulationLocked={true}` (`/exam-sim`): initialised to the object; never changed.
+- When `simulationLocked={false}` (`/practice`): checkbox "Simulation mode" toggles between
+  null and the object. UI label "Simulation mode" is unchanged (copy; not the field name).
+
+### is_simulation derivation scope
+
+`is_simulation` on `SessionStateDTO` is engine-type-scoped:
+
+```typescript
+is_simulation: state.engine_type === 'linear' ? state.simulation_params != null : false
+```
+
+Non-linear engines return `false`. Simulation mode is a LinearEngine-only feature, explicitly
+scoped by ADR-0037:
+
+- ADR-0037 §Decision 4 line 124: "NO `AssessmentEngine` interface change. NO changes to
+  other engine implementations." Simulation enforcement is excluded from Skill/Diagnostic/
+  Adaptive engines by decision, not by omission.
+- ADR-0037 §Rationale (Decision 4) lines 177–178: "Reading `state.simulation_params` keeps
+  the decision local to LinearEngine where it belongs."
+- ADR-0037 §Decision 6 rationale lines 133–134: "Both stored on `LinearEngineState` as
+  optional analytics markers" — `simulation_params` is declared on `LinearEngineStateSchema`
+  only (`packages/engines/src/contracts.ts:237`); absent from Skill/Diagnostic/Adaptive schemas.
+
+The `state.engine_type === 'linear'` guard in `resumeSession` is required to satisfy the
+TypeScript discriminated union (`EngineState` = `LinearEngineState | SkillEngineState |
+DiagnosticEngineState | AdaptiveEngineState`). Without the guard, `state.simulation_params`
+would be a type error because the field does not exist on non-linear branches.
+
+Future engines opting into simulation require: (1) `simulation_params` added to that engine's
+state schema, (2) a new branch in the `resumeSession` derivation expression, (3) an ADR
+amendment here. The narrowing pattern makes the extension point explicit.
 
 Commit: v1.1-S5 impl (pending) · Related: ADR-0036, ADR-0037, ADR-0038, Q-1.1-5.1, Q-1.1-5.2,
 Q-1.1-5.3, Q-1.1-5.4, Q-1.1-5.5, Q-1.1-5.6
