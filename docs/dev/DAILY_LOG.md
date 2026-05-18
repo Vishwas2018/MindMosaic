@@ -2,6 +2,73 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## v1.1-S5 — 2026-05-18
+
+**Planned (from docs/dev/v1.1-phase-plan.md §S5):** Student Practice + Simulation Flows — student-facing entry routes for composing and launching practice exams (/practice/*) and simulation exams (/exam-sim/*). Consumes S2 (composer API), S3 (simulation), S4 (assignments). T5 three-gate flow. Phase exit review at close.
+
+**Actually delivered:**
+
+- Branch `v1.1/exam-content`; 3 commits: 7b63e2a prep · 18aac21 impl · this chore.
+- `/practice/page.tsx` — thin wrapper; `<StudentComposerForm simulationLocked={false} />`; 5-state matrix (LoadingState / EmptyState_ / ErrorState / UpgradeState / StudentComposerForm). [18aac21]
+- `/exam-sim/page.tsx` — thin wrapper; `<StudentComposerForm simulationLocked={true} />`; same 5-state matrix. [18aac21]
+- `apps/web/src/components/student/StudentComposerForm.tsx` — shared form with pathway selector, item count (5–80), difficulty distribution (cross-field Zod `.refine()` sum === item_count AND > 0), time limit (9 schema-derived options 5–180 min), simulation toggle (hidden when simulationLocked=true); `mode='exam'` in submit path (§N Trap 2 documented ADR-0039). [18aac21]
+- `apps/web/src/components/student/StudentNav.tsx` — 5 nav entries. [18aac21]
+- `apps/web/src/components/exam/SimulationBanner.tsx` — amber banner; `role=status`, `aria-live=polite`; outside QuestionMap focus trap (N2). [18aac21]
+- `apps/web/src/app/(student)/copy/studentComposer.ts` — `STUDENT_COMPOSER_COPY` constant. [18aac21]
+- `packages/types/src/session.ts` — `is_simulation: z.boolean()` additive field on `SessionStateDTOSchema` (server-authoritative). [18aac21]
+- `supabase/functions/assessment-svc/handlers.ts:868` — `getSessionState` derivation: `engine_type === 'linear' ? state.simulation_params != null : false` (LinearEngine-scoped per ADR-0037). [18aac21]
+- `apps/web/src/app/(student)/session/[id]/exam/page.tsx` — `<SimulationBanner />` conditional on `state.is_simulation === true`. [18aac21]
+- `apps/web/playwright/e2e/student-composer-a11y.spec.ts` — axe-core spec on `/practice` + `/exam-sim`; `test.skip()` when `E2E_WEB_URL` absent. ISSUE-0038 tracks live-run obligation. [18aac21]
+- Tests 795 → 828 (+33: 5 @mm/types, 3 assessment-svc, 25 apps/web). [18aac21]
+- Q-1.1-5.1..6 resolved at prep 7b63e2a; ADR-0039 accepted at impl 18aac21 (folded amendment: C3 time-limit option set + is_simulation LinearEngine-scope derivation). [7b63e2a + 18aac21]
+
+**Time spent:** ~1 day (1 Claude session: morning ritual + prep + impl + chore).
+
+**Surprises / departures:**
+
+- **§N trap caught (4th consecutive v1.1 stage).** Phase plan §S5 names `/exam-sim/*` without spec citation; resolved at Q-1.1-5.1 — `/exam-sim` is a student-facing entry/setup screen only, redirects to existing `/session/[id]/exam`; no new session-running surface. Same §N-trap escape pattern as S2/S3/S4.
+- **is_simulation additive backend field required.** `SessionStateDTOSchema` had no way for the client to know whether to show `<SimulationBanner />` — Q-1.1-5.4 resolved to additive `is_simulation: z.boolean()` on DTO (server-authoritative, TypeScript discriminated-union guard required to read `simulation_params` safely). Minor backend scope beyond the UI stage; the cleanest authoritative signal.
+- **§N Trap 2 — "Practice exam" copy ≠ `mode='exam'` API.** UI labels the composed exam flow "Practice Exam" but API must use `mode='exam'` (LinearEngine). `mode='practice'` would invoke SkillEngine (unscored immediate feedback). Explicitly documented in ADR-0039 §Implementation Notes to prevent future "correction". Submit path confirmed at `StudentComposerForm.tsx:176`.
+- **T2-tightened CLEAN.** Q-1.1-5.1..6 all resolved at prep commit 7b63e2a (T3 round-trips + ADR-0039 draft). No retroactive Q-* filings needed at chore close — first T2-clean stage in v1.1 series (S4 had 2 retroactive filings).
+- **DEV-20260515-2 atomic announcement honored** on all 3 S5 commits.
+
+**Decisions made (not in stage):**
+
+- Q-1.1-5.1 → `/exam-sim` is entry screen only; redirects to `/session/[id]/exam` (operator-confirmed). ADR-0039 Decision 1.
+- Q-1.1-5.2 → two thin route wrappers + shared `<StudentComposerForm>` (operator-confirmed). ADR-0039 Decision 2.
+- Q-1.1-5.3 → full student self-serve composer (operator-confirmed). ADR-0039 Decision 3.
+- Q-1.1-5.4 → `is_simulation: z.boolean()` additive on `SessionStateDTOSchema`; server-authoritative (operator-confirmed). ADR-0039 Decision 4.
+- Q-1.1-5.5 → `<SimulationBanner />` conditional inline on exam page (operator-confirmed). ADR-0039 Decision 5.
+- Q-1.1-5.6 → reuse `/results/[id]`; no simulation-specific results variant in S5 (operator-confirmed). ADR-0039 Decision 6.
+- ADR-0039 accepted at impl 18aac21; folded amendment (C3 time-limit option set schema-derived 5–180 min + is_simulation LinearEngine-scope derivation) landed in impl commit per S4 ADR-0038 precedent.
+
+**Deviations logged:**
+
+- DEV-20260515-2 honored on all 3 S5 commits (atomic commit-and-push announcement; tracking only).
+- No new deviations.
+
+**Issues opened / closed / questions raised:**
+
+- Q-1.1-5.1..6 all resolved at prep 7b63e2a (T2-tightened discipline held; no retroactive chore-close filing).
+- ISSUE-0038 carries (axe-core live-run; S5 adds 2nd axe-core Playwright spec — resolves on first green preview/CI run; no code action).
+- No new issues opened.
+
+**Quality gates at close:**
+
+- Lint ✅ (17 packages) · Typecheck ✅ (17/17, --force, 0 cached) · Tests ✅ (828 passed / 1 skipped = 829 total) · pgTAP n/a (no new migrations in S5) · RLS n/a (existing policies unchanged; is_simulation is a derived DTO field, not persisted) · Build n/a (docs-only chore commit)
+
+**Retrospective:**
+
+- **T2-tightened held for the first time.** All 6 Qs filed and resolved at prep — not deferred to chore. Confirms the discipline is learnable within a stage cycle, not just aspirational.
+- **§N Trap 2 is a maintenance trap, not a structural one.** The API/copy collision (`mode='exam'` vs "Practice exam" label) would have been invisible to a future developer reading only the component. Documenting it in ADR-0039 §Implementation Notes is the correct mitigation.
+- **T5 three-gate flow: 2 of 2 v1.1 UI stages clean.** Checkpoint A → Checkpoint B → fill → push gate ran without architect interruption.
+- **v1.1 platform phase complete.** S1–S5 closed. S6 (content tooling) unblocked.
+
+**Tomorrow — first thing:**
+v1.1-S6 — Bulk Content Import Pipeline + Authoring Spec Templates. Read v1.1-phase-plan §S6 + resolve 5 open decisions (batch endpoint vs script, manifest external-key, curriculum-strand lookup, similarity check, legal review process). No T5 gate (no UI component). Legal review of authoring spec templates is hard prerequisite for S7.1 — flag early.
+
+---
+
 ## v1.1-S4 — 2026-05-18
 
 **Planned (from docs/dev/v1.1-phase-plan.md §S4):** Teacher Exam Authoring UI — two teacher routes under /teacher/content for bank browsing + exam composition; extend CreateAssignmentRequest with composer_params + simulation_params; assignments-svc forward-to-session on student start.
