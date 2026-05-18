@@ -280,7 +280,11 @@ importers:
 
   supabase/functions/billing-svc: {}
 
-  supabase/functions/content-svc: {}
+  supabase/functions/content-svc:
+    dependencies:
+      '@mm/types':
+        specifier: workspace:*
+        version: link:../../../packages/types
 
   supabase/functions/intelligence-svc:
     dependencies:

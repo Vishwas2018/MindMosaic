@@ -778,6 +778,39 @@ describe('content-svc — POST /content/items (createItem)', () => {
     expect(result.status).toBe(422);
     expect(result.code).toBe('VALIDATION_ERROR');
   });
+
+  it('returns 422 VALIDATION_ERROR when optional field has wrong type (ISSUE-0042 Zod gap)', async () => {
+    const client = mockClient({});
+    const result = await createItem(client, {
+      response_type: 'multiple_choice',
+      skill_ids: ['sk-1'],
+      difficulty: 0.4,
+      year_levels: [5],
+      exam_families: ['naplan'],
+      discrimination: 'bad' as unknown as number,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected error');
+    expect(result.status).toBe(422);
+    expect(result.code).toBe('VALIDATION_ERROR');
+    expect(result.message).toContain('discrimination');
+  });
+
+  it('returns 422 VALIDATION_ERROR when exam_families is empty array', async () => {
+    const client = mockClient({});
+    const result = await createItem(client, {
+      response_type: 'multiple_choice',
+      skill_ids: ['sk-1'],
+      difficulty: 0.4,
+      year_levels: [5],
+      exam_families: [],
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected error');
+    expect(result.status).toBe(422);
+    expect(result.code).toBe('VALIDATION_ERROR');
+    expect(result.message).toContain('exam_families');
+  });
 });
 
 describe('content-svc — PATCH /content/items/{id} (updateItem)', () => {
@@ -804,6 +837,18 @@ describe('content-svc — PATCH /content/items/{id} (updateItem)', () => {
     if (result.ok) throw new Error('expected error');
     expect(result.status).toBe(404);
     expect(result.code).toBe('NOT_FOUND');
+  });
+
+  it('returns 422 VALIDATION_ERROR when body field has wrong type (ISSUE-0042 Zod gap)', async () => {
+    const client = mockClient({});
+    const result = await updateItem(client, 'item-uuid-1', {
+      difficulty: 'not-a-number' as unknown as number,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected error');
+    expect(result.status).toBe(422);
+    expect(result.code).toBe('VALIDATION_ERROR');
+    expect(result.message).toContain('difficulty');
   });
 });
 

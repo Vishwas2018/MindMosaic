@@ -11,6 +11,8 @@
  * resolution in `/content/select`.
  */
 
+import { ItemCreateDTOSchema, ItemUpdateDTOSchema } from '@mm/types';
+
 // ─── Shared types ────────────────────────────────────────────────────────────
 
 export type HandlerResult<T> =
@@ -837,14 +839,11 @@ export async function createItem(
   client: DbClient,
   body: ItemCreateBody,
 ): Promise<HandlerResult<ItemAdminDTO>> {
-  if (
-    typeof body.response_type !== 'string' || body.response_type.length === 0 ||
-    !Array.isArray(body.skill_ids) || body.skill_ids.length === 0 ||
-    typeof body.difficulty !== 'number' ||
-    !Array.isArray(body.year_levels) || body.year_levels.length === 0 ||
-    !Array.isArray(body.exam_families) || body.exam_families.length === 0
-  ) {
-    return err(422, 'VALIDATION_ERROR', 'response_type, skill_ids, difficulty, year_levels, exam_families required');
+  const parse = ItemCreateDTOSchema.safeParse(body);
+  if (!parse.success) {
+    // Zod guarantees issues is non-empty when success === false
+    const first = parse.error.issues[0]!;
+    return err(422, 'VALIDATION_ERROR', `${first.path.join('.')}: ${first.message}`);
   }
 
   const row: Record<string, unknown> = {
@@ -880,6 +879,13 @@ export async function updateItem(
   itemId: string,
   body: ItemUpdateBody,
 ): Promise<HandlerResult<ItemAdminDTO>> {
+  const parse = ItemUpdateDTOSchema.safeParse(body);
+  if (!parse.success) {
+    // Zod guarantees issues is non-empty when success === false
+    const first = parse.error.issues[0]!;
+    return err(422, 'VALIDATION_ERROR', `${first.path.join('.')}: ${first.message}`);
+  }
+
   const check = await (client.from('item').select('id').eq('id', itemId) as unknown as {
     maybeSingle(): Promise<{ data: { id: string } | null; error: { message: string } | null }>;
   }).maybeSingle();
