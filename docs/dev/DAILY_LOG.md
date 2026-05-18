@@ -2,6 +2,78 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## v1.1-S4 — 2026-05-18
+
+**Planned (from docs/dev/v1.1-phase-plan.md §S4):** Teacher Exam Authoring UI — two teacher routes under /teacher/content for bank browsing + exam composition; extend CreateAssignmentRequest with composer_params + simulation_params; assignments-svc forward-to-session on student start.
+
+**Actually delivered:**
+
+- Branch `v1.1/exam-content`; 3 commits: 2faeb65 prep · b8b8290 impl · this chore.
+- `/teacher/content` — bank browser listing pathways via `usePathways()`, 5-state matrix (LoadingState / EmptyState_ / ErrorState / UpgradeState / PathwayGrid). [b8b8290]
+- `/teacher/content/new` — single-page exam composer form (Bank Pick / Configure / Assign sections) with `createExamContent` server action, idempotency key, 5-state matrix on both route and form. [b8b8290]
+- `apps/web/src/app/(teacher)/copy/examContent.ts` — `EXAM_CONTENT_COPY` constant. [b8b8290]
+- `packages/types/src/assignments.ts` — `ExamContentFormValues` + composer/simulation types. [b8b8290]
+- `packages/sdk/src/__tests__/assignments.test.ts` + `assignments-contract.test.ts` — 2 new SDK tests. [b8b8290]
+- `supabase/functions/assignments-svc/__tests__/contract.test.ts` — 5 new handler contract tests for composer_params + simulation_params wiring. [b8b8290]
+- `supabase/functions/assignments-svc/handlers.ts` — handler extended; forwards composer_params + simulation_params into session-create on student start. [b8b8290]
+- Migration 0022: `ALTER TABLE assignment ADD COLUMN composer_params jsonb NULL, ADD COLUMN simulation_params jsonb NULL`. RLS unchanged. pgTAP deferred-validation per 0021 pattern. [b8b8290]
+- `apps/web/playwright/e2e/exam-content-a11y.spec.ts` — axe-core spec on `/teacher/content` + `/teacher/content/new`; `test.skip()` guard when `E2E_WEB_URL` absent. ISSUE-0038 tracks live-run obligation. [b8b8290]
+- Tests 770 → 795 (+25: 13 @mm/types, 5 assignments-svc, 2 @mm/sdk, 12 apps/web incl. axe-core spec). [b8b8290]
+- Q-1.1-4.1..8 resolved (4.1..5 at prep 2faeb65; 4.6 + 4.7 inline at impl; 4.8 pre-push catch). [2faeb65 + b8b8290]
+- ADR-0038 accepted at impl b8b8290; §Decision 4 amendment (migration 0022 added, "zero migrations" claim corrected per Q-1.1-4.8). [b8b8290]
+
+**Time spent:** ~1 day (1 Claude session: morning ritual + prep + impl + chore).
+
+**Surprises / departures:**
+
+- **§N trap caught (3rd consecutive v1.1 stage).** Phase plan §S4 "authoring" ambiguous → exam authoring resolved (Q-1.1-4.1); item-authoring stays deferred per ADR-0035 §Decision 2. Same §N-trap escape pattern as S2 (composer vs architect) + S3 (simulation vs challenge).
+- **Two structural catches at checkpoints.** B6: PathwayDTO has no item count; "247 items" dropped from Checkpoint A sketch (Q-1.1-4.7 self-resolved inline at Checkpoint B skeleton). B9: migration 0022 required; `difficulty_range` is a semantic float-range field (migration 0015), not a generic jsonb passthrough; composer_params + simulation_params are net-new exam-mode fields — "0 migrations" ADR claim corrected (Q-1.1-4.8). ADR-0038 §Decision 4 amendment landed in impl commit.
+- **Pre-push verification gate held twice mid-impl for fidelity corrections.** First gate: test arithmetic + missing V-checks. Second gate: stale ADR-0035 cross-ref in migration 0022 header. Both caught + corrected before commit.
+- **No new UI primitives.** Distribution band picker uses three numeric Input fields from existing 31-primitive set (Q-1.1-4.6 self-resolved at Checkpoint A).
+- **Migration 0022** = 1 ALTER TABLE + 2 ADD COLUMN (composer_params + simulation_params jsonb nullable). RLS unchanged. pgTAP deferred-validation per 0021 pattern.
+- **axe-core spec** authored at `apps/web/playwright/e2e/exam-content-a11y.spec.ts`; `test.skip()` when E2E_WEB_URL absent (codebase pattern). 2 tests, both guarded. Live run pending preview/CI provision — ISSUE-0038 tracks.
+- **First UI stage of v1.1.** T5 three-gate flow applied: Checkpoint A sketch → Checkpoint B skeleton → fill → push gate. Three architect gates honoured.
+- **DEV-20260515-2 atomic announcement honoured** on all 3 S4 commits.
+
+**Decisions made (not in stage):**
+
+- Q-1.1-4.1 → exam authoring only (operator-confirmed 2026-05-15). ADR-0038 Decision 1.
+- Q-1.1-4.2 → two routes (operator-confirmed 2026-05-15). ADR-0038 Decision 2.
+- Q-1.1-4.3 → single-page form (operator-confirmed 2026-05-15). ADR-0038 Decision 3.
+- Q-1.1-4.4 → extend CreateAssignmentRequest additively (operator-confirmed 2026-05-15). ADR-0038 Decision 4.
+- Q-1.1-4.5 → pathway-level browse only (operator-confirmed 2026-05-15). ADR-0038 Decision 5.
+- Q-1.1-4.6 → numeric inputs, no new primitive (self-resolved inline at Checkpoint A).
+- Q-1.1-4.7 → drop "247 items" from sketch (self-resolved inline at Checkpoint B skeleton, PathwayDTO gap).
+- Q-1.1-4.8 → migration 0022 required, ADR-0038 §Decision 4 amended (pre-push catch 2026-05-18).
+- ADR-0038 accepted at impl b8b8290.
+
+**Deviations logged:**
+
+- DEV-20260515-2 honored on all 3 S4 commits (atomic commit-and-push announcement; tracking only).
+- No new deviations.
+
+**Issues opened / closed / questions raised:**
+
+- Q-1.1-4.6 + Q-1.1-4.7 self-resolved inline at Checkpoint A/B; filed retroactively at chore close per T2-tightened.
+- Q-1.1-4.8 raised + resolved at pre-push verification (2026-05-18).
+- ISSUE-0038 opened: axe-core live run pending (info severity; resolves on first green preview/CI run).
+
+**Quality gates at close:**
+
+- Lint ✅ (17 packages) · Typecheck ✅ (17/17, --force, 0 cached) · Tests ✅ (795 passed / 1 skipped = 796 total) · pgTAP n/a (migration 0022 on disk; deferred-validation per 0021 pattern) · RLS n/a (existing policies unchanged; additive nullable columns) · Build n/a (docs-only chore commit)
+
+**Retrospective:**
+
+- **T5 three-gate flow worked cleanly.** Checkpoint A + B caught structural issues (item count + migration gap) that would have surfaced as rework mid-impl. Three architect gates honoured without friction.
+- **Pre-push fidelity gate caught two commit-message + verification round errors.** "Always cross-check claims against deliverables" discipline now battle-tested. Both caught + corrected before commit.
+- **§N trap pattern matched across S2/S3/S4.** Consistent spec-verbatim escape. "Verbatim cite the §N row at T1 pre-read" is a proven default across three consecutive stages.
+- **T2-tightened gap.** Q-1.1-4.6 + Q-1.1-4.7 not filed in QUESTIONS.md at impl time; retroactively added at chore close. Reminder: file T2 Qs in same work session, not deferred to chore.
+
+**Tomorrow — first thing:**
+v1.1-S5 — Student Practice + Simulation Flows. Second UI stage of v1.1 — T5 three-gate flow activates again. Read v1.1-phase-plan §S5 + spec student mode sections + existing apps/web/src/app/(student)/* for pattern parity. Phase exit review at S5 close.
+
+---
+
 ## v1.1-S3 — 2026-05-15
 
 **Planned (from docs/dev/v1.1-phase-plan.md §S3):** Simulation Exam Mode — backend administration layer that locks a session under realistic test-taking constraints: no back-navigation, no per-response feedback.

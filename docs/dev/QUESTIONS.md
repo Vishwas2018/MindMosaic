@@ -30,6 +30,36 @@
 - Resolution: Migration 0022 created (2026-05-18). ADR-0038 §Decision 4 amended
   with Q-1.1-4.8 correction block.
 
+### Q-1.1-4.7 — PathwayDTO item count: can "247 items" stat be rendered in bank browser?
+
+- Date raised: 2026-05-15 (v1.1-S4 Checkpoint B skeleton — self-resolved inline per T3 Option 3 hybrid)
+- Asked of: self (T3 tight detail)
+- Source: Checkpoint A sketch included "247 items" item-count stat per pathway; `packages/sdk/src/hooks/content.ts` `usePathways()` return type — `PathwayDTOSchema` does not include an item count field; `useListItems` does not exist (ADR-0038 Decision 5)
+- Question: The Checkpoint A sketch included "247 items" per pathway in the bank browser. `usePathways()` does not return an item count. Can this stat be rendered, or must it be dropped?
+- Why ambiguous: Item count is a natural stat for a bank browser. The sketch was designed before T1 pre-read of hook return types confirmed the gap.
+- Blocking? no — sketch element only; drop if not in DTO
+- Assumed answer: Drop the item count label. `usePathways()` does not return item count; rendering it would require a `useListItems()` hook (deferred per ADR-0038 Decision 5 follow-up).
+- Code affected: `apps/web/src/app/(teacher)/teacher/content/page.tsx`
+- Status: resolved
+- Resolution: "247 items" label dropped from bank browser at Checkpoint B skeleton (2026-05-15). `C.itemCountLabel(n)` helper defined in `EXAM_CONTENT_COPY` but not rendered — reserved for when item-list endpoint ships per ADR-0038 Decision 5 follow-up. ADR-0038 §Implementation Notes addendum: "N items drop" bullet. *(Filed retroactively at chore close — T2-tightened gap.)*
+
+---
+
+### Q-1.1-4.6 — Distribution band picker: new numeric-slider primitive vs existing numeric Input?
+
+- Date raised: 2026-05-15 (v1.1-S4 Checkpoint A sketch — deferred from ADR-0038 draft)
+- Asked of: self (T3 tight detail — deferred from ADR-0038 Options §Decision 3 note)
+- Source: ADR-0038 draft note "Distribution band picker decision deferred to Checkpoint A sketch"; `packages/ui/src/` existing 31 primitives
+- Question: Should the easy/mid/hard item-count picker use (a) a new slider or drag-to-distribute component, or (b) three existing `<Input type="number">` fields from the existing primitive set?
+- Why ambiguous: A drag-to-distribute slider would be richer UX but requires a new UI primitive not in the existing 31. ADR-0038 deferred the choice to Checkpoint A.
+- Blocking? no — tight implementation detail
+- Assumed answer: Option b — three numeric Input fields. No new primitive required.
+- Code affected: `apps/web/src/app/(teacher)/teacher/content/new/page.tsx`
+- Status: resolved
+- Resolution: Option b confirmed at Checkpoint A (2026-05-15). Distribution band uses three numeric inputs from existing Input component. No new UI primitives added — composition from existing 31. ADR-0038 §Implementation Notes: "No new UI primitives by default." *(Filed retroactively at chore close — T2-tightened gap.)*
+
+---
+
 ### Q-1.1-4.5 — Bank browser depth: item-level list endpoint vs pathway-level stats only?
 
 - Date raised: 2026-05-15 (v1.1-S4 morning ritual)

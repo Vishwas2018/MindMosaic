@@ -523,6 +523,20 @@ grep -rn "IndexedDB\|idb-keyval\|next-pwa\|sw\.js\|serviceWorker" apps/web/
 
 L5 writes `async_pipeline_event` (scope_type='student_pathway'); L7/L9 write both. L1/L2/L3a/L3b continue writing `pipeline_event`. Linked: ADR-0032, ADR-0033, Q-29.4, Q-30.2, ISSUE-0017.
 
+---
+
+### ISSUE-0038 — v1.1-S4 axe-core E2E live run pending
+
+- Status: open
+- Severity: info
+- Reported: 2026-05-18 (v1.1-S4 close)
+- Area: tests (apps/web — Playwright)
+- Tags: playwright · a11y · axe-core · exam-content
+
+**Summary.** axe-core E2E spec authored at `apps/web/playwright/e2e/exam-content-a11y.spec.ts`. Spec uses `test.skip()` guard when `E2E_WEB_URL` is absent (codebase pattern) — 2 tests covering `/teacher/content` and `/teacher/content/new`. UI_CONTRACT DoD (lines 748–759) requires zero serious/critical violations on both new teacher content routes — gate is enforced when the spec runs live. No code action required; resolves on first green preview/CI run.
+
+**Tracking pointer.** v1.1-S4 impl commit b8b8290. Spec covers `/teacher/content` and `/teacher/content/new`. ADR-0038 §Implementation Notes.
+
 ## Resolved
 
 ### ISSUE-0037 — `sb_secret_*` literal observed in local working tree of `apps/web/.env.local.example`
