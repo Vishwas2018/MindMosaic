@@ -107,6 +107,7 @@ export const ItemVersionDTOSchema = z.object({
   distractor_rationale: z.record(z.string(), z.unknown()).nullable(),
   explanation: z.record(z.string(), z.unknown()).nullable(),
   metadata: z.record(z.string(), z.unknown()),
+  authoring_method: z.enum(['human', 'ai_assisted_human_reviewed']),
   difficulty: z.number(),
   discrimination: z.number().nullable(),
   is_current: z.boolean(),
@@ -123,6 +124,7 @@ export const ItemVersionCreateDTOSchema = z.object({
   difficulty: z.number(),
   discrimination: z.number().nullable().optional(),
   supersedes: z.number().int().nullable().optional(),
+  authoring_method: z.enum(['human', 'ai_assisted_human_reviewed']),
 });
 export type ItemVersionCreateDTO = z.infer<typeof ItemVersionCreateDTOSchema>;
 
@@ -166,6 +168,7 @@ export type StimulusUpdateDTO = z.infer<typeof StimulusUpdateDTOSchema>;
 export const ImportManifestItemSchema = z.object({
   external_key: z.string().min(1).max(200),
   copyright_declaration: z.literal('original'),
+  authoring_method: z.enum(['human', 'ai_assisted_human_reviewed']),
   item: z.object({
     response_type: z.string().min(1),
     skill_ids: z.array(z.string()).min(1),

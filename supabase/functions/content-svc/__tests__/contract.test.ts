@@ -729,6 +729,7 @@ const VERSION_STUB = {
   distractor_rationale: null,
   explanation: null,
   metadata: { author_id: 'author-uuid' },
+  authoring_method: 'human' as const,
   difficulty: 0.4,
   discrimination: null,
   is_current: true,
@@ -875,6 +876,7 @@ describe('content-svc — POST /content/items/{id}/versions (createItemVersion)'
         response_config: { options: ['3', '4', '5', '6'] },
         difficulty: 0.4,
         supersedes: 1,
+        authoring_method: 'human',
       },
       'author-uuid',
     );
@@ -892,7 +894,7 @@ describe('content-svc — POST /content/items/{id}/versions (createItemVersion)'
     const result = await createItemVersion(
       client,
       'item-uuid-1',
-      { stem: null as unknown as Record<string, unknown>, response_config: {}, difficulty: 0.4 },
+      { stem: null as unknown as Record<string, unknown>, response_config: {}, difficulty: 0.4, authoring_method: 'human' },
       'author-uuid',
     );
     expect(result.ok).toBe(false);
@@ -908,12 +910,32 @@ describe('content-svc — POST /content/items/{id}/versions (createItemVersion)'
     const result = await createItemVersion(
       client,
       'missing-id',
-      { stem: {}, response_config: {}, difficulty: 0.4 },
+      { stem: {}, response_config: {}, difficulty: 0.4, authoring_method: 'human' },
       'author-uuid',
     );
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected error');
     expect(result.status).toBe(404);
+  });
+
+  it('returns 422 VALIDATION_ERROR when authoring_method is absent (provenance gate)', async () => {
+    const client = mockClient({});
+    const result = await createItemVersion(
+      client,
+      'item-uuid-1',
+      {
+        stem: { kind: 'plain_text', value: 'Q' },
+        response_config: {},
+        difficulty: 0.4,
+        authoring_method: undefined as unknown as 'human',
+      },
+      'author-uuid',
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected error');
+    expect(result.status).toBe(422);
+    expect(result.code).toBe('VALIDATION_ERROR');
+    expect(result.message).toContain('authoring_method');
   });
 });
 
@@ -1415,6 +1437,7 @@ describe('content-svc — POST /content/import (importItems)', () => {
     stem: { kind: 'plain_text', value: 'What is 2 + 2?' },
     response_config: { options: ['3', '4', '5', '6'] },
     distractor_rationale: null, explanation: null, metadata: { author_id: 'import' },
+    authoring_method: 'human' as const,
     difficulty: 0.5, discrimination: null, is_current: true, supersedes: null,
     created_at: '2026-05-19T00:00:00.000Z',
   };
@@ -1453,12 +1476,12 @@ describe('content-svc — POST /content/import (importItems)', () => {
       manifest_version: '1.0',
       items: [
         {
-          external_key: 'key-001', copyright_declaration: 'original',
+          external_key: 'key-001', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 2 + 2?' }, response_config: { options: ['3', '4', '5', '6'] }, difficulty: 0.5 },
         },
         {
-          external_key: 'key-002', copyright_declaration: 'original',
+          external_key: 'key-002', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-2'], difficulty: 0.6, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 3 + 3?' }, response_config: { options: ['4', '5', '6', '7'] }, difficulty: 0.6 },
         },
@@ -1487,12 +1510,12 @@ describe('content-svc — POST /content/import (importItems)', () => {
       manifest_version: '1.0',
       items: [
         {
-          external_key: 'key-001', copyright_declaration: 'original',
+          external_key: 'key-001', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 2 + 2?' }, response_config: {}, difficulty: 0.5 },
         },
         {
-          external_key: 'key-002', copyright_declaration: 'original',
+          external_key: 'key-002', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-2'], difficulty: 0.6, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 3 + 3?' }, response_config: {}, difficulty: 0.6 },
         },
@@ -1517,12 +1540,12 @@ describe('content-svc — POST /content/import (importItems)', () => {
       manifest_version: '1.0',
       items: [
         {
-          external_key: 'key-001', copyright_declaration: 'original',
+          external_key: 'key-001', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: sharedStem, response_config: {}, difficulty: 0.5 },
         },
         {
-          external_key: 'key-002', copyright_declaration: 'original',
+          external_key: 'key-002', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-2'], difficulty: 0.6, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: sharedStem, response_config: {}, difficulty: 0.6 }, // identical stem
         },
@@ -1561,13 +1584,13 @@ describe('content-svc — POST /content/import (importItems)', () => {
       manifest_version: '1.0',
       items: [
         {
-          external_key: 'key-dup', copyright_declaration: 'original',
+          external_key: 'key-dup', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 2 + 2?' }, response_config: {}, difficulty: 0.5 },
         },
         {
           external_key: 'key-dup', // duplicate external_key
-          copyright_declaration: 'original',
+          copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-2'], difficulty: 0.6, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 3 + 3?' }, response_config: {}, difficulty: 0.6 },
         },
@@ -1589,12 +1612,12 @@ describe('content-svc — POST /content/import (importItems)', () => {
       manifest_version: '1.0',
       items: [
         {
-          external_key: 'key-001', copyright_declaration: 'original',
+          external_key: 'key-001', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 2 + 2?' }, response_config: {}, difficulty: 0.5 },
         },
         {
-          external_key: 'key-002', copyright_declaration: 'original',
+          external_key: 'key-002', copyright_declaration: 'original', authoring_method: 'human',
           item: { response_type: 'multiple_choice', skill_ids: ['sk-2'], difficulty: 0.6, year_levels: [5], exam_families: ['naplan'] },
           version: { stem: { kind: 'plain_text', value: 'What is 3 + 3?' }, response_config: {}, difficulty: 0.6 },
         },
@@ -1610,5 +1633,82 @@ describe('content-svc — POST /content/import (importItems)', () => {
     expect(result.data.items[1]!.status).toBe('ok');
     // No DB calls made — mock would throw on any from() call since responses={}
     expect(Object.keys((client as ReturnType<typeof mockClient>).callCounts())).toHaveLength(0);
+  });
+
+  // ── authoring_method provenance tests (step 1b, Q-1.1-S7-LEGAL-1) ──────────
+
+  it('schema rejects manifest item with authoring_method absent (provenance 422 gate)', () => {
+    const parseResult = ImportManifestSchema.safeParse({
+      manifest_version: '1.0',
+      items: [{
+        external_key: 'key-001',
+        copyright_declaration: 'original',
+        // authoring_method intentionally omitted — z.enum without default must reject
+        item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
+        version: { stem: { kind: 'plain_text', value: 'Q' }, response_config: {}, difficulty: 0.5 },
+      }],
+    });
+    expect(parseResult.success).toBe(false);
+    if (parseResult.success) throw new Error('expected parse failure');
+    const paths = parseResult.error.issues.map(i => i.path.join('.'));
+    expect(paths.some(p => p.includes('authoring_method'))).toBe(true);
+  });
+
+  it('manifest with authoring_method=ai_assisted_human_reviewed imports ok', async () => {
+    // Schema-level: ImportManifestSchema accepts 'ai_assisted_human_reviewed'
+    const schemaCheck = ImportManifestSchema.safeParse({
+      manifest_version: '1.0',
+      items: [{
+        external_key: 'key-001', copyright_declaration: 'original', authoring_method: 'ai_assisted_human_reviewed',
+        item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
+        version: { stem: { kind: 'plain_text', value: 'Q' }, response_config: {}, difficulty: 0.5 },
+      }],
+    });
+    expect(schemaCheck.success).toBe(true);
+
+    // Handler-level: createItemVersion persists authoring_method; ITEM_VERSION_COLS SELECT returns it
+    const aiStub = { ...VERSION_STUB, authoring_method: 'ai_assisted_human_reviewed' as const };
+    const client = mockClient({
+      item: [
+        { data: { id: 'item-uuid-1' }, error: null },   // exists check
+        { data: null, error: null },                     // sync current_version
+      ],
+      item_version: [
+        { data: [{ version: 1 }], error: null },         // max version
+        { data: null, error: null },                     // flip is_current=false
+        { data: aiStub, error: null },                   // insert; SELECT returns authoring_method
+      ],
+    });
+    const result = await createItemVersion(
+      client,
+      'item-uuid-1',
+      {
+        stem: { kind: 'plain_text', value: 'Q' },
+        response_config: {},
+        difficulty: 0.4,
+        authoring_method: 'ai_assisted_human_reviewed',
+      },
+      'author-uuid',
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.data.authoring_method).toBe('ai_assisted_human_reviewed');
+  });
+
+  it('schema rejects manifest item with invalid authoring_method value', () => {
+    const parseResult = ImportManifestSchema.safeParse({
+      manifest_version: '1.0',
+      items: [{
+        external_key: 'key-001',
+        copyright_declaration: 'original',
+        authoring_method: 'robot',
+        item: { response_type: 'multiple_choice', skill_ids: ['sk-1'], difficulty: 0.5, year_levels: [5], exam_families: ['naplan'] },
+        version: { stem: { kind: 'plain_text', value: 'Q' }, response_config: {}, difficulty: 0.5 },
+      }],
+    });
+    expect(parseResult.success).toBe(false);
+    if (parseResult.success) throw new Error('expected parse failure');
+    const paths = parseResult.error.issues.map(i => i.path.join('.'));
+    expect(paths.some(p => p.includes('authoring_method'))).toBe(true);
   });
 });

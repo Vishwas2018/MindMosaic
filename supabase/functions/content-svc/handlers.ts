@@ -747,6 +747,7 @@ export interface ItemVersionDTO {
   distractor_rationale: Record<string, unknown> | null;
   explanation: Record<string, unknown> | null;
   metadata: Record<string, unknown>;
+  authoring_method: 'human' | 'ai_assisted_human_reviewed';
   difficulty: number;
   discrimination: number | null;
   is_current: boolean;
@@ -807,6 +808,7 @@ export interface ItemVersionCreateBody {
   difficulty: number;
   discrimination?: number | null;
   supersedes?: number | null;
+  authoring_method: 'human' | 'ai_assisted_human_reviewed';
 }
 
 export interface ItemLifecycleBody {
@@ -921,7 +923,7 @@ export async function updateItem(
 
 const ITEM_VERSION_COLS =
   'item_id, version, stem, response_config, distractor_rationale, explanation, metadata, ' +
-  'difficulty, discrimination, is_current, supersedes, created_at';
+  'authoring_method, difficulty, discrimination, is_current, supersedes, created_at';
 
 export async function createItemVersion(
   client: DbClient,
@@ -932,9 +934,10 @@ export async function createItemVersion(
   if (
     body.stem === undefined || body.stem === null ||
     body.response_config === undefined || body.response_config === null ||
-    typeof body.difficulty !== 'number'
+    typeof body.difficulty !== 'number' ||
+    body.authoring_method === undefined || body.authoring_method === null
   ) {
-    return err(422, 'VALIDATION_ERROR', 'stem, response_config, and difficulty required');
+    return err(422, 'VALIDATION_ERROR', 'stem, response_config, difficulty, and authoring_method required');
   }
 
   const itemCheck = await (client.from('item').select('id').eq('id', itemId) as unknown as {
@@ -972,6 +975,7 @@ export async function createItemVersion(
     stem: body.stem,
     response_config: body.response_config,
     metadata: { author_id: authorId },
+    authoring_method: body.authoring_method,
     difficulty: body.difficulty,
     is_current: true,
   };
@@ -1236,6 +1240,7 @@ export async function importItems(
         distractor_rationale: versionFields.distractor_rationale,
         explanation: versionFields.explanation,
         discrimination: versionFields.discrimination,
+        authoring_method: manifestItem.authoring_method,
       },
       callerId,
     );
