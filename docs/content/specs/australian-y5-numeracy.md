@@ -1,4 +1,4 @@
-# naplan-y5-numeracy.md — NAPLAN-Style Year 5 Numeracy Authoring Spec
+# australian-y5-numeracy.md — NAPLAN-Style Year 5 Numeracy Authoring Spec
 
 > Pilot authoring template for `docs/content/specs/`. Legal review required
 > before bulk authoring runs (S7.1 gate — operator-side). See ADR-0041 §Decision 4.
@@ -6,6 +6,14 @@
 > **Copyright guardrail (binding):** All items authored to this template must be
 > original works. Format alignment to NAPLAN Year 5 Numeracy is permitted;
 > reproduction of any actual past-paper item is not. See §8 for full guardrails.
+
+---
+
+## §0 — Non-affiliation disclaimer
+
+MindMosaic is not affiliated with, endorsed by, or sponsored by ACARA,
+NAPLAN, or ICAS. References are used solely for curriculum-alignment and
+assessment-format interoperability purposes.
 
 ---
 
@@ -231,6 +239,34 @@ The following constraint is reproduced verbatim from v1.1-phase-plan.md §Critic
 > optional and not negotiable; treat it with the same weight as the child-
 > safety and security non-negotiables in CLAUDE.md.
 
+### §9.1 — Prohibited authoring methods (enumerated)
+
+The following methods are explicitly prohibited regardless of how substantially
+the output is modified:
+
+1. **Scraping** — automated or manual extraction of content from past NAPLAN or
+   ICAS paper websites, PDFs, or digitised archives.
+2. **OCR extraction** — optical character recognition of printed or scanned
+   past-paper materials.
+3. **Manual transcription** — copying question stems, options, or scenarios by
+   hand from past papers.
+4. **Paraphrase rewriting** — rewriting a protected item by synonym substitution
+   or structural rearrangement that preserves the original question's structure
+   or scenario.
+5. **Answer-bank transformation** — deriving new items from protected items by
+   substituting numbers, names, or surface features while retaining the
+   underlying question structure.
+6. **Synthetic regeneration from copyrighted prompts** — using protected item
+   text as a prompt to a generative AI tool and treating the output as original
+   content without originality review.
+
+### §9.2 — AI-assisted authoring
+
+AI-assisted authoring tools may be used only as drafting aids. All generated
+content must undergo human originality review and must not reproduce or closely
+paraphrase protected assessment materials. Similarity scanning, plagiarism
+review, and reviewer sign-off are required before activation.
+
 **Practical checklist for every authored item:**
 
 - [ ] The question stem is not copied or paraphrased from a known past NAPLAN paper.
@@ -302,3 +338,50 @@ No code action required; operational gate only. See ADR-0041 §Decision 4.
   }
 }
 ```
+
+---
+
+## §11 — Curriculum disclaimer
+
+Curriculum mappings are provided as guidance only and may require periodic
+review due to changes in ACARA publications or state education frameworks.
+Authors must verify strand codes and descriptors against current primary-source
+ACARA documentation before authoring; the strand table in §2 is a reference
+starting point, not a substitute for the primary source.
+
+---
+
+## §12 — Privacy and safeguarding
+
+This template produces educational content for use with children. Authors must
+observe:
+
+- **Australian Privacy Act 1988** — no personal information about students
+  (names, images, identifying details) may be embedded in item content.
+- **Child-data handling** — content must not contain material inappropriate for
+  the relevant year level.
+- **Content moderation review** — all items must pass the `draft → review`
+  lifecycle gate, which includes a content-suitability check alongside
+  originality review.
+
+---
+
+## §13 — Accessibility compliance
+
+All authored content must comply with WCAG 2.1 AA where applicable, including
+stimuli, graphs, tables, and colour usage:
+
+- Text in stimuli must meet minimum contrast (4.5:1 for body text; 3:1 for
+  large text).
+- Graphs and diagrams must include sufficient descriptive context in the stem
+  for screen-reader users.
+- Questions relying solely on colour to convey meaning are prohibited.
+- Tables must include clear header labels.
+
+---
+
+## §14 — Jurisdiction
+
+This specification is governed by Australian law and intended for
+educational-content development within Australia. Disputes arising from use of
+this specification are subject to the jurisdiction of Australian courts.

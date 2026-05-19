@@ -6,7 +6,7 @@
 ## Position
 
 - Last completed stage: v1.1-S6 — Bulk Content Import Pipeline + Authoring Spec Templates (2026-05-19)
-- Next stage: v1.1-S7 — Content Authoring & Bank Population (gated on legal review of `docs/content/specs/naplan-y5-numeracy.md`)
+- Next stage: v1.1-S7 — Content Authoring & Bank Population (gated on legal review of `docs/content/specs/australian-y5-numeracy.md`)
 - v1 build window: **CLOSED** — 49/49 stages (Days 1–65 of 75; 10 days banked unused)
 - Active branch: `v1.1/exam-content` — 22 commits ahead of origin/main (9376d98 v1.0.0):
   a7a43d0 v1.1-S1 prep · e76dbfc v1.1-S1 impl · c4c868e v1.1-S1 chore · 3c1afe0 v1.1-S2 prep · 0bdd43b v1.1-S2 impl · f72a7a8 v1.1-S2 chore · ac36e80 ISSUE-0037 remediation · 560e2d2 v1.1-S3 prep · 96b19b5 v1.1-S3 impl · ca9c670 v1.1-S3 chore · 2faeb65 v1.1-S4 prep · b8b8290 v1.1-S4 impl · 5c9692f v1.1-S4 chore · 7b63e2a v1.1-S5 prep · 18aac21 v1.1-S5 impl · efb27e7 v1.1-S5 chore · dc851cf audit+ADR-0040 · b3eb668 ISSUE-0042 fix · 27ded4d ISSUE-0042 docs close · 3340c93 v1.1-S6 prep · 28e85e2 v1.1-S6 impl · this chore
@@ -101,9 +101,9 @@ Full table: `docs/dev/perf/measurements.md`.
 
 ## Notes for next session
 
-**v1.1-S7 — Content Authoring & Bank Population** is next. **HARD GATE:** S7.1 pilot authoring does not begin until legal review of `docs/content/specs/naplan-y5-numeracy.md` is confirmed (operator-side; ADR-0041 §Decision 4). No code action required for the gate itself.
+**v1.1-S7 — Content Authoring & Bank Population** is next. **HARD GATE:** S7.1 pilot authoring does not begin until legal review of `docs/content/specs/australian-y5-numeracy.md` is confirmed (operator-side; ADR-0041 §Decision 4). No code action required for the gate itself.
 
-**S7.1 sub-batch target:** ~50 NAPLAN-style Year 5 Numeracy original items. Author against `docs/content/specs/naplan-y5-numeracy.md` → `POST /content/import` (dry-run first) → lifecycle `draft → review → active`. Idempotency-Key required on all live imports.
+**S7.1 sub-batch target:** ~50 NAPLAN-style Year 5 Numeracy original items. Author against `docs/content/specs/australian-y5-numeracy.md` → `POST /content/import` (dry-run first) → lifecycle `draft → review → active`. Idempotency-Key required on all live imports.
 
 **ISSUE-0042 CLOSED** (b3eb668 2026-05-19 — content-svc scope). assessment-svc index.ts:222 type-assertion gap carries non-blocking per ADR-0040.
 
@@ -111,7 +111,7 @@ Full table: `docs/dev/perf/measurements.md`.
 
 **Carry-forward operator follow-ups:**
 
-- **Legal review gate (S7.1 pre-condition).** Review `docs/content/specs/naplan-y5-numeracy.md` and confirm sign-off before S7.1 authoring begins. ADR-0041 §Decision 4 records the gate.
+- **Legal review gate (S7.1 pre-condition).** Review `docs/content/specs/australian-y5-numeracy.md` and confirm sign-off before S7.1 authoring begins. ADR-0041 §Decision 4 records the gate.
 - **ISSUE-0038: axe-core live run** on first preview/CI provision. Covers `exam-content-a11y.spec.ts` (S4) + `student-composer-a11y.spec.ts` (S5). Clears when first green run lands. No code action.
 - **`.githooks/pre-commit` activation.** Once per clone: `git config core.hooksPath .githooks`.
 - **DEV-20260515-1: T3 fidelity reminder.** Classify each Q-* at impl T1 as structural-vs-tight-detail BEFORE deciding self-resolve eligibility.

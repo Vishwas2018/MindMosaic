@@ -15,7 +15,7 @@
 - `supabase/functions/content-svc/handlers.ts` — `importItems` handler: intra-manifest SHA Set + external_key Map dedup in single forward pass, per-item write loop (stimulus → item → item_version), dry-run pass-through, per-item rollback on version create failure (best-effort orphan delete). [28e85e2]
 - `supabase/functions/content-svc/index.ts` — router branch for `POST /content/import`: manifest parse, dual-path (dry-run direct / non-dry-run withIdempotency), 200/207/422 status selection. [28e85e2]
 - `docs/content/manifest-format.md` — full fill §1–§10 (versioning, shape, per-item fields, copyright declaration, dedup model, validation order, response shapes, dry-run, examples). [this chore]
-- `docs/content/specs/naplan-y5-numeracy.md` — pilot authoring template (AC v9.0 strand IDs, difficulty bands, question-type mix, distractor-rationale spec, worked-solution spec, copyright guardrails verbatim). [this chore]
+- `docs/content/specs/australian-y5-numeracy.md` — pilot authoring template (AC v9.0 strand IDs, difficulty bands, question-type mix, distractor-rationale spec, worked-solution spec, copyright guardrails verbatim). [this chore]
 - ADR-0041 accepted. Q-1.1-6.1..8 all resolved. ISSUE-0050 filed. [this chore]
 - Tests 828 → 839 (+11: +9 content-svc incl. ISSUE-0042 fix 3 + S6 impl 6; +7 apps/web correction; −5 types correction per ISSUE-0048). [28e85e2]
 
@@ -56,10 +56,10 @@
 
 - **T5 backend-artefact adaptation (Q-1.1-6.5) worked cleanly.** Sketch → skeleton → fill on backend artefacts (not UI) ran without structural rework across three gates.
 - **Both cross-DB dedup deferrals correct at S6 launch.** Empty-bank rationale makes Q-1.1-6.7 + Q-1.1-6.8 deferral decisions unambiguously correct. ISSUE-0050 provides the upgrade hook without blocking S7.
-- **Legal review gate recorded operationally.** ADR-0041 §Decision 4 + `naplan-y5-numeracy.md §9` carry the S7.1 pre-condition. Traceability chain complete.
+- **Legal review gate recorded operationally.** ADR-0041 §Decision 4 + `australian-y5-numeracy.md §9` carry the S7.1 pre-condition. Traceability chain complete.
 
 **Tomorrow — first thing:**
-v1.1-S7 — Content Authoring & Bank Population. **Gated on legal review** of `docs/content/specs/naplan-y5-numeracy.md` (operator-side prerequisite). Do not begin S7.1 bulk authoring until legal sign-off confirmed.
+v1.1-S7 — Content Authoring & Bank Population. **Gated on legal review** of `docs/content/specs/australian-y5-numeracy.md` (operator-side prerequisite). Do not begin S7.1 bulk authoring until legal sign-off confirmed.
 
 ---
 

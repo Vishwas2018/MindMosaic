@@ -114,6 +114,17 @@ is a machine-enforceable intake gate for the copyright constraint:
 enforcement layer requiring human review before any item can be activated. The
 manifest field is the intake gate; the lifecycle gate is the quality gate.
 
+**Template compliance.** All items authored to an approved spec template
+(`docs/content/specs/`) must adhere to the template's copyright guardrails,
+including the prohibition on AI-assisted authoring without human originality
+review (§9.2 of the relevant template). The `copyright_declaration: "original"`
+field attests that those guardrails were observed. Submitting a manifest with
+`copyright_declaration: "original"` for items that violate the template's
+AI-authoring clause constitutes a misrepresentation.
+
+**Cross-reference.** For NAPLAN-style Year 5 Numeracy items, see
+`docs/content/specs/australian-y5-numeracy.md §9.2` for the AI-authoring clause.
+
 ---
 
 ## §5 — Dedup model

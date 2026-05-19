@@ -9,6 +9,40 @@
 
 ## Resolved
 
+### Q-1.1-S7-LEGAL-2 — exam_family enum values: trademark exposure in public-facing surfaces (item 9)
+
+- Date raised: 2026-05-19 (v1.1-S7 legal review — finding 9)
+- Asked of: operator (T3 structural — DB schema + migration)
+- Source: legal review of `docs/content/specs/australian-y5-numeracy.md`; exposure audit of `exam_family` enum surfaces
+- Question: Should `exam_family` enum values `naplan` and `icas` be renamed to neutral identifiers to reduce trademark exposure in public-facing API responses and UI labels?
+- Why ambiguous: "naplan" and "icas" appear in student-facing UI (session-selection/page.tsx:78,105), teacher UI (teacher/content/page.tsx:92), and API responses to all authenticated users (`GET /pathways`). Trademark risk from using registered trademark strings as bare technical identifiers. Three options surfaced: (A) full enum rename + migration 0024, (B) display-name map in UI only (no migration), (C) doc-only disclaimer reliance.
+- Blocking? yes — step 1c blocked; S7 gates on legal re-review
+- Assumed answer: Option A (full enum rename, migration 0024)
+- Code affected: `supabase/migrations/0024_exam_family_rename.sql` (new), `packages/types/src/content.ts`, `supabase/seeds/`, `supabase/tests/rls/`, `apps/web/src/app/(student)/session-selection/page.tsx`, `apps/web/src/app/(teacher)/content/page.tsx`, `supabase/functions/content-svc/handlers.ts`, `scripts/validate-content.ts`
+- Status: resolved
+- Resolution: **Option A. Full enum rename + migration 0024. (2026-05-19 operator decision)** New enum values TBD at step 1c morning ritual (neutral identifiers replacing `naplan`/`icas`). All surfaces updated in step 1c atomic commit.
+
+T3 classification: structural — one-way DDL (`ALTER TYPE`); schema + API wire format + UI all change; round-trip required and completed.
+
+---
+
+### Q-1.1-S7-LEGAL-1 — Authoring-method provenance in manifest schema (item 3)
+
+- Date raised: 2026-05-19 (v1.1-S7 legal review — finding 3)
+- Asked of: operator (T3 structural — Zod schema + migration)
+- Source: legal review of `docs/content/specs/australian-y5-numeracy.md` §9.2; `ImportManifestItemSchema` in `packages/types/src/content.ts`
+- Question: Should a machine-readable `authoring_method` field be added to `ImportManifestItemSchema` and `item_version` table to declare whether content was human-authored or AI-assisted (with human review)?
+- Why ambiguous: `copyright_declaration: "original"` attests originality but not authoring method. §9.2 AI-authoring clause (added in step 1a) requires human review but has no schema hook for enforcement or audit. Three options: (A) add `authoring_method` Zod enum + `NOT NULL` column in `item_version` (migration 0023), (B) doc-only enforcement, (C) Zod validation without DB storage.
+- Blocking? yes — step 1b blocked; S7 gates on legal re-review
+- Assumed answer: Option A (schema provenance, migration 0023)
+- Code affected: `packages/types/src/content.ts` (`ImportManifestItemSchema`), `supabase/migrations/0023_item_version_authoring_method.sql` (new), `supabase/functions/content-svc/handlers.ts` (`importItems`), contract tests (+3 minimum)
+- Status: resolved
+- Resolution: **Option A. Add `authoring_method: z.enum(['human', 'ai_assisted_human_reviewed'])` to `ImportManifestItemSchema` + `item_version` column (NOT NULL). Migration 0023. (2026-05-19 operator decision)** Enforces §9.2 at import and creates a permanent audit trail. Step 1b implements.
+
+T3 classification: structural — DTO shape change + DDL (NOT NULL column on `item_version`); one-way; round-trip required and completed.
+
+---
+
 ### Q-1.1-6.1 — S6 scope: "content operation tooling" — human authoring tools vs automated generation?
 
 - Date raised: 2026-05-19 (v1.1-S6 morning ritual — §N trap)
