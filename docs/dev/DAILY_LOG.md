@@ -2,6 +2,63 @@
 
 > Newest entry at TOP. Use the template from CLAUDE.md §Templates.
 
+## v1.1-S7-prep step 1c — 2026-05-20
+
+**Planned (from Q-1.1-S7-LEGAL-2 Option A operator decision):** `exam_family` enum rename — `ALTER TYPE RENAME VALUE` (migration 0024) renaming `'naplan'` → `'au_numeracy_y5_format'` and `'icas'` → `'au_math_paper_c_format'`. Full mechanical sweep of all affected surfaces (seeds, contract tests, RLS pgTAP, UI call sites, scripts, docs). Intelligence-svc slug-split coupling fix (Q-2.5). UI display-label map (Q-2.3).
+
+**Actually delivered:**
+
+- `supabase/migrations/0024_exam_family_rename.sql` — `ALTER TYPE exam_family RENAME VALUE` (×2, in-place DDL, no backfill). [a5140e0]
+- `apps/web/src/lib/content-labels.ts` — new file: `EXAM_FAMILY_DISPLAY_LABELS` map + `getExamFamilyLabel()` helper. Decouples DB identifier from user-facing label (Q-2.3). [a5140e0]
+- `supabase/functions/intelligence-svc/handlers.ts` — removed slug-split coupling (`pathwaySlug.split('-')[0]`); handler now reads `pathway.exam_family` from DB directly (Q-2.5 fix). Select query expanded to include `exam_family` field. [a5140e0]
+- `apps/web/src/app/(student)/session-selection/page.tsx` — two `{pathway.exam_family}` render sites → `{getExamFamilyLabel(pathway.exam_family)}`. [a5140e0]
+- `apps/web/src/app/(teacher)/teacher/content/page.tsx` — `{p.exam_family}` → `{getExamFamilyLabel(p.exam_family)}`. [a5140e0]
+- `supabase/seeds/01_skill_graph.sql` — pathway_tags cast arrays (×9): `ARRAY['naplan','icas']::exam_family[]` → new values. [a5140e0]
+- `supabase/seeds/02_content.sql` — item exam_families (50 rows: ×25 + ×25) + stimulus exam_families. [a5140e0]
+- `supabase/seeds/03_assessment_config.sql` — exam_family column values in framework_config, pathway, assessment_profile inserts (6 occurrences). program column `'NAPLAN'`/`'ICAS'` intentionally unchanged (Q-2.4). [a5140e0]
+- `supabase/functions/content-svc/__tests__/contract.test.ts` — all exam_family/exam_families fixture values + stale `.toBe('naplan')` assertion. [a5140e0]
+- `supabase/functions/intelligence-svc/__tests__/contract.test.ts` — pathway_tags fixtures + `exam_family` field added to pathway mock (Q-2.5 wiring — fixes 5 Gate II failures). [a5140e0]
+- `supabase/tests/rls/002_content.sql`, `003_assessment_config.sql`, `004_sessions_events.sql`, `007_new_domains.sql`, `021_content_authoring.sql` — all `'naplan'`/`'icas'` as `exam_family` values. [a5140e0]
+- `packages/ui/src/Select/Select.test.tsx`, `Select.stories.tsx` — option value/label updates. [a5140e0]
+- `scripts/validate-content.ts` — `countContains` literals. [a5140e0]
+- `docs/content/manifest-format.md`, `docs/content/specs/australian-y5-numeracy.md` — example external_key + exam_families values. [a5140e0]
+- ADR-0041 §Implementation Notes Step 1c addendum appended. [this chore]
+- ISSUE-0051 filed (Q-2.4 carry: non-enum trademark surfaces). [this chore]
+- PROJECT_STATE.md + v1.1-phase-plan.md updated. [this chore]
+
+**Time spent:** ~1 day (1 Claude session: morning ritual + Q-1.1-S7-LEGAL-2.x T3 round-trip + Gate II skeleton + Gate III mechanical sweep [20 files] + V1-V11 verification + commit + chore close).
+
+**Surprises / departures:**
+
+- **Intelligence-svc latent coupling bug (critical, pre-existing):** `handlers.ts` derived `exam_family` by splitting the pathway slug (`pathwaySlug.split('-')[0]`). After enum rename, slug prefix `'naplan'` would no longer match `'au_numeracy_y5_format'` → `pathway_tags.includes(undefined)` → 0 skills → 404 on every intelligence refresh. Caught at Gate II pre-code analysis (Q-2.5). Fixed by adding `exam_family` to pathway DB select and reading `pathway.exam_family` directly. This bug would have fired silently in production without the enum rename triggering it — a latent correctness defect, not just a rename gap.
+- **Five Gate II test failures (expected then fixed):** `intelligence-svc` contract tests (5 `processPredictiveRefresh L5` tests) failed at Gate II because the pathway fixture stub lacked `exam_family` field after Q-2.5 coupling fix. Fixed at Gate III by adding `exam_family: 'au_numeracy_y5_format'` to fixture. All 843 passed at Gate III.
+- **Stale `.toBe('naplan')` assertion:** `content-svc/contract.test.ts:196` had a standalone `.toBe('naplan')` assertion not caught by the `exam_family: 'naplan'` replace_all pattern. Required a targeted edit after Gate III grep verification.
+
+**Decisions made (not in stage):**
+
+- Q-1.1-S7-LEGAL-2.1..2.5 all resolved in same session — T2-tightened clean.
+- ADR-0041 §Step 1c addendum documents all five sub-question resolutions.
+- ISSUE-0051 filed for non-enum trademark surfaces (program column, display_name, slugs, feature_key, UI copy). No code action until legal direction received.
+
+**Deviations logged:**
+
+- DEV-20260515-2 honored. No new deviations.
+
+**Issues opened / closed / questions raised:**
+
+- ISSUE-0051 opened (trademark strings in non-enum surfaces — Q-2.4 carry; medium severity).
+- Q-1.1-S7-LEGAL-2 and all five sub-questions resolved; recorded in QUESTIONS.md.
+- ADR-0041 §Implementation Notes Step 1c addendum appended (this chore).
+
+**Quality gates at close:**
+
+- Lint ✅ (17 packages) · Typecheck ✅ (17/17, --force, 0 cached) · Tests ✅ (843 passed / 1 skipped = 844 total, no delta — rename sweep not adding tests) · Migration 0024 SQL on disk (deferred-validation per 0021 pattern) · RLS n/a (no new tables; existing exam_family values updated in-place by DDL) · Build n/a (chore close) · Mojibake ✅ (0 hits on modified .md files) · Stale-symbol grep ✅ (0 hits in apps/web after rename)
+
+**Tomorrow — first thing:**
+Await legal re-review of `docs/content/specs/australian-y5-numeracy.md` (operator-side — Step 2 in §S7-prep Legal Review Tracking). S7 morning ritual on sign-off.
+
+---
+
 ## v1.1-S7-prep step 1b — 2026-05-19
 
 **Planned (from Q-1.1-S7-LEGAL-1 Option A operator decision):** Schema provenance — add `authoring_method` Zod enum to `ImportManifestItemSchema`, `ItemVersionCreateDTOSchema`, `ItemVersionDTOSchema` + `NOT NULL` column on `item_version` (migration 0023) + REST handler enforcement. Legal review finding 3.

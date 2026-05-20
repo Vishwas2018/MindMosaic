@@ -249,3 +249,59 @@ DEFAULT` constraint is the correct shape for an immutable provenance field.
 
 Commit: 4453ddc (step 1a, doc-only legal prep) · bd3a310 (step 1b, schema + migration + tests)
 Related: Q-1.1-S7-LEGAL-1, migration 0023
+
+---
+
+**Step 1c addendum (2026-05-20) — exam_family enum rename (Q-1.1-S7-LEGAL-2 Option A):**
+
+Legal review finding 9 identified that `exam_family` enum values `'naplan'` and `'icas'` expose
+trademark strings in public-facing API responses (`GET /pathways`), student UI (`session-selection/
+page.tsx`), and teacher UI (`teacher/content/page.tsx`). All enum values appear verbatim in API wire
+format to any authenticated user.
+
+**Binding decision (Q-1.1-S7-LEGAL-2 Option A, 2026-05-19 operator):** Full enum rename via
+`ALTER TYPE RENAME VALUE` (migration 0024). No display-name-map-only approach (Option B) — the
+trademark strings must not appear in the DB enum or API wire format.
+
+Sub-question resolutions:
+- **Q-1.1-S7-LEGAL-2.1 (rename mapping):** `'naplan'` → `'au_numeracy_y5_format'`;
+  `'icas'` → `'au_math_paper_c_format'`. Neutral identifiers — format + year-level + subject
+  descriptors, no trademark strings.
+- **Q-1.1-S7-LEGAL-2.2 (commit atomicity):** Single atomic feat commit covering migration + all
+  code sites (seeds, tests, UI, docs). Per DEV-20260515-2 discipline.
+- **Q-1.1-S7-LEGAL-2.3 (UI display label pattern):** Option A — `EXAM_FAMILY_DISPLAY_LABELS`
+  map at `apps/web/src/lib/content-labels.ts` with `getExamFamilyLabel()` helper. Labels:
+  `'au_numeracy_y5_format'` → `'Numeracy Y5'`; `'au_math_paper_c_format'` → `'Math Paper C'`.
+  Decouples internal DB identifier from user-facing string; the helper is the single translation
+  point for all future call sites.
+- **Q-1.1-S7-LEGAL-2.4 (scope of rename):** Enum rename only. Other trademark surfaces (program
+  column values `'NAPLAN'`/`'ICAS'`, `display_name` values, pathway slugs, `feature_key` values,
+  UI copy strings) are deferred to ISSUE-0051 for separate legal + operational review. The enum
+  is the highest-risk surface (API wire format exposure); the others are lower-risk (internal
+  identifiers or display strings already modifiable without a DDL change).
+- **Q-1.1-S7-LEGAL-2.5 (intelligence-svc slug coupling fix):** Option A — DB lookup. Handler
+  previously extracted exam_family by splitting pathway slug (`pathwaySlug.split('-')[0]`); after
+  rename the slug prefix `'naplan'` would no longer match the new enum value `'au_numeracy_y5_format'`,
+  breaking skill filtering silently (0 skills → 404). Fixed by adding `exam_family` to the pathway
+  SELECT and reading `pathway.exam_family` directly — removes the slug-split coupling entirely.
+
+**Migration 0024 DDL (one-way, no backfill):**
+```sql
+ALTER TYPE exam_family RENAME VALUE 'naplan' TO 'au_numeracy_y5_format';
+ALTER TYPE exam_family RENAME VALUE 'icas'   TO 'au_math_paper_c_format';
+```
+`ALTER TYPE RENAME VALUE` updates the enum label in-place; existing rows are updated by Postgres
+without a data backfill scan. One-way DDL: no reverse migration; any rollback would require a
+re-rename (which is safe, but operationally non-trivial — flag for deploy runbook).
+
+**EXAM_FAMILY_DISPLAY_LABELS pattern:** `apps/web/src/lib/content-labels.ts` is the canonical
+translation point. Any new call site rendering `exam_family` to users must call
+`getExamFamilyLabel(examFamily)`. Do not render raw enum values in UI.
+
+**ISSUE-0051 cross-reference (Q-2.4 carry):** Non-enum trademark surfaces remain. See ISSUE-0051
+for the full enumerated list and resolution path (program column, display_name values, pathway
+slugs, feature_key values, UI copy strings). ISSUE-0051 requires separate legal review before
+any remediation is scoped.
+
+Commit: a5140e0 (step 1c feat — migration + code sweep) · this chore close
+Related: Q-1.1-S7-LEGAL-2, migration 0024, ISSUE-0051

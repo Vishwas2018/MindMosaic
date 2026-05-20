@@ -5,6 +5,61 @@
 
 ## Open
 
+### ISSUE-0051 — Trademark strings remain in non-enum surfaces (program column, display_name, slugs, feature_key, UI copy)
+
+- Status: open
+- Severity: medium
+- Reported: 2026-05-20 (v1.1-S7-prep step 1c chore close — Q-1.1-S7-LEGAL-2.4 carry)
+- Area: backend + frontend + content-ops
+- Tags: legal · trademark · content-ops
+
+**Summary.** Step 1c (a5140e0) renamed the `exam_family` Postgres enum values from `'naplan'`/`'icas'`
+to neutral identifiers `'au_numeracy_y5_format'`/`'au_math_paper_c_format'`. This covers the highest-risk
+trademark surface (DB enum + API wire format). The following non-enum surfaces were explicitly deferred
+per Q-1.1-S7-LEGAL-2.4 and require separate legal + operational review before remediation is scoped:
+
+1. **`program` column values** — `'NAPLAN'` and `'ICAS'` stored in `item.program[]` array. Present in
+   `seeds/03_assessment_config.sql`, `seeds/02_content.sql` (item inserts). API-exposed via
+   `GET /pathways` response DTO and item list responses. Internal identifier, but appears in API wire
+   format.
+
+2. **`display_name` values** — pathway `display_name` column values include `'NAPLAN Year 5 Numeracy'`
+   and `'ICAS Mathematics Paper C'`. Stored in `pathway` table; exposed in `GET /pathways` response
+   to all authenticated users. High visibility — likely intentional marketing copy, but flagged for
+   legal review.
+
+3. **Pathway slugs** — `naplan-y5-numeracy` and `icas-math-paper-c` used as URL path segments (student
+   session-selection) and SDK pathway slug keys. Step 1c explicitly preserved these slugs (Q-2.5 fix
+   reads `pathway.exam_family` from DB, not the slug). Slug changes are breaking (URL-visible) and
+   require a redirect strategy.
+
+4. **`feature_key` values** — `naplan_y5` and `icas_math_y5` in `framework_config.feature_key` column.
+   Internal identifier used for feature-flag lookup; not API-exposed to end users, but present in DB.
+
+5. **UI copy strings** — `apps/web/src/lib/billing.ts` plan description strings and auth-shell copy
+   reference `'NAPLAN'`/`'ICAS'` by name. These are marketing/display strings; may be intentional brand
+   references (like `display_name`) or may warrant rewriting to generic descriptors.
+
+**Affected files (enumerated from step 1c grep catalogue):**
+- `supabase/seeds/02_content.sql` — program column: `'NAPLAN'` ×25, `'ICAS'` ×25
+- `supabase/seeds/03_assessment_config.sql` — display_name column, feature_key column, program column
+- `apps/web/src/lib/billing.ts` — UI copy strings
+- `apps/web/src/app/(student)/session-selection/page.tsx` — `pathway.display_name` render
+- `apps/web/src/app/(teacher)/teacher/content/page.tsx` — `p.display_name` render
+- `apps/web/src/app/auth/*/` — auth-shell copy (NAPLAN/ICAS mentions)
+
+**Pre-launch blocker status: TBD.** Legal re-review of `docs/content/specs/australian-y5-numeracy.md`
+(Step 2 gate) will determine whether any of the above surfaces constitute trademark infringement
+risk at the v1.1 launch context (educational platform, non-commercial item names, curriculum-alignment
+framing, §0 non-affiliation disclaimer in place). Remediation scope and priority determined after
+that review. Owner: operator-side legal; no code action until legal direction received.
+
+**Do not close this issue without legal sign-off on the surface enumeration above.**
+
+Related: Q-1.1-S7-LEGAL-2.4, ADR-0041 §Step 1c addendum, a5140e0
+
+---
+
 ### ISSUE-0050 — Cross-import exact-match dedup: cross-DB stem SHA + cross-import external_key
 
 - Status: open
