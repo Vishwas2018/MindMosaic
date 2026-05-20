@@ -3,6 +3,20 @@
 > Every deviation from DEV_PLAN.md, in writing.
 > Newest at TOP. Use the template from CLAUDE.md §Templates.
 
+### DEV-20260520-1 — S7 opened without legal re-review of authoring spec template
+
+- Date: 2026-05-20
+- Stage: v1.1-S7 (opening)
+- Type: postponement
+- What the stage said: v1.1-phase-plan.md §S7-prep Legal Review Tracking Step 2 — "Legal re-review of `docs/content/specs/australian-y5-numeracy.md` with 1a+1b+1c in place" is a required gate before S7.1 bulk authoring begins. ADR-0041 §Decision 4 records the legal review hard gate as operator-side.
+- What I actually did: Operator decision to open v1.1-S7 without completing Step 2 legal re-review. S7 morning ritual begins directly after this deviation record.
+- Why: Pre-launch tolerance. Mitigating factors: (1) no live users — item bank is empty, no student is exposed to authored content yet; (2) all three S7-prep code changes (steps 1a/1b/1c) that address the original legal findings are complete and on origin; (3) S7 authoring will produce `draft` items only — no item can reach `active` state without passing the `draft → review` lifecycle gate (human sign-off required, spec §15.3); (4) legal re-review is deferred, not waived — it becomes a hard pre-launch gate before merging `v1.1/exam-content` to `main` and deploying to production.
+- Impact on later stages: Legal re-review becomes a blocking pre-launch gate (sequence step 5 in the v1.1 deploy checklist). No `active` items may be deployed to production until legal re-review of the authoring spec template is confirmed. Any items authored in S7 must remain in `draft` or `review` state until that gate clears. The `v1.1/exam-content` → `main` merge is blocked on legal re-review.
+- Linked: ADR-0041 §Decision 4, v1.1-phase-plan.md §S7-prep Legal Review Tracking, ISSUE-0051
+- Resolved by: pre-launch merge gate — legal re-review of `docs/content/specs/australian-y5-numeracy.md` confirmed before `v1.1/exam-content` → `main` merge
+
+---
+
 ### DEV-20260515-2 — Spurious commit-success report during v1.1-S2 chore-close (commit + push announced non-atomically)
 
 - Date: 2026-05-15
