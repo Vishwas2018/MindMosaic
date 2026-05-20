@@ -337,3 +337,35 @@ Slug resolution upgrade deferred: ISSUE-0052 tracks adding slug→UUID resolutio
 
 Commit: this pre-S7 chore
 Related: Q-1.1-7.T1A, Q-1.1-7.T1B, Q-1.1-7.T1C, ISSUE-0052, ISSUE-0053
+
+---
+
+**S7.1 workflow addendum (2026-05-20) — Q-1.1-7.1..9 resolutions:**
+
+Q-1.1-7.1..9 were raised at S7 morning ritual (T3 structural — all 9 required operator round-trip before S7.1 opens). All defaults accepted 2026-05-20. Binding decisions recorded here as an ADR addendum:
+
+**Authoring approach (Q-1.1-7.1):** Hybrid — `authoring_method: "ai_assisted_human_reviewed"` on all S7.1 items. Claude drafts original items to `docs/content/specs/australian-y5-numeracy.md` template; operator reviews against §9.2 checklist and commits.
+
+**Authoring source format (Q-1.1-7.2):** Direct manifest JSON per `docs/content/manifest-format.md` (Option A). No intermediate tooling for S7.1 pilot. Revisit at S7.2+ if volume demands.
+
+**Originality review artifact (Q-1.1-7.3 + Q-1.1-7.3.1 tightening):** Operator-side review. Artifact: `docs/content/reviews/<batch>.md`, per-item entries using 7-item checklist at `docs/content/reviews/_template.md`. Committed in same batch commit as manifest. Checklist covers: `copyright_declaration: "original"` attestation; authoring_method match; §9.1 prohibited methods not used; §9.2 AI clause satisfied; similarity check performed; curriculum alignment verified; approval to transition to `review` lifecycle.
+
+**Import target environment (Q-1.1-7.4):** Local Supabase for S7.1 dry-runs and live import. Content migration to preview/staging deferred to pre-launch gate.
+
+**Lifecycle transition ownership (Q-1.1-7.5):** Operator-only triggers transitions via content-svc lifecycle endpoint. `draft → review` gates on review-log entry present (Q-1.1-7.3 artifact). `review → active` blocked on DEV-20260520-1 legal pre-launch gate. Items may accumulate in `review` state during S7.1.
+
+**Test gate for S7 commits (Q-1.1-7.6):** Per-batch dry-run only (Option B). `POST /content/import?dry_run=true` zero-rejections required before each live import. No new unit test files. Dry-run IS the test.
+
+**Commit granularity (Q-1.1-7.7):** Per-batch (Option B). One commit per import run: manifest JSON + review log + `docs/content/coverage.md` update, atomic. Commit message format: `content(s7.1): batch N — <strand> <item-count> items imported`.
+
+**Manifest file storage (Q-1.1-7.8):** In-repo at `docs/content/manifests/<batch>.json`. Directory bootstrapped with `.gitkeep` in this chore. Scale review at S7.2+.
+
+**T5 content-adapted 3-gate flow (Q-1.1-7.9):**
+- Gate I: dry-run of first 5–10 pilot items (format + coverage direction check) → operator approval before remaining S7.1 items are authored.
+- Gate II: full 50-item manifest dry-run (`POST /content/import?dry_run=true`) → zero rejections → operator approval before live import.
+- Gate III: live import + `docs/content/coverage.md` update committed.
+
+**DEV-20260520-1 still active:** No item may be set to `active` until pre-launch legal gate clears. Items authored in S7.1 land as `draft`; may be advanced to `review` (with review-log entry); `review → active` blocked.
+
+Commit: this S7.1 workflow chore
+Related: Q-1.1-7.1, Q-1.1-7.2, Q-1.1-7.3, Q-1.1-7.4, Q-1.1-7.5, Q-1.1-7.6, Q-1.1-7.7, Q-1.1-7.8, Q-1.1-7.9, DEV-20260520-1, ISSUE-0052, ISSUE-0053

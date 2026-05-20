@@ -9,6 +9,144 @@
 
 ## Resolved
 
+### Q-1.1-7.9 — T5 adaptation for S7 content work
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3 structural — process gate model)
+- Source: CLAUDE.md §T-Discipline T5; v1.1-phase-plan.md §S7
+- Question: Does T5 (layout sketch → skeleton → fill) apply to S7 content work, and if so what is the adapted gate model?
+- Why ambiguous: T5 is defined for UI stages. S7 produces items, not code. A content-adapted T5 would use dry-run mechanics as the gate proxy.
+- Blocking? yes — determines whether S7.1 is gated or free-running
+- Assumed answer: 3-gate adapted. Gate I: dry-run of first 5–10 pilot items (format + coverage direction check) → operator approval. Gate II: full 50-item manifest dry-run → zero rejections → operator approval before live import. Gate III: live import + coverage matrix update.
+- Code affected: S7.1 workflow discipline only; no code change
+- Status: resolved
+- Resolution: **Default accepted. 3-gate adapted T5 for S7 content work: Gate I (5–10 item pilot dry-run + format check) → operator approval; Gate II (full 50-item manifest dry-run, zero rejections) → operator approval; Gate III (live import + coverage matrix update). (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.8 — Manifest file storage: in repo / private store / gitignored
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3 structural — repository hygiene + content traceability)
+- Source: v1.1-phase-plan.md §S7; `docs/content/manifest-format.md`
+- Question: Where are authored manifest files stored — in the repo, in a private store, or gitignored?
+- Why ambiguous: In-repo provides full audit trail and traceability; private store keeps content out of the public git history (relevant if this repo is public); gitignored avoids the question but breaks reproducibility.
+- Blocking? yes — determines directory structure and `.gitignore` additions before first item is authored
+- Assumed answer: In repo at `docs/content/manifests/<batch>.json`. Pilot transparency preferred; scale concerns (hundreds of manifests) revisited at S7.2+.
+- Code affected: `.gitignore` (if private store or gitignored); `docs/content/manifests/` (new directory if in-repo)
+- Status: resolved
+- Resolution: **Default accepted. Manifests stored in-repo at `docs/content/manifests/<batch>.json`. Scale review deferred to S7.2+. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.7 — Commit granularity: per-item / per-batch / per-strand
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3)
+- Source: CLAUDE.md §Atomic commits; v1.1-phase-plan.md §S7
+- Question: What is the commit unit for S7 content work? Options: (A) per-item (50 commits for S7.1), (B) per-batch (one commit per import run, all batch artefacts bundled), (C) per-strand (6 commits for S7.1, one per AC v9.0 strand).
+- Why ambiguous: Per-item gives maximum granularity for bisect but is impractical at volume; per-batch is the natural unit given the import pipeline; per-strand aligns with the coverage matrix.
+- Blocking? yes — determines how manifests, review logs, and coverage updates are staged
+- Assumed answer: Option B — per-batch. One commit per import run: manifest file + review log entries + `docs/content/coverage.md` update, atomic. Commit message format: `content(s7.1): batch N — <strand> <item-count> items imported`.
+- Code affected: commit discipline only; no code change
+- Status: resolved
+- Resolution: **Option B accepted. Per-batch commit model: manifest + review log + coverage update, atomic. Commit format: `content(s7.1): batch N — <strand> <item-count> items imported`. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.6 — Test surface for S7 content commits
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3)
+- Source: CLAUDE.md §Quality non-negotiables; v1.1-phase-plan.md §S7
+- Question: What automated test surface covers S7 content commits? Options: (A) per-item smoke (curl dry-run per item before authoring), (B) per-batch dry-run as the gate (full manifest `POST /content/import?dry_run=true` → zero rejections before live import), (C) no automated test beyond the pipeline's own Zod validation.
+- Why ambiguous: S7 is content, not code — no unit tests exist for item content. The import pipeline already validates schemas. Additional testing may be redundant or essential depending on the review model.
+- Blocking? yes — determines CI / quality gate shape for S7 commits
+- Assumed answer: Option B — per-batch dry-run is the test. `POST /content/import?dry_run=true` on the full manifest before every live import; zero rejections required. No new test files. The dry-run IS the test. Combined with Q-1.1-7.9 Gate II.
+- Code affected: workflow discipline only; no new test files
+- Status: resolved
+- Resolution: **Option B accepted. Per-batch dry-run is the test gate: `POST /content/import?dry_run=true` zero-rejections before every live import. No new test files. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.5 — Lifecycle transition ownership and gates
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3)
+- Source: spec §15.3 lifecycle FSM; ADR-0041 §Decision 6; DEV-20260520-1
+- Question: Who triggers `draft → review` and `review → active` transitions, and what gates each?
+- Why ambiguous: The FSM exists in content-svc; the operational ownership is not defined. Under DEV-20260520-1, no item may reach `active` until legal pre-launch sign-off — but the `review` state must be reachable for copyright review to occur before that gate.
+- Blocking? yes — determines whether `draft → review` can be triggered during S7.1 or must wait for legal
+- Assumed answer: Operator-only triggers transitions via content-svc lifecycle endpoint. `draft → review` gates on §9.2 review-log entry present (per Q-1.1-7.3). `review → active` gates on legal pre-launch sign-off (DEV-20260520-1 — blocked until pre-launch gate). Items may accumulate in `review` state during S7.1 authoring.
+- Code affected: operational process only; no code change
+- Status: resolved
+- Resolution: **Default accepted. Operator-only lifecycle transitions. `draft → review` requires review-log entry present (Q-1.1-7.3 artifact). `review → active` blocked on DEV-20260520-1 legal pre-launch gate. Items may accumulate in `review` state during S7.1. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.4 — Import target environment
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3)
+- Source: ADR-0041; `POST /content/import`; v1.1-phase-plan.md §S7
+- Question: Where are S7.1 items imported — local Supabase, a preview project, or a staging project?
+- Why ambiguous: Local Supabase is accessible immediately with no additional credentials; preview/staging requires a provisioned environment. Items imported to local cannot be accessed by other team members or the production deploy.
+- Blocking? yes — determines `SUPABASE_URL` + service-role key used for `POST /content/import`; determines whether S7.1 items are visible at the pre-launch gate
+- Assumed answer: Local Supabase for S7.1 dry-runs + live import. Content migration to preview/staging carried to pre-launch gate (sequence step 4 in v1.1 deploy checklist).
+- Code affected: operational only; no code change
+- Status: resolved
+- Resolution: **Default accepted. Local Supabase for S7.1 dry-runs and live import. Content migration to preview/staging deferred to pre-launch gate. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.3 — Originality review owner + artifact (§9.2 gate)
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3)
+- Source: `docs/content/specs/australian-y5-numeracy.md §9.2`; spec §15.3 (`draft → review` gate)
+- Question: Who performs the §9.2 originality review for each authored item, and what is the review artifact that gates the `draft → review` lifecycle transition?
+- Why ambiguous: §9.2 requires "human originality review" for AI-assisted items and "reviewed by a second person before setting to `review`". Ownership and artifact format are not specified.
+- Blocking? yes — the `draft → review` transition requires sign-off; without a defined artifact there is no machine- or process-checkable gate
+- Assumed answer: Operator-side review. Artifact: per-item entry in `docs/content/reviews/<batch>.md` committed alongside the manifest. Entry fields: `external_key`, `reviewer`, `date`, §9.2 checklist items (7 checkboxes per template). File committed in the same batch commit (Q-1.1-7.7).
+- Code affected: `docs/content/reviews/` (new directory); no code change
+- Status: resolved
+- Resolution: **Default accepted with Q-1.1-7.3.1 tightening. Operator-side review. Artifact: `docs/content/reviews/<batch>.md`, per-item entries using `docs/content/reviews/_template.md` (7-item checklist). Committed in same batch commit as manifest. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.2 — Authoring source format
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3 structural — authoring workflow)
+- Source: `docs/content/manifest-format.md`; `docs/content/specs/australian-y5-numeracy.md`
+- Question: In what format are items authored before import? Options: (A) directly as manifest-format JSON per `docs/content/manifest-format.md`; (B) intermediate markdown per §5–§8 fields, assembled into JSON by a script; (C) hybrid — markdown for review/QA, JSON assembled for import.
+- Why ambiguous: Direct JSON is the most traceable and requires no intermediate tooling; markdown is more human-readable for review but adds an assembly step. The review artifact (Q-1.1-7.3) may benefit from a markdown intermediate.
+- Blocking? yes — determines the authoring artifact that exists before manifest assembly
+- Assumed answer: Option A — direct manifest JSON. Fewest moving parts for S7.1 pilot. No intermediate script needed. Review artifact (Q-1.1-7.3) is the review log file, not the manifest format. Revisit at S7.2+ if volume demands a more ergonomic authoring format.
+- Code affected: no code change; directory structure only (per Q-1.1-7.8)
+- Status: resolved
+- Resolution: **Option A accepted. Direct manifest JSON authoring. No intermediate tooling for S7.1 pilot. Revisit at S7.2+ if volume demands. (2026-05-20 operator decision)**
+
+---
+
+### Q-1.1-7.1 — Authoring approach: AI-assisted / Human SME / Hybrid
+
+- Date raised: 2026-05-20 (v1.1-S7 morning ritual — Q-1.1-7.* round)
+- Asked of: operator (T3 structural — determines `authoring_method` value on every manifest item)
+- Source: v1.1-phase-plan.md §S7 authoring approaches; `docs/content/specs/australian-y5-numeracy.md §9.2`; migration 0023 (`authoring_method` field)
+- Question: Which authoring approach is used for the S7.1 pilot batch?
+  - **AI-assisted (Claude):** Claude drafts original items to the S6 spec template → output as manifest JSON → human originality review before import. `authoring_method: "ai_assisted_human_reviewed"`.
+  - **Human SME:** Subject-matter expert authors items directly to the template → manifest JSON. `authoring_method: "human"`.
+  - **Hybrid (recommended by phase plan):** Claude drafts → human SME reviews, corrects, approves → import. `authoring_method: "ai_assisted_human_reviewed"`.
+- Why ambiguous: All three produce valid items; the choice determines the `authoring_method` value declared in every manifest item, shapes the review artifact (Q-1.1-7.3), and determines who does the work.
+- Blocking? yes — must be decided before the first item is drafted; `authoring_method` is a required NOT NULL field (migration 0023) with no DEFAULT
+- Assumed answer: Hybrid — Claude drafts original items to template, operator (or SME) reviews against §9.2 checklist, approves, commits. Every item gets `authoring_method: "ai_assisted_human_reviewed"`.
+- Code affected: every manifest item's `authoring_method` field; no code change
+- Status: resolved
+- Resolution: **Hybrid approach accepted: `authoring_method: "ai_assisted_human_reviewed"` on all S7.1 items. Claude drafts original items to spec template; operator reviews against §9.2 checklist and commits. (2026-05-20 operator decision)**
+
+---
+
 ### Q-1.1-7.T1C — Probability strand has no skill node in seed; template §2 targets 2 items
 
 - Date raised: 2026-05-20 (v1.1-S7 morning ritual — T1 pre-read finding)
