@@ -17,6 +17,9 @@
 
 -- ── Step 1: Add 'system' to user_role enum (Q-44.1) ──────────────────────────
 ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'system';
+-- COMMIT required: PostgreSQL prohibits using a newly-added enum value in the
+-- same transaction. COMMIT makes 'system' visible to subsequent statements.
+COMMIT;
 
 -- ── Step 2: Sentinel tenant row (Q-44.5) ─────────────────────────────────────
 -- Required because user_profile.tenant_id is NOT NULL REFERENCES tenant(id).

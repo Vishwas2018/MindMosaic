@@ -17,7 +17,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. subscription
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE subscription (
+CREATE TABLE IF NOT EXISTS subscription (
   id                     uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id              uuid         NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
   tier                   subscription_tier NOT NULL DEFAULT 'free',
@@ -33,17 +33,17 @@ CREATE TABLE subscription (
 );
 
 -- One active subscription per tenant (Stripe model: one active subscription).
-CREATE UNIQUE INDEX idx_sub_active_per_tenant ON subscription(tenant_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sub_active_per_tenant ON subscription(tenant_id)
   WHERE is_active = true;
 
-CREATE TRIGGER trg_subscription_updated_at
+CREATE OR REPLACE TRIGGER trg_subscription_updated_at
   BEFORE UPDATE ON subscription
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. billing_customer
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE billing_customer (
+CREATE TABLE IF NOT EXISTS billing_customer (
   tenant_id              uuid         PRIMARY KEY REFERENCES tenant(id) ON DELETE RESTRICT,
   stripe_customer_id     text         UNIQUE NOT NULL,
   default_payment_method text,
@@ -51,14 +51,14 @@ CREATE TABLE billing_customer (
   updated_at             timestamptz  NOT NULL DEFAULT now()
 );
 
-CREATE TRIGGER trg_billing_customer_updated_at
+CREATE OR REPLACE TRIGGER trg_billing_customer_updated_at
   BEFORE UPDATE ON billing_customer
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. invoice
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE invoice (
+CREATE TABLE IF NOT EXISTS invoice (
   id                 uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id          uuid         NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
   stripe_invoice_id  text         UNIQUE NOT NULL,
@@ -72,12 +72,12 @@ CREATE TABLE invoice (
   created_at         timestamptz  NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_invoice_tenant ON invoice(tenant_id, invoiced_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invoice_tenant ON invoice(tenant_id, invoiced_at DESC);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. billing_event — IMMUTABLE audit log (arch §1.3; never UPDATE or DELETE)
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE billing_event (
+CREATE TABLE IF NOT EXISTS billing_event (
   id               uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id        uuid         REFERENCES tenant(id) ON DELETE SET NULL,
   stripe_event_id  text         UNIQUE NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE billing_event (
 );
 
 -- Partial index for unprocessed events (jobs-worker polling pattern).
-CREATE INDEX idx_be_unprocessed ON billing_event(created_at)
+CREATE INDEX IF NOT EXISTS idx_be_unprocessed ON billing_event(created_at)
   WHERE processed_at IS NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────

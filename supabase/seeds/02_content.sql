@@ -341,7 +341,7 @@ BEGIN
     INSERT INTO item_version (
       item_id, version, stem, response_config,
       distractor_rationale, explanation, metadata,
-      difficulty, is_current
+      difficulty, is_current, authoring_method
     ) VALUES (
       iid, 1,
       jsonb_build_object('text', stm[i]),
@@ -365,7 +365,8 @@ BEGIN
       jsonb_build_object('text', 'Review the worked solution in the explanation panel.'),
       '{}',
       diff[i],
-      true
+      true,
+      'human'
     ) ON CONFLICT (item_id, version) DO NOTHING;
   END LOOP;
 END $$;
